@@ -19,6 +19,7 @@ class User(Base):
     role = Column(SQLEnum(UserRole), nullable=False)
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
+    verification_token = Column(String, nullable=True)
 
     # Courier-specific fields
     max_deviation_km = Column(Integer, default=5)  # Default 5km deviation
