@@ -51,6 +51,7 @@ class PackageResponse(BaseModel):
     dropoff_contact_phone: str | None
     price: float | None
     created_at: datetime
+    updated_at: datetime | None
 
     class Config:
         from_attributes = True

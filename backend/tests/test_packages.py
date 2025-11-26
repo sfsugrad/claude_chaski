@@ -377,6 +377,365 @@ class TestGetPackageById:
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
+class TestUpdatePackage:
+    """Tests for update package details endpoint (PUT /api/packages/{package_id})"""
+
+    def test_update_package_success_as_sender(self, client, authenticated_sender, test_package_data):
+        """Test successful package update by the sender who created it"""
+        # Create a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+        original_created_at = create_response.json()["created_at"]
+
+        # Update package
+        update_data = {
+            "description": "Updated package description",
+            "size": "large",
+            "weight_kg": 15.5,
+            "price": 75.00,
+            "pickup_contact_name": "Updated Pickup Contact",
+            "pickup_contact_phone": "+1-555-9999",
+            "dropoff_contact_name": "Updated Dropoff Contact",
+            "dropoff_contact_phone": "+1-555-8888"
+        }
+
+        response = client.put(
+            f"/api/packages/{package_id}",
+            json=update_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["description"] == "Updated package description"
+        assert data["size"] == "large"
+        assert data["weight_kg"] == 15.5
+        assert data["price"] == 75.00
+        assert data["pickup_contact_name"] == "Updated Pickup Contact"
+        assert data["pickup_contact_phone"] == "+1-555-9999"
+        assert data["dropoff_contact_name"] == "Updated Dropoff Contact"
+        assert data["dropoff_contact_phone"] == "+1-555-8888"
+        # Verify created_at hasn't changed
+        assert data["created_at"] == original_created_at
+        # Verify updated_at is present (timestamp updated)
+        assert "updated_at" in data
+
+    def test_update_package_success_as_admin(self, client, db_session, authenticated_sender, authenticated_admin, test_package_data):
+        """Test successful package update by admin"""
+        # Sender creates a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+
+        # Admin updates it
+        update_data = {
+            "description": "Admin updated description",
+            "price": 100.00
+        }
+
+        response = client.put(
+            f"/api/packages/{package_id}",
+            json=update_data,
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["description"] == "Admin updated description"
+        assert data["price"] == 100.00
+
+    def test_update_package_partial_update(self, client, authenticated_sender, test_package_data):
+        """Test updating only some fields (partial update)"""
+        # Create a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+        original_size = create_response.json()["size"]
+        original_weight = create_response.json()["weight_kg"]
+
+        # Update only description
+        update_data = {
+            "description": "Only description changed"
+        }
+
+        response = client.put(
+            f"/api/packages/{package_id}",
+            json=update_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["description"] == "Only description changed"
+        # Verify other fields unchanged
+        assert data["size"] == original_size
+        assert data["weight_kg"] == original_weight
+
+    def test_update_package_courier_cannot_edit(self, client, authenticated_sender, authenticated_courier, test_package_data):
+        """Test that couriers cannot edit packages"""
+        # Sender creates a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+
+        # Courier tries to update it
+        update_data = {
+            "description": "Courier trying to edit"
+        }
+
+        response = client.put(
+            f"/api/packages/{package_id}",
+            json=update_data,
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert "don't have permission" in response.json()["detail"].lower()
+
+    def test_update_package_sender_cannot_edit_others_package(self, client, authenticated_sender, authenticated_both_role, test_package_data):
+        """Test that senders cannot edit other senders' packages"""
+        # User 1 creates a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+
+        # User 2 tries to update it
+        update_data = {
+            "description": "Trying to edit someone else's package"
+        }
+
+        response = client.put(
+            f"/api/packages/{package_id}",
+            json=update_data,
+            headers={"Authorization": f"Bearer {authenticated_both_role}"}
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert "don't have permission" in response.json()["detail"].lower()
+
+    def test_update_package_fails_for_non_pending_status(self, client, db_session, authenticated_sender, test_package_data):
+        """Test that only pending packages can be edited"""
+        # Create a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+
+        # Change status to matched (simulating matching)
+        package = db_session.query(Package).filter(Package.id == package_id).first()
+        package.status = PackageStatus.MATCHED
+        db_session.commit()
+
+        # Try to update it
+        update_data = {
+            "description": "Trying to edit non-pending package"
+        }
+
+        response = client.put(
+            f"/api/packages/{package_id}",
+            json=update_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "only pending packages can be edited" in response.json()["detail"].lower()
+
+    def test_update_package_invalid_size(self, client, authenticated_sender, test_package_data):
+        """Test updating package with invalid size"""
+        # Create a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+
+        # Try to update with invalid size
+        update_data = {
+            "size": "invalid_size"
+        }
+
+        response = client.put(
+            f"/api/packages/{package_id}",
+            json=update_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_update_package_invalid_weight(self, client, authenticated_sender, test_package_data):
+        """Test updating package with invalid weight values"""
+        # Create a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+
+        # Try negative weight
+        response = client.put(
+            f"/api/packages/{package_id}",
+            json={"weight_kg": -5.0},
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+        # Try zero weight
+        response = client.put(
+            f"/api/packages/{package_id}",
+            json={"weight_kg": 0},
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+        # Try weight too high
+        response = client.put(
+            f"/api/packages/{package_id}",
+            json={"weight_kg": 1500},
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_update_package_invalid_price(self, client, authenticated_sender, test_package_data):
+        """Test updating package with negative price"""
+        # Create a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+
+        # Try negative price
+        response = client.put(
+            f"/api/packages/{package_id}",
+            json={"price": -10.50},
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_update_package_description_too_long(self, client, authenticated_sender, test_package_data):
+        """Test updating package with description exceeding max length"""
+        # Create a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+
+        # Try description too long
+        response = client.put(
+            f"/api/packages/{package_id}",
+            json={"description": "x" * 501},  # Max is 500
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_update_package_not_found(self, client, authenticated_sender):
+        """Test updating non-existent package"""
+        response = client.put(
+            "/api/packages/99999",
+            json={"description": "Update non-existent package"},
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert "not found" in response.json()["detail"].lower()
+
+    def test_update_package_without_authentication(self, client, test_package_data):
+        """Test updating package without authentication"""
+        response = client.put(
+            "/api/packages/1",
+            json={"description": "Update without auth"}
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_update_package_addresses_immutable(self, client, authenticated_sender, test_package_data):
+        """Test that addresses and coordinates cannot be changed via update endpoint"""
+        # Create a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+        original_pickup_address = create_response.json()["pickup_address"]
+        original_pickup_lat = create_response.json()["pickup_lat"]
+        original_dropoff_address = create_response.json()["dropoff_address"]
+
+        # Try to update with address fields (they should be ignored)
+        update_data = {
+            "description": "Updated description",
+            "pickup_address": "New Pickup Address",
+            "pickup_lat": 99.9999,
+            "dropoff_address": "New Dropoff Address"
+        }
+
+        response = client.put(
+            f"/api/packages/{package_id}",
+            json=update_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        # Description should be updated
+        assert data["description"] == "Updated description"
+        # But addresses should remain unchanged
+        assert data["pickup_address"] == original_pickup_address
+        assert data["pickup_lat"] == original_pickup_lat
+        assert data["dropoff_address"] == original_dropoff_address
+
+    def test_update_package_updates_timestamp(self, client, authenticated_sender, test_package_data):
+        """Test that updated_at timestamp is updated on package edit"""
+        import time
+
+        # Create a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+
+        # Wait a moment to ensure timestamp difference
+        time.sleep(0.1)
+
+        # Update package
+        response = client.put(
+            f"/api/packages/{package_id}",
+            json={"description": "Updated description"},
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        # Verify updated_at exists in response
+        assert "updated_at" in response.json()
+
+
 class TestUpdatePackageStatus:
     """Tests for update package status endpoint"""
 

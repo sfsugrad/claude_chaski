@@ -4,6 +4,247 @@ All notable changes to the Chaski project will be documented in this file.
 
 ## [Unreleased]
 
+### Added - User Profile Editing & Detail Page (2025-11-26)
+
+#### Backend
+- **User Profile Update Endpoint** (`app/routes/admin.py`)
+  - `PUT /api/admin/users/{user_id}/profile` - Update user profile information
+  - `UpdateUserProfile` request model with optional fields:
+    - `full_name` (str | None) - User's full name
+    - `phone_number` (str | None) - User's phone number
+    - `max_deviation_km` (int | None) - Max route deviation (1-500 km)
+  - **Validation**: max_deviation_km must be between 1 and 500 km
+  - **Error Handling**:
+    - 404 NOT_FOUND for non-existent users
+    - 403 FORBIDDEN for non-admin users
+    - 400 BAD_REQUEST for out-of-range max_deviation_km
+  - **Features**:
+    - Partial updates supported (only send changed fields)
+    - Automatic `updated_at` timestamp update
+    - Admin-only access with `get_current_admin_user` dependency
+    - Returns complete updated user object
+
+- **Comprehensive Test Suite** (`tests/test_admin.py`)
+  - **New Test Class**: `TestAdminUserProfileUpdate` with 13 tests
+  - **Field Update Tests**:
+    - `test_update_user_full_name` - Update user's full name
+    - `test_update_user_phone_number` - Update user's phone number
+    - `test_update_user_max_deviation_km` - Update max deviation
+    - `test_update_multiple_profile_fields` - Update all fields at once
+  - **Boundary Testing**:
+    - `test_update_max_deviation_km_min_boundary` - Test minimum (1 km)
+    - `test_update_max_deviation_km_max_boundary` - Test maximum (500 km)
+  - **Validation Tests**:
+    - `test_update_max_deviation_km_below_minimum` - Reject < 1 km (400)
+    - `test_update_max_deviation_km_above_maximum` - Reject > 500 km (400)
+  - **Error Handling Tests**:
+    - `test_update_user_profile_not_found` - 404 for missing user
+    - `test_update_user_profile_as_non_admin` - 403 for non-admin
+    - `test_update_user_profile_without_authentication` - 403 without auth
+  - **Data Integrity Tests**:
+    - `test_update_user_profile_updates_timestamp` - Verify timestamp update
+    - `test_update_user_profile_with_empty_phone` - Allow clearing phone
+  - **Test Results**: All 13 tests passing (100% success rate)
+
+#### Frontend - Admin Dashboard
+- **Clickable User Names** (`app/admin/page.tsx`)
+  - User names in User Management table are now clickable links
+  - Navigate to user detail page: `/admin/users/{user_id}`
+  - Purple color with underline on hover
+  - Uses Next.js Link component for client-side routing
+
+#### Frontend - User Detail Page
+- **New Page**: `app/admin/users/[id]/page.tsx` (666 lines)
+- **Comprehensive User Information Display**:
+  - **Account Information Section**:
+    - User ID (read-only, monospace font)
+    - Email address (read-only, cannot be changed)
+    - Full name (editable)
+    - Phone number (editable, optional)
+    - Role (editable with dropdown, self-protection)
+  - **Account Status Section**:
+    - Active status (editable with radio buttons, self-protection)
+    - Verification status (read-only, coming soon)
+    - Account created timestamp
+    - Last updated timestamp
+  - **Preferences Section**:
+    - Max route deviation (editable, 1-500 km range)
+    - Helper text: "Range: 1-500 km. Maximum distance from planned route for package matching."
+    - Number input with "km" unit label
+  - **Activity Statistics Section**:
+    - Total packages count
+    - Delivered packages count
+    - Active packages count
+  - **Related Packages Table**:
+    - Shows all packages where user is sender or courier
+    - Columns: Package ID, Description, Status, Price, Created
+    - Clickable package IDs linking to package detail pages
+    - Color-coded status badges
+    - Empty state message if no packages
+
+- **Edit User Functionality**:
+  - **Edit Button**: Located in page header
+  - **Editable Fields**:
+    - Full Name → Text input (required)
+    - Phone Number → Tel input (optional, placeholder: "+1234567890")
+    - Max Route Deviation → Number input (1-500 km, with "km" label)
+    - Role → Dropdown (Sender, Courier, Both, Admin)
+    - Active Status → Radio buttons (Active/Inactive)
+  - **Save/Cancel Buttons**:
+    - Cancel (gray) - Discards changes, exits edit mode
+    - Save Changes (green) - Saves to backend, reloads data
+  - **Self-Protection Rules**:
+    - Admin cannot change their own role (dropdown disabled, warning message)
+    - Admin cannot deactivate their own account (radio disabled, warning message)
+    - Visual indicators: gray background, disabled cursor, red warning text
+  - **Validation & UX**:
+    - HTML5 validation (required, min/max, type)
+    - Purple focus rings on all inputs
+    - Placeholder text for guidance
+    - Success alert on save: "User updated successfully"
+    - Error alerts with backend error messages
+    - Automatic data refresh after successful save
+    - Smart updates: only sends changed fields to API
+
+- **Color-Coded Badges**:
+  - **Role Badges**: Admin (red), Sender (blue), Courier (green), Both (teal)
+  - **Active Status**: Active (green), Inactive (red)
+  - **Verification**: Verified (green), Unverified (yellow)
+
+- **Security & Authorization**:
+  - Admin-only access (redirects non-admins)
+  - Authentication check on page load
+  - Token validation via `/auth/me`
+  - Proper error handling for 403/404 responses
+
+#### API Changes
+- **New Endpoint**: `PUT /admin/users/{user_id}/profile`
+- **Request Body** (all fields optional):
+  ```json
+  {
+    "full_name": "New Name",
+    "phone_number": "+1234567890",
+    "max_deviation_km": 250
+  }
+  ```
+- **Response**: Complete UserAdminResponse object with updated fields
+- **Status Codes**: 200 OK, 400 Bad Request, 403 Forbidden, 404 Not Found
+
+#### Summary
+- **Backend**: 1 new endpoint, 13 new tests (100% passing)
+- **Frontend**: 2 pages updated (admin dashboard, new user detail page)
+- **Lines Added**: 980+ lines across 4 files
+- **Editable Fields**: Full name, phone number, max deviation (1-500 km), role, active status
+- **Self-Protection**: Cannot change own role or deactivate own account
+- **Test Coverage**: Field updates, validation, boundaries, errors, data integrity
+
+---
+
+### Added - Package Editing (2025-11-26)
+
+#### Backend
+- **Package Update Endpoint** (`app/routes/packages.py`)
+  - `PUT /api/packages/{package_id}` - Update package details
+  - `PackageUpdate` request model with optional fields
+  - **Permissions**: Only admin or package sender can edit
+  - **Restriction**: Only pending packages can be edited
+  - **Editable Fields**:
+    - Description (1-500 characters)
+    - Size (small, medium, large, extra_large)
+    - Weight (0.1-1000 kg)
+    - Price (>= 0)
+    - Pickup contact name and phone
+    - Dropoff contact name and phone
+  - Automatic `updated_at` timestamp update
+  - Comprehensive validation and error messages
+  - 403 FORBIDDEN for unauthorized edit attempts
+  - 400 BAD_REQUEST for non-pending packages
+
+#### Frontend
+- **Edit Mode** (`app/packages/[id]/page.tsx`)
+  - **Edit Package Button**:
+    - Visible only to admin or sender who created the package
+    - Only shown for packages with "pending" status
+    - Located in page header next to package status
+  - **Editable Form Fields**:
+    - Description → Textarea (3 rows, full width)
+    - Size → Dropdown select (Small, Medium, Large, Extra Large)
+    - Weight → Number input (step: 0.1 kg, min: 0.1)
+    - Price → Number input (step: 0.01, min: 0, currency format)
+    - Pickup contact name → Text input with placeholder
+    - Pickup contact phone → Tel input with placeholder
+    - Dropoff contact name → Text input with placeholder
+    - Dropoff contact phone → Tel input with placeholder
+  - **Save/Cancel Buttons**:
+    - Cancel button (gray) - Discards changes, exits edit mode
+    - Save Changes button (green) - Saves to backend, reloads page
+    - Replace Edit button when in edit mode
+  - **Real-time State Management**:
+    - Local state tracks edited values
+    - Page reloads with updated data after successful save
+    - Error messages displayed via alerts
+  - **UI/UX Enhancements**:
+    - Purple focus rings on all inputs
+    - Consistent styling with rest of application
+    - Responsive grid layout maintained
+
+#### Security & Business Rules
+- Admin can edit any pending package
+- Sender can only edit packages they created
+- Courier cannot edit packages
+- Only pending packages can be edited (enforced on frontend and backend)
+- Non-pending packages show read-only view with no Edit button
+- Address and coordinates are immutable (location cannot be changed after creation)
+- Permission validation on both frontend and backend (defense in depth)
+- Status updates remain separate via `/status` endpoint (courier-only)
+
+#### Testing
+- **Package Editing Tests** (`tests/test_packages.py::TestUpdatePackage`)
+  - 14 comprehensive test cases covering all scenarios
+  - **Success Cases**:
+    - Sender can edit their own pending packages
+    - Admin can edit any pending package
+    - Partial updates (only some fields)
+    - All fields can be updated
+    - Timestamp updates verified
+  - **Permission Tests**:
+    - Courier cannot edit packages (403 FORBIDDEN)
+    - Sender cannot edit other sender's packages (403 FORBIDDEN)
+    - Unauthenticated requests blocked (403 FORBIDDEN)
+  - **Business Rule Tests**:
+    - Non-pending packages cannot be edited (400 BAD_REQUEST)
+    - Package not found returns 404
+  - **Validation Tests**:
+    - Invalid size rejected (422 UNPROCESSABLE_ENTITY)
+    - Invalid weight (negative, zero, too high) rejected
+    - Negative price rejected
+    - Description too long (>500 chars) rejected
+  - **Immutability Tests**:
+    - Addresses and coordinates remain unchanged when update attempted
+- **PackageResponse Model Enhancement**:
+  - Added `updated_at` field to track package modifications
+  - All existing tests verified to work with new field
+
+- **Package Toggle Active Tests** (`tests/test_admin.py::TestAdminPackageToggleActive`)
+  - 10 comprehensive test cases for soft delete functionality
+  - **Success Cases**:
+    - Admin can deactivate pending packages
+    - Admin can reactivate inactive packages
+    - Timestamp updates on toggle
+    - Data preservation when deactivated
+  - **Business Rule Tests**:
+    - Only pending packages can be deactivated (400 BAD_REQUEST)
+    - Non-pending packages CAN be reactivated
+    - Package not found returns 404
+  - **Permission Tests**:
+    - Non-admin cannot toggle packages (403 FORBIDDEN)
+    - Unauthenticated requests blocked (403 FORBIDDEN)
+  - **Data Integrity Tests**:
+    - Deactivation preserves all package data
+    - Multiple packages can be toggled independently
+
+---
+
 ### Added - Comprehensive Test Suite (2025-11-26)
 
 #### Backend Testing
@@ -30,11 +271,13 @@ All notable changes to the Chaski project will be documented in this file.
   - Added `test_verified_user` fixture - Returns verified User object
   - Added `test_admin` fixture - Returns admin User object
   - Updated `pytest.ini` - Added asyncio marker configuration
-  - Total test count increased from 126 to 149 tests
+  - Total test count increased from 126 to 199 tests
 
 #### Test Coverage Summary
-- **Total Tests**: 149 (141 passed, 8 skipped)
-- **Backend Coverage**: Auth routes, packages, admin, email utils, dependencies, models
+- **Total Tests**: 199 (191 passed, 8 skipped)
+- **Backend Coverage**: Auth routes, packages (editing + soft delete), admin (including package toggle), email utils, dependencies, models
+- **Package Editing**: 14 comprehensive tests covering permissions, validation, and immutability
+- **Package Soft Delete**: 10 comprehensive tests for toggle-active functionality
 - **All Core Functionality**: Fully tested with comprehensive edge cases
 
 ---

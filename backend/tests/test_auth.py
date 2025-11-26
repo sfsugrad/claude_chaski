@@ -347,6 +347,212 @@ class TestGetCurrentUser:
         assert "inactive" in response.json()["detail"].lower()
 
 
+class TestEmailVerification:
+    """Tests for email verification endpoints"""
+
+    def test_verify_email_with_valid_token(self, client, db_session):
+        """Test email verification with valid token"""
+        from app.models.user import User, UserRole
+        from app.utils.email import generate_verification_token
+
+        # Create unverified user
+        token = generate_verification_token()
+        user = User(
+            email="verify@example.com",
+            hashed_password="hashed_password",
+            full_name="Verify User",
+            role=UserRole.SENDER,
+            is_verified=False,
+            verification_token=token
+        )
+        db_session.add(user)
+        db_session.commit()
+
+        # Verify email
+        response = client.get(f"/api/auth/verify-email/{token}")
+
+        assert response.status_code == status.HTTP_200_OK
+        assert "successfully" in response.json()["message"].lower()
+        assert response.json()["email"] == "verify@example.com"
+
+        # Verify user is now verified in database
+        db_session.refresh(user)
+        assert user.is_verified is True
+        assert user.verification_token is None
+
+    def test_verify_email_with_invalid_token(self, client):
+        """Test email verification with invalid token"""
+        response = client.get("/api/auth/verify-email/invalid_token_12345")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "invalid" in response.json()["detail"].lower()
+
+    def test_verify_email_already_verified(self, client, db_session):
+        """Test verifying an already verified email"""
+        from app.models.user import User, UserRole
+        from app.utils.email import generate_verification_token
+
+        # Create verified user
+        token = generate_verification_token()
+        user = User(
+            email="already.verified@example.com",
+            hashed_password="hashed_password",
+            full_name="Already Verified",
+            role=UserRole.SENDER,
+            is_verified=True,  # Already verified
+            verification_token=token
+        )
+        db_session.add(user)
+        db_session.commit()
+
+        # Try to verify again
+        response = client.get(f"/api/auth/verify-email/{token}")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "already verified" in response.json()["detail"].lower()
+
+    def test_verify_email_clears_token(self, client, db_session):
+        """Test that verification clears the token"""
+        from app.models.user import User, UserRole
+        from app.utils.email import generate_verification_token
+
+        # Create unverified user
+        token = generate_verification_token()
+        user = User(
+            email="clear.token@example.com",
+            hashed_password="hashed_password",
+            full_name="Clear Token",
+            role=UserRole.SENDER,
+            is_verified=False,
+            verification_token=token
+        )
+        db_session.add(user)
+        db_session.commit()
+
+        # Verify email
+        client.get(f"/api/auth/verify-email/{token}")
+
+        # Verify token is cleared
+        db_session.refresh(user)
+        assert user.verification_token is None
+
+    def test_resend_verification_email_to_unverified_user(self, client, db_session):
+        """Test resending verification email to unverified user"""
+        from app.models.user import User, UserRole
+
+        # Create unverified user
+        user = User(
+            email="resend@example.com",
+            hashed_password="hashed_password",
+            full_name="Resend User",
+            role=UserRole.SENDER,
+            is_verified=False,
+            verification_token="old_token"
+        )
+        db_session.add(user)
+        db_session.commit()
+
+        # Resend verification email
+        response = client.post("/api/auth/resend-verification?email=resend@example.com")
+
+        assert response.status_code == status.HTTP_200_OK
+        assert "sent successfully" in response.json()["message"].lower()
+
+        # Verify new token was generated
+        db_session.refresh(user)
+        assert user.verification_token is not None
+        assert user.verification_token != "old_token"
+
+    def test_resend_verification_to_verified_user(self, client, db_session):
+        """Test that verified users cannot request verification email"""
+        from app.models.user import User, UserRole
+
+        # Create verified user
+        user = User(
+            email="verified@example.com",
+            hashed_password="hashed_password",
+            full_name="Verified User",
+            role=UserRole.SENDER,
+            is_verified=True,
+            verification_token=None
+        )
+        db_session.add(user)
+        db_session.commit()
+
+        # Try to resend verification email
+        response = client.post("/api/auth/resend-verification?email=verified@example.com")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "already verified" in response.json()["detail"].lower()
+
+    def test_resend_verification_to_nonexistent_user(self, client):
+        """Test resending verification to non-existent email"""
+        response = client.post("/api/auth/resend-verification?email=nonexistent@example.com")
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert "not found" in response.json()["detail"].lower()
+
+    def test_verify_email_generates_new_token_on_resend(self, client, db_session):
+        """Test that resending generates a new token"""
+        from app.models.user import User, UserRole
+
+        # Create unverified user
+        old_token = "old_verification_token_123"
+        user = User(
+            email="newtoken@example.com",
+            hashed_password="hashed_password",
+            full_name="New Token User",
+            role=UserRole.SENDER,
+            is_verified=False,
+            verification_token=old_token
+        )
+        db_session.add(user)
+        db_session.commit()
+
+        # Resend verification
+        client.post("/api/auth/resend-verification?email=newtoken@example.com")
+
+        # Verify token changed
+        db_session.refresh(user)
+        assert user.verification_token != old_token
+        assert user.verification_token is not None
+
+    def test_verification_workflow_complete(self, client, db_session):
+        """Test complete verification workflow"""
+        from app.models.user import User, UserRole
+        from app.utils.email import generate_verification_token
+
+        # Step 1: Create unverified user
+        token = generate_verification_token()
+        user = User(
+            email="workflow@example.com",
+            hashed_password="hashed_password",
+            full_name="Workflow User",
+            role=UserRole.SENDER,
+            is_verified=False,
+            verification_token=token
+        )
+        db_session.add(user)
+        db_session.commit()
+
+        # Step 2: Verify they're unverified
+        assert user.is_verified is False
+        assert user.verification_token is not None
+
+        # Step 3: Verify email
+        response = client.get(f"/api/auth/verify-email/{token}")
+        assert response.status_code == status.HTTP_200_OK
+
+        # Step 4: Verify they're now verified
+        db_session.refresh(user)
+        assert user.is_verified is True
+        assert user.verification_token is None
+
+        # Step 5: Try to resend (should fail)
+        response = client.post("/api/auth/resend-verification?email=workflow@example.com")
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
 class TestAuthenticationWorkflow:
     """Integration tests for complete authentication workflow"""
 

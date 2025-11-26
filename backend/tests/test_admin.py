@@ -931,6 +931,265 @@ class TestAdminPackageManagement:
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
+class TestAdminPackageToggleActive:
+    """Tests for admin package toggle-active endpoint (soft delete)"""
+
+    def test_admin_can_deactivate_pending_package(self, client, db_session, authenticated_admin, authenticated_sender, test_package_data):
+        """Test admin can deactivate a pending package"""
+        # Sender creates a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+
+        # Admin deactivates it
+        response = client.put(
+            f"/api/admin/packages/{package_id}/toggle-active",
+            json={"is_active": False},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["is_active"] is False
+        assert data["id"] == package_id
+
+        # Verify package is still in database but inactive
+        from app.models.package import Package
+        package = db_session.query(Package).filter(Package.id == package_id).first()
+        assert package is not None
+        assert package.is_active is False
+
+    def test_admin_can_reactivate_inactive_package(self, client, db_session, authenticated_admin, authenticated_sender, test_package_data):
+        """Test admin can reactivate an inactive package"""
+        # Sender creates a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+
+        # Admin deactivates it
+        client.put(
+            f"/api/admin/packages/{package_id}/toggle-active",
+            json={"is_active": False},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        # Admin reactivates it
+        response = client.put(
+            f"/api/admin/packages/{package_id}/toggle-active",
+            json={"is_active": True},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["is_active"] is True
+
+        # Verify in database
+        from app.models.package import Package
+        package = db_session.query(Package).filter(Package.id == package_id).first()
+        assert package.is_active is True
+
+    def test_cannot_deactivate_non_pending_package(self, client, db_session, authenticated_admin, authenticated_sender, test_package_data):
+        """Test that only pending packages can be deactivated"""
+        # Create a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+
+        # Change package status to matched
+        from app.models.package import Package, PackageStatus
+        package = db_session.query(Package).filter(Package.id == package_id).first()
+        package.status = PackageStatus.MATCHED
+        db_session.commit()
+
+        # Try to deactivate it
+        response = client.put(
+            f"/api/admin/packages/{package_id}/toggle-active",
+            json={"is_active": False},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "only pending packages can be deactivated" in response.json()["detail"].lower()
+
+    def test_can_reactivate_non_pending_package(self, client, db_session, authenticated_admin, authenticated_sender, test_package_data):
+        """Test that non-pending packages CAN be reactivated (only deactivation is restricted)"""
+        # Create and deactivate a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+
+        # Deactivate while pending
+        client.put(
+            f"/api/admin/packages/{package_id}/toggle-active",
+            json={"is_active": False},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        # Change status to delivered
+        from app.models.package import Package, PackageStatus
+        package = db_session.query(Package).filter(Package.id == package_id).first()
+        package.status = PackageStatus.DELIVERED
+        db_session.commit()
+
+        # Reactivate it (should work)
+        response = client.put(
+            f"/api/admin/packages/{package_id}/toggle-active",
+            json={"is_active": True},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["is_active"] is True
+
+    def test_non_admin_cannot_toggle_package(self, client, authenticated_sender, test_package_data):
+        """Test that non-admin users cannot toggle package active status"""
+        # Sender creates a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+
+        # Sender tries to deactivate it
+        response = client.put(
+            f"/api/admin/packages/{package_id}/toggle-active",
+            json={"is_active": False},
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_toggle_package_not_found(self, client, authenticated_admin):
+        """Test toggling active status of non-existent package"""
+        response = client.put(
+            "/api/admin/packages/99999/toggle-active",
+            json={"is_active": False},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert "not found" in response.json()["detail"].lower()
+
+    def test_toggle_package_without_authentication(self, client):
+        """Test toggling package without authentication"""
+        response = client.put(
+            "/api/admin/packages/1/toggle-active",
+            json={"is_active": False}
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_toggle_package_updates_timestamp(self, client, authenticated_admin, authenticated_sender, test_package_data):
+        """Test that updated_at timestamp is updated when toggling active status"""
+        import time
+
+        # Create a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+        original_updated_at = create_response.json().get("updated_at")
+
+        # Wait a moment
+        time.sleep(0.1)
+
+        # Toggle active status
+        response = client.put(
+            f"/api/admin/packages/{package_id}/toggle-active",
+            json={"is_active": False},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        new_updated_at = response.json().get("updated_at")
+
+        # Verify timestamp changed (if original was None, new should not be None)
+        if original_updated_at is not None:
+            assert new_updated_at != original_updated_at
+
+    def test_deactivate_package_preserves_data(self, client, db_session, authenticated_admin, authenticated_sender, test_package_data):
+        """Test that deactivating a package preserves all package data"""
+        # Create a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+        original_description = create_response.json()["description"]
+        original_price = create_response.json()["price"]
+
+        # Deactivate it
+        client.put(
+            f"/api/admin/packages/{package_id}/toggle-active",
+            json={"is_active": False},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        # Verify all data is preserved
+        from app.models.package import Package
+        package = db_session.query(Package).filter(Package.id == package_id).first()
+        assert package is not None
+        assert package.description == original_description
+        assert package.price == original_price
+        assert package.is_active is False
+
+    def test_toggle_multiple_packages_independently(self, client, authenticated_admin, authenticated_sender, test_package_data):
+        """Test that multiple packages can be toggled independently"""
+        # Create two packages
+        response1 = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id_1 = response1.json()["id"]
+
+        test_package_data["description"] = "Second package"
+        response2 = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id_2 = response2.json()["id"]
+
+        # Deactivate only first package
+        client.put(
+            f"/api/admin/packages/{package_id_1}/toggle-active",
+            json={"is_active": False},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        # Verify first is inactive
+        response1 = client.get(
+            f"/api/admin/packages/{package_id_1}",
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+        assert response1.json()["is_active"] is False
+
+        # Verify second is still active
+        response2 = client.get(
+            f"/api/admin/packages/{package_id_2}",
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+        assert response2.json()["is_active"] is True
+
+
 class TestAdminStatistics:
     """Tests for admin statistics endpoint"""
 
