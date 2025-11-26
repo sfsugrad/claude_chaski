@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import axios from 'axios'
@@ -12,9 +12,14 @@ export default function VerifyEmailPage() {
   const searchParams = useSearchParams()
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
   const [message, setMessage] = useState('')
+  const hasVerified = useRef(false)
 
   useEffect(() => {
     const verifyEmail = async () => {
+      // Prevent double execution (React StrictMode in development)
+      if (hasVerified.current) return
+      hasVerified.current = true
+
       const token = searchParams.get('token')
 
       if (!token) {
