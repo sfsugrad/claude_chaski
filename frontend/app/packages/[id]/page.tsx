@@ -218,6 +218,32 @@ export default function PackageDetailPage() {
                 {pkg.status.replace('_', ' ').toUpperCase()}
               </span>
             </div>
+            <div className="flex gap-2">
+              {canEdit() && !isEditing && (
+                <button
+                  onClick={handleEdit}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"
+                >
+                  Edit Package
+                </button>
+              )}
+              {isEditing && (
+                <>
+                  <button
+                    onClick={handleCancel}
+                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
+                  >
+                    Save Changes
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -236,24 +262,68 @@ export default function PackageDetailPage() {
             <div className="space-y-4">
               <div>
                 <label className="text-sm font-medium text-gray-500">Description</label>
-                <p className="text-gray-900 mt-1">{pkg.description}</p>
+                {isEditing ? (
+                  <textarea
+                    value={editedPackage.description || ''}
+                    onChange={(e) => setEditedPackage({ ...editedPackage, description: e.target.value })}
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    rows={3}
+                  />
+                ) : (
+                  <p className="text-gray-900 mt-1">{pkg.description}</p>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-gray-500">Size</label>
-                  <p className="text-gray-900 mt-1">{getSizeLabel(pkg.size)}</p>
+                  {isEditing ? (
+                    <select
+                      value={editedPackage.size || pkg.size}
+                      onChange={(e) => setEditedPackage({ ...editedPackage, size: e.target.value })}
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="small">Small</option>
+                      <option value="medium">Medium</option>
+                      <option value="large">Large</option>
+                      <option value="extra_large">Extra Large</option>
+                    </select>
+                  ) : (
+                    <p className="text-gray-900 mt-1">{getSizeLabel(pkg.size)}</p>
+                  )}
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Weight</label>
-                  <p className="text-gray-900 mt-1">{pkg.weight_kg} kg</p>
+                  <label className="text-sm font-medium text-gray-500">Weight (kg)</label>
+                  {isEditing ? (
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0.1"
+                      value={editedPackage.weight_kg || ''}
+                      onChange={(e) => setEditedPackage({ ...editedPackage, weight_kg: parseFloat(e.target.value) })}
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                  ) : (
+                    <p className="text-gray-900 mt-1">{pkg.weight_kg} kg</p>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Price</label>
-                  <p className="text-gray-900 mt-1 text-lg font-semibold">
-                    ${pkg.price?.toFixed(2) || 'N/A'}
-                  </p>
+                  <label className="text-sm font-medium text-gray-500">Price ($)</label>
+                  {isEditing ? (
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={editedPackage.price !== undefined ? editedPackage.price : ''}
+                      onChange={(e) => setEditedPackage({ ...editedPackage, price: parseFloat(e.target.value) })}
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                  ) : (
+                    <p className="text-gray-900 mt-1 text-lg font-semibold">
+                      ${pkg.price?.toFixed(2) || 'N/A'}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-500">Created</label>
@@ -282,7 +352,16 @@ export default function PackageDetailPage() {
                 <label className="text-sm font-medium text-gray-500">Sender</label>
                 {sender ? (
                   <div className="mt-1">
-                    <p className="text-gray-900 font-medium">{sender.full_name}</p>
+                    {currentUser?.role === 'admin' || currentUser?.role === 'ADMIN' ? (
+                      <Link
+                        href={`/users/${sender.id}`}
+                        className="text-purple-600 hover:text-purple-800 font-medium underline"
+                      >
+                        {sender.full_name}
+                      </Link>
+                    ) : (
+                      <p className="text-gray-900 font-medium">{sender.full_name}</p>
+                    )}
                     <p className="text-gray-600 text-sm">{sender.email}</p>
                   </div>
                 ) : (
@@ -293,7 +372,16 @@ export default function PackageDetailPage() {
                 <label className="text-sm font-medium text-gray-500">Courier</label>
                 {courier ? (
                   <div className="mt-1">
-                    <p className="text-gray-900 font-medium">{courier.full_name}</p>
+                    {currentUser?.role === 'admin' || currentUser?.role === 'ADMIN' ? (
+                      <Link
+                        href={`/users/${courier.id}`}
+                        className="text-purple-600 hover:text-purple-800 font-medium underline"
+                      >
+                        {courier.full_name}
+                      </Link>
+                    ) : (
+                      <p className="text-gray-900 font-medium">{courier.full_name}</p>
+                    )}
                     <p className="text-gray-600 text-sm">{courier.email}</p>
                   </div>
                 ) : pkg.courier_id ? (
@@ -329,17 +417,36 @@ export default function PackageDetailPage() {
                   <p className="text-gray-900 mt-1 font-mono text-sm">{pkg.pickup_lng}</p>
                 </div>
               </div>
-              {(pkg.pickup_contact_name || pkg.pickup_contact_phone) && (
+              {(pkg.pickup_contact_name || pkg.pickup_contact_phone || isEditing) && (
                 <div className="border-t pt-4">
                   <label className="text-sm font-medium text-gray-500">Contact Information</label>
-                  <div className="mt-2 space-y-1">
-                    {pkg.pickup_contact_name && (
-                      <p className="text-gray-900">{pkg.pickup_contact_name}</p>
-                    )}
-                    {pkg.pickup_contact_phone && (
-                      <p className="text-gray-600">{pkg.pickup_contact_phone}</p>
-                    )}
-                  </div>
+                  {isEditing ? (
+                    <div className="mt-2 space-y-2">
+                      <input
+                        type="text"
+                        placeholder="Contact Name"
+                        value={editedPackage.pickup_contact_name || ''}
+                        onChange={(e) => setEditedPackage({ ...editedPackage, pickup_contact_name: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                      <input
+                        type="tel"
+                        placeholder="Contact Phone"
+                        value={editedPackage.pickup_contact_phone || ''}
+                        onChange={(e) => setEditedPackage({ ...editedPackage, pickup_contact_phone: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+                  ) : (
+                    <div className="mt-2 space-y-1">
+                      {pkg.pickup_contact_name && (
+                        <p className="text-gray-900">{pkg.pickup_contact_name}</p>
+                      )}
+                      {pkg.pickup_contact_phone && (
+                        <p className="text-gray-600">{pkg.pickup_contact_phone}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -369,17 +476,36 @@ export default function PackageDetailPage() {
                   <p className="text-gray-900 mt-1 font-mono text-sm">{pkg.dropoff_lng}</p>
                 </div>
               </div>
-              {(pkg.dropoff_contact_name || pkg.dropoff_contact_phone) && (
+              {(pkg.dropoff_contact_name || pkg.dropoff_contact_phone || isEditing) && (
                 <div className="border-t pt-4">
                   <label className="text-sm font-medium text-gray-500">Contact Information</label>
-                  <div className="mt-2 space-y-1">
-                    {pkg.dropoff_contact_name && (
-                      <p className="text-gray-900">{pkg.dropoff_contact_name}</p>
-                    )}
-                    {pkg.dropoff_contact_phone && (
-                      <p className="text-gray-600">{pkg.dropoff_contact_phone}</p>
-                    )}
-                  </div>
+                  {isEditing ? (
+                    <div className="mt-2 space-y-2">
+                      <input
+                        type="text"
+                        placeholder="Contact Name"
+                        value={editedPackage.dropoff_contact_name || ''}
+                        onChange={(e) => setEditedPackage({ ...editedPackage, dropoff_contact_name: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                      <input
+                        type="tel"
+                        placeholder="Contact Phone"
+                        value={editedPackage.dropoff_contact_phone || ''}
+                        onChange={(e) => setEditedPackage({ ...editedPackage, dropoff_contact_phone: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+                  ) : (
+                    <div className="mt-2 space-y-1">
+                      {pkg.dropoff_contact_name && (
+                        <p className="text-gray-900">{pkg.dropoff_contact_name}</p>
+                      )}
+                      {pkg.dropoff_contact_phone && (
+                        <p className="text-gray-600">{pkg.dropoff_contact_phone}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
