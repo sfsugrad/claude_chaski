@@ -169,7 +169,7 @@ class TestAdminUserManagement:
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_admin_cannot_remove_own_admin_role(self, client, db_session, authenticated_admin, test_admin_data):
-        """Test admin cannot remove their own admin privileges"""
+        """Test admin cannot change their own role"""
         admin_user = db_session.query(User).filter(User.email == test_admin_data["email"]).first()
 
         response = client.put(
@@ -178,8 +178,21 @@ class TestAdminUserManagement:
             headers={"Authorization": f"Bearer {authenticated_admin}"}
         )
 
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "cannot remove your own admin privileges" in response.json()["detail"].lower()
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert "cannot change your own role" in response.json()["detail"].lower()
+
+    def test_admin_cannot_change_own_role_even_to_admin(self, client, db_session, authenticated_admin, test_admin_data):
+        """Test admin cannot change their own role, even when selecting admin again"""
+        admin_user = db_session.query(User).filter(User.email == test_admin_data["email"]).first()
+
+        response = client.put(
+            f"/api/admin/users/{admin_user.id}",
+            json={"role": "admin"},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert "cannot change your own role" in response.json()["detail"].lower()
 
     def test_update_user_role_as_non_admin(self, client, authenticated_sender):
         """Test non-admin cannot update user roles"""
@@ -325,7 +338,7 @@ class TestAdminUserToggleActive:
             headers={"Authorization": f"Bearer {authenticated_admin}"}
         )
 
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.status_code == status.HTTP_403_FORBIDDEN
         assert "cannot deactivate your own account" in response.json()["detail"].lower()
 
         # Verify user is still active in database

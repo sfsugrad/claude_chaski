@@ -441,4 +441,315 @@ describe('AdminPage', () => {
       // This verifies the component structure is ready for all roles
     })
   })
+
+  describe('Self-Deactivation Prevention', () => {
+    it('disables deactivate button for currently logged-in admin', async () => {
+      ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
+
+      // Mock the auth check
+      mockedAxios.get.mockResolvedValueOnce({
+        data: {
+          id: 1,
+          email: 'admin@example.com',
+          full_name: 'Admin User',
+          role: 'ADMIN',
+        },
+      })
+
+      // Mock users list API call
+      .mockResolvedValueOnce({
+        data: [
+          {
+            id: 1,
+            email: 'admin@example.com',
+            full_name: 'Admin User',
+            role: 'ADMIN',
+            is_verified: true,
+            is_active: true,
+            created_at: '2024-01-01T00:00:00Z',
+          },
+          {
+            id: 2,
+            email: 'other@example.com',
+            full_name: 'Other User',
+            role: 'SENDER',
+            is_verified: true,
+            is_active: true,
+            created_at: '2024-01-02T00:00:00Z',
+          },
+        ],
+      })
+
+      // Mock packages and stats
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({
+        data: {
+          total_users: 2,
+          total_senders: 1,
+          total_couriers: 0,
+          total_both: 0,
+          total_admins: 1,
+          total_packages: 0,
+          active_packages: 0,
+          completed_packages: 0,
+          pending_packages: 0,
+          total_revenue: 0,
+        },
+      })
+
+      const { getByText, queryByTitle } = render(<AdminPage />)
+
+      // Navigate to Users tab
+      await waitFor(() => {
+        const usersTab = getByText('Users')
+        usersTab.click()
+      })
+
+      // Wait for users to load
+      await waitFor(() => {
+        expect(screen.getByText('admin@example.com')).toBeInTheDocument()
+        expect(screen.getByText('other@example.com')).toBeInTheDocument()
+      })
+
+      // Check that the logged-in admin's deactivate button is disabled
+      const disabledDeactivate = queryByTitle('You cannot deactivate your own account')
+      expect(disabledDeactivate).toBeInTheDocument()
+      expect(disabledDeactivate).toHaveClass('text-gray-400')
+      expect(disabledDeactivate).toHaveClass('cursor-not-allowed')
+    })
+
+    it('allows deactivating other users', async () => {
+      ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
+
+      // Mock the auth check
+      mockedAxios.get.mockResolvedValueOnce({
+        data: {
+          id: 1,
+          email: 'admin@example.com',
+          full_name: 'Admin User',
+          role: 'ADMIN',
+        },
+      })
+
+      // Mock users list API call
+      .mockResolvedValueOnce({
+        data: [
+          {
+            id: 1,
+            email: 'admin@example.com',
+            full_name: 'Admin User',
+            role: 'ADMIN',
+            is_verified: true,
+            is_active: true,
+            created_at: '2024-01-01T00:00:00Z',
+          },
+          {
+            id: 2,
+            email: 'other@example.com',
+            full_name: 'Other User',
+            role: 'SENDER',
+            is_verified: true,
+            is_active: true,
+            created_at: '2024-01-02T00:00:00Z',
+          },
+        ],
+      })
+
+      // Mock packages and stats
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({
+        data: {
+          total_users: 2,
+          total_senders: 1,
+          total_couriers: 0,
+          total_both: 0,
+          total_admins: 1,
+          total_packages: 0,
+          active_packages: 0,
+          completed_packages: 0,
+          pending_packages: 0,
+          total_revenue: 0,
+        },
+      })
+
+      const { getByText, getAllByText } = render(<AdminPage />)
+
+      // Navigate to Users tab
+      await waitFor(() => {
+        const usersTab = getByText('Users')
+        usersTab.click()
+      })
+
+      // Wait for users to load
+      await waitFor(() => {
+        expect(screen.getByText('other@example.com')).toBeInTheDocument()
+      })
+
+      // Check that deactivate buttons are shown for other users
+      const deactivateButtons = getAllByText('Deactivate')
+
+      // Should have at least one active deactivate button (for the other user)
+      const activeDeactivateButton = deactivateButtons.find(
+        btn => btn.tagName === 'BUTTON' && !btn.hasAttribute('disabled')
+      )
+      expect(activeDeactivateButton).toBeDefined()
+    })
+  })
+
+  describe('Self-Role Change Prevention', () => {
+    it('disables role dropdown for currently logged-in admin', async () => {
+      ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
+
+      // Mock the auth check
+      mockedAxios.get.mockResolvedValueOnce({
+        data: {
+          id: 1,
+          email: 'admin@example.com',
+          full_name: 'Admin User',
+          role: 'ADMIN',
+        },
+      })
+
+      // Mock users list API call
+      .mockResolvedValueOnce({
+        data: [
+          {
+            id: 1,
+            email: 'admin@example.com',
+            full_name: 'Admin User',
+            role: 'ADMIN',
+            is_verified: true,
+            is_active: true,
+            created_at: '2024-01-01T00:00:00Z',
+          },
+          {
+            id: 2,
+            email: 'other@example.com',
+            full_name: 'Other User',
+            role: 'SENDER',
+            is_verified: true,
+            is_active: true,
+            created_at: '2024-01-02T00:00:00Z',
+          },
+        ],
+      })
+
+      // Mock packages and stats
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({
+        data: {
+          total_users: 2,
+          total_senders: 1,
+          total_couriers: 0,
+          total_both: 0,
+          total_admins: 1,
+          total_packages: 0,
+          active_packages: 0,
+          completed_packages: 0,
+          pending_packages: 0,
+          total_revenue: 0,
+        },
+      })
+
+      const { getByText, container } = render(<AdminPage />)
+
+      // Navigate to Users tab
+      await waitFor(() => {
+        const usersTab = getByText('Users')
+        usersTab.click()
+      })
+
+      // Wait for users to load
+      await waitFor(() => {
+        expect(screen.getByText('admin@example.com')).toBeInTheDocument()
+        expect(screen.getByText('other@example.com')).toBeInTheDocument()
+      })
+
+      // Find all role dropdowns
+      const roleSelects = container.querySelectorAll('select')
+
+      // The first dropdown should be disabled (logged-in admin)
+      const adminRoleSelect = roleSelects[0]
+      expect(adminRoleSelect).toBeDisabled()
+      expect(adminRoleSelect).toHaveClass('bg-gray-100')
+      expect(adminRoleSelect).toHaveClass('cursor-not-allowed')
+      expect(adminRoleSelect).toHaveAttribute('title', 'You cannot change your own role')
+    })
+
+    it('allows changing role for other users', async () => {
+      ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
+
+      // Mock the auth check
+      mockedAxios.get.mockResolvedValueOnce({
+        data: {
+          id: 1,
+          email: 'admin@example.com',
+          full_name: 'Admin User',
+          role: 'ADMIN',
+        },
+      })
+
+      // Mock users list API call
+      .mockResolvedValueOnce({
+        data: [
+          {
+            id: 1,
+            email: 'admin@example.com',
+            full_name: 'Admin User',
+            role: 'ADMIN',
+            is_verified: true,
+            is_active: true,
+            created_at: '2024-01-01T00:00:00Z',
+          },
+          {
+            id: 2,
+            email: 'other@example.com',
+            full_name: 'Other User',
+            role: 'SENDER',
+            is_verified: true,
+            is_active: true,
+            created_at: '2024-01-02T00:00:00Z',
+          },
+        ],
+      })
+
+      // Mock packages and stats
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({
+        data: {
+          total_users: 2,
+          total_senders: 1,
+          total_couriers: 0,
+          total_both: 0,
+          total_admins: 1,
+          total_packages: 0,
+          active_packages: 0,
+          completed_packages: 0,
+          pending_packages: 0,
+          total_revenue: 0,
+        },
+      })
+
+      const { getByText, container } = render(<AdminPage />)
+
+      // Navigate to Users tab
+      await waitFor(() => {
+        const usersTab = getByText('Users')
+        usersTab.click()
+      })
+
+      // Wait for users to load
+      await waitFor(() => {
+        expect(screen.getByText('other@example.com')).toBeInTheDocument()
+      })
+
+      // Find all role dropdowns
+      const roleSelects = container.querySelectorAll('select')
+
+      // The second dropdown should be enabled (other user)
+      const otherUserRoleSelect = roleSelects[1]
+      expect(otherUserRoleSelect).not.toBeDisabled()
+      expect(otherUserRoleSelect).not.toHaveClass('bg-gray-100')
+    })
+  })
 })

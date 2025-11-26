@@ -4,6 +4,125 @@ All notable changes to the Chaski project will be documented in this file.
 
 ## [Unreleased]
 
+### Added - Comprehensive Test Suite (2025-11-26)
+
+#### Backend Testing
+- **Email Utility Tests** (`tests/test_email.py`)
+  - `TestGenerateVerificationToken` - Token generation, uniqueness, URL-safety
+  - `TestSendVerificationEmail` - Verification email sending with mocking
+  - `TestSendWelcomeEmail` - Welcome email functionality tests
+  - 11 test cases for email utilities (8 async tests currently skipped)
+
+- **Authentication Dependencies Tests** (`tests/test_dependencies.py`)
+  - `TestGetCurrentUser` - JWT authentication, token validation, expiration
+  - `TestGetCurrentActiveUser` - Active user verification
+  - `TestGetCurrentAdminUser` - Admin privilege validation
+  - `TestDependenciesIntegration` - Dependency chain testing
+  - 14 test cases for authentication dependencies
+
+- **Model Validation Tests** (`tests/test_models.py`)
+  - `TestUserModel` - User creation, constraints, required fields, all roles
+  - `TestPackageModel` - Package creation, statuses, sizes, relationships
+  - `TestCourierRouteModel` - Route creation, departure times, multiple routes
+  - 23 test cases for model validations and database constraints
+
+- **Test Infrastructure Improvements**
+  - Added `test_verified_user` fixture - Returns verified User object
+  - Added `test_admin` fixture - Returns admin User object
+  - Updated `pytest.ini` - Added asyncio marker configuration
+  - Total test count increased from 126 to 149 tests
+
+#### Test Coverage Summary
+- **Total Tests**: 149 (141 passed, 8 skipped)
+- **Backend Coverage**: Auth routes, packages, admin, email utils, dependencies, models
+- **All Core Functionality**: Fully tested with comprehensive edge cases
+
+---
+
+### Added - Admin Self-Protection UI & API (2025-11-26)
+
+#### Frontend Security
+- **Admin User Management** (`app/admin/page.tsx`)
+  - **Role Dropdown Protection**:
+    - Disabled for logged-in admin's own account
+    - Gray background (`bg-gray-100`) visual indicator
+    - Cursor changed to `cursor-not-allowed`
+    - Tooltip: "You cannot change your own role"
+  - **Deactivate Button Protection**:
+    - Replaced with grayed-out text for own account
+    - Non-clickable with disabled styling
+    - Tooltip: "You cannot deactivate your own account"
+    - Other users retain full functionality
+
+- **Admin Page Tests** (`app/admin/__tests__/page.test.tsx`)
+  - `test_admin_cannot_change_own_role_even_to_admin` - Verify role dropdown disabled
+  - `test_allows_changing_role_for_other_users` - Verify others remain editable
+  - `test_disables_deactivate_button_for_currently_logged_in_admin` - Verify deactivate disabled
+  - `test_allows_deactivating_other_users` - Verify others remain deactivatable
+
+#### Backend Security Enhancements
+- **Admin Route Improvements** (`app/routes/admin.py`)
+  - **Role Change Protection**:
+    - Check happens before role validation (more efficient)
+    - Prevents ANY role change to own account (even selecting same role)
+    - Changed from `400 BAD_REQUEST` to `403 FORBIDDEN` (semantically correct)
+    - Error message: "You cannot change your own role"
+  - **Deactivation Protection**:
+    - Changed from `400 BAD_REQUEST` to `403 FORBIDDEN`
+    - Error message: "You cannot deactivate your own account"
+
+- **Admin Test Updates** (`tests/test_admin.py`)
+  - Updated `test_admin_cannot_remove_own_admin_role` - Now checks for 403 status
+  - **NEW**: `test_admin_cannot_change_own_role_even_to_admin` - Absolute role change prevention
+  - Updated `test_admin_cannot_deactivate_self` - Now checks for 403 status
+  - All 57 admin tests passing
+
+#### Security Summary
+- **Defense in Depth**: Protection at both UI and API levels
+- **Frontend**: Visual feedback with disabled controls and tooltips
+- **Backend**: Server-side validation prevents API bypass attempts
+- **Consistent Error Handling**: Proper HTTP status codes (403 FORBIDDEN)
+- **Self-Protection**: Prevents admins from accidentally locking themselves out
+
+---
+
+### Added - Test Data Fixtures (2025-11-26)
+
+#### Backend Test Data
+- **Test Data Directory** (`backend/test_data/`)
+  - `users.json` - 10 test users with various roles and states
+    - 1 Admin, 3 Senders, 3 Couriers, 2 Both roles, 1 Unverified user
+    - Pre-configured passwords for easy testing
+  - `packages.json` - 10 test packages with realistic data
+    - Various statuses: pending, matched, picked_up, in_transit, delivered, cancelled
+    - Different sizes: small, medium, large, extra_large
+    - San Francisco addresses with real coordinates
+  - `courier_routes.json` - 7 courier routes
+    - Mix of active and inactive routes
+    - Various SF neighborhoods
+    - Different max deviation distances (7-15 km)
+
+- **Data Loading Script** (`test_data/load_test_data.py`)
+  - Python script to load JSON fixtures into database
+  - Automatic password hashing
+  - ID mapping for referential integrity
+  - Optional data clearing
+  - Usage: `python -m test_data.load_test_data`
+
+- **Documentation** (`test_data/README.md`)
+  - Complete guide for loading test data
+  - Test credentials table
+  - Data overview and relationships
+  - Notes on usage and timestamps
+
+#### Test Credentials
+- Admin: admin@chaski.com / admin123
+- Sender: john.sender@example.com / sender123
+- Courier: mike.courier@example.com / courier123
+- Both: alex.both@example.com / both123
+
+---
+
 ### Added - User Soft Delete & Filtering (2025-01-26)
 
 #### Backend

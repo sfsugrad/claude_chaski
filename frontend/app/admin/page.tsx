@@ -565,8 +565,11 @@ export default function AdminPage() {
                           <select
                             value={u.role}
                             onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                            className="text-sm border rounded px-2 py-1"
-                            disabled={!u.is_active}
+                            className={`text-sm border rounded px-2 py-1 ${
+                              u.id === user?.id ? 'bg-gray-100 cursor-not-allowed' : ''
+                            }`}
+                            disabled={!u.is_active || u.id === user?.id}
+                            title={u.id === user?.id ? 'You cannot change your own role' : ''}
                           >
                             <option value="sender">Sender</option>
                             <option value="courier">Courier</option>
@@ -599,12 +602,21 @@ export default function AdminPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           {u.is_active ? (
-                            <button
-                              onClick={() => handleToggleUserActive(u.id, u.is_active)}
-                              className="text-red-600 hover:text-red-900 font-medium"
-                            >
-                              Deactivate
-                            </button>
+                            u.id === user?.id ? (
+                              <span
+                                className="text-gray-400 cursor-not-allowed"
+                                title="You cannot deactivate your own account"
+                              >
+                                Deactivate
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => handleToggleUserActive(u.id, u.is_active)}
+                                className="text-red-600 hover:text-red-900 font-medium"
+                              >
+                                Deactivate
+                              </button>
+                            )
                           ) : (
                             <button
                               onClick={() => handleToggleUserActive(u.id, u.is_active)}

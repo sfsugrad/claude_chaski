@@ -227,6 +227,13 @@ async def update_user_role(
             detail="User not found"
         )
 
+    # Prevent admin from changing their own role
+    if user.id == admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You cannot change your own role"
+        )
+
     # Validate role
     role_upper = role_update.role.upper()
     try:
@@ -235,13 +242,6 @@ async def update_user_role(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid role. Must be one of: SENDER, COURIER, BOTH, ADMIN"
-        )
-
-    # Prevent admin from removing their own admin role
-    if user.id == admin.id and new_role != UserRole.ADMIN:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot remove your own admin privileges"
         )
 
     user.role = new_role
@@ -291,8 +291,8 @@ async def toggle_user_active(
     # Prevent admin from deactivating themselves
     if user.id == admin.id and not toggle_data.is_active:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot deactivate your own account"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You cannot deactivate your own account"
         )
 
     user.is_active = toggle_data.is_active

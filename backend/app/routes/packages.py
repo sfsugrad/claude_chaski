@@ -195,8 +195,95 @@ async def get_package(
     return package
 
 
+class PackageUpdate(BaseModel):
+    description: str | None = Field(None, min_length=1, max_length=500)
+    size: str | None = Field(None, pattern="^(small|medium|large|extra_large)$")
+    weight_kg: float | None = Field(None, gt=0, le=1000)
+    pickup_contact_name: str | None = None
+    pickup_contact_phone: str | None = None
+    dropoff_contact_name: str | None = None
+    dropoff_contact_phone: str | None = None
+    price: float | None = Field(None, ge=0)
+
+
 class StatusUpdate(BaseModel):
     status: str
+
+
+@router.put("/{package_id}", response_model=PackageResponse)
+async def update_package(
+    package_id: int,
+    package_update: PackageUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update package details.
+
+    Only the sender who created the package or an admin can update it.
+    Only pending packages can be edited.
+    """
+    package = db.query(Package).filter(Package.id == package_id).first()
+
+    if not package:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Package not found"
+        )
+
+    # Check permissions: must be admin or the sender who created it
+    is_admin = current_user.role.value == 'admin'
+    is_sender = package.sender_id == current_user.id
+
+    if not (is_admin or is_sender):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to edit this package"
+        )
+
+    # Only allow editing pending packages
+    if package.status != PackageStatus.PENDING:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot edit package with status '{package.status.value}'. Only pending packages can be edited."
+        )
+
+    # Update fields if provided
+    if package_update.description is not None:
+        package.description = package_update.description
+
+    if package_update.size is not None:
+        try:
+            package.size = PackageSize(package_update.size)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid package size. Must be: small, medium, large, or extra_large"
+            )
+
+    if package_update.weight_kg is not None:
+        package.weight_kg = package_update.weight_kg
+
+    if package_update.pickup_contact_name is not None:
+        package.pickup_contact_name = package_update.pickup_contact_name
+
+    if package_update.pickup_contact_phone is not None:
+        package.pickup_contact_phone = package_update.pickup_contact_phone
+
+    if package_update.dropoff_contact_name is not None:
+        package.dropoff_contact_name = package_update.dropoff_contact_name
+
+    if package_update.dropoff_contact_phone is not None:
+        package.dropoff_contact_phone = package_update.dropoff_contact_phone
+
+    if package_update.price is not None:
+        package.price = package_update.price
+
+    package.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(package)
+
+    return package
 
 
 @router.put("/{package_id}/status")

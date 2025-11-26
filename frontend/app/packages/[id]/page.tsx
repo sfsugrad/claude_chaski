@@ -45,6 +45,8 @@ export default function PackageDetailPage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [isEditing, setIsEditing] = useState(false)
+  const [editedPackage, setEditedPackage] = useState<Partial<Package>>({})
 
   useEffect(() => {
     loadPackageData()
@@ -128,6 +130,48 @@ export default function PackageDetailPage() {
       extra_large: 'Extra Large'
     }
     return sizeMap[size] || size
+  }
+
+  const canEdit = () => {
+    if (!currentUser || !pkg) return false
+    const isAdmin = currentUser.role === 'admin' || currentUser.role === 'ADMIN'
+    const isSender = pkg.sender_id === currentUser.id
+    const isPending = pkg.status.toLowerCase() === 'pending'
+    return (isAdmin || isSender) && isPending
+  }
+
+  const handleEdit = () => {
+    if (pkg) {
+      setEditedPackage({
+        description: pkg.description,
+        size: pkg.size,
+        weight_kg: pkg.weight_kg,
+        price: pkg.price,
+        pickup_contact_name: pkg.pickup_contact_name,
+        pickup_contact_phone: pkg.pickup_contact_phone,
+        dropoff_contact_name: pkg.dropoff_contact_name,
+        dropoff_contact_phone: pkg.dropoff_contact_phone
+      })
+      setIsEditing(true)
+    }
+  }
+
+  const handleCancel = () => {
+    setIsEditing(false)
+    setEditedPackage({})
+  }
+
+  const handleSave = async () => {
+    try {
+      await axios.put(`/packages/${packageId}`, editedPackage)
+      alert('Package updated successfully')
+      setIsEditing(false)
+      await loadPackageData()
+    } catch (err: any) {
+      console.error('Error updating package:', err)
+      const errorMessage = err.response?.data?.detail || 'Failed to update package'
+      alert(errorMessage)
+    }
   }
 
   if (loading) {
