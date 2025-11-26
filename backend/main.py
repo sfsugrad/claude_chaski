@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 from app.config import settings
 from app.database import engine
 from app.models import base
@@ -12,6 +13,16 @@ app = FastAPI(
     title="Chaski API",
     description="Courier-to-package matching platform API",
     version="1.0.0"
+)
+
+# Session middleware (required for OAuth)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.SECRET_KEY,
+    session_cookie="chaski_session",
+    max_age=3600,  # 1 hour
+    same_site="lax",
+    https_only=False  # Set to True in production with HTTPS
 )
 
 # CORS middleware

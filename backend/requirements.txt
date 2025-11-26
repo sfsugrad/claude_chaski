@@ -13,6 +13,11 @@ python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
 python-dotenv==1.0.0
+authlib==1.3.0
+itsdangerous==2.1.2
+
+# Email
+fastapi-mail==1.4.1
 
 # Geospatial
 geopy==2.4.1
