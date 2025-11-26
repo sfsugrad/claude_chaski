@@ -256,6 +256,66 @@ class ToggleUserActive(BaseModel):
     is_active: bool
 
 
+class UpdateUserProfile(BaseModel):
+    full_name: str | None = None
+    phone_number: str | None = None
+    max_deviation_km: int | None = None
+
+
+@router.put("/users/{user_id}/profile", response_model=UserAdminResponse)
+async def update_user_profile(
+    user_id: int,
+    profile_update: UpdateUserProfile,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Update user profile information (admin only).
+
+    Allows admins to update user's full name, phone number, and max deviation.
+
+    Args:
+        user_id: User ID
+        profile_update: Profile data to update
+        db: Database session
+        admin: Current admin user
+
+    Returns:
+        Updated user details
+
+    Raises:
+        HTTPException: If user not found or invalid max_deviation_km
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    # Update fields if provided
+    if profile_update.full_name is not None:
+        user.full_name = profile_update.full_name
+
+    if profile_update.phone_number is not None:
+        user.phone_number = profile_update.phone_number
+
+    if profile_update.max_deviation_km is not None:
+        # Validate max_deviation_km range
+        if profile_update.max_deviation_km < 1 or profile_update.max_deviation_km > 500:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Max deviation must be between 1 and 500 km"
+            )
+        user.max_deviation_km = profile_update.max_deviation_km
+
+    user.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(user)
+
+    return user
+
+
 @router.put("/users/{user_id}/toggle-active", response_model=UserAdminResponse)
 async def toggle_user_active(
     user_id: int,

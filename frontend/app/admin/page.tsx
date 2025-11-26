@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import axios from '@/lib/api'
 
 interface User {
@@ -556,9 +557,12 @@ export default function AdminPage() {
                     {getFilteredUsers().map((u) => (
                       <tr key={u.id} className={!u.is_active ? 'bg-gray-50 opacity-60' : ''}>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
+                          <Link
+                            href={`/admin/users/${u.id}`}
+                            className="text-sm font-medium text-purple-600 hover:text-purple-700 hover:underline"
+                          >
                             {u.full_name}
-                          </div>
+                          </Link>
                           <div className="text-sm text-gray-500">{u.email}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">

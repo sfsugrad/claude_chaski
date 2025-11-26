@@ -543,6 +543,254 @@ class TestAdminUserToggleActive:
         assert users[2].is_active is True
 
 
+class TestAdminUserProfileUpdate:
+    """Tests for admin user profile update endpoint"""
+
+    def test_update_user_full_name(self, client, db_session, authenticated_admin, test_user_data):
+        """Test admin can update user's full name"""
+        # Create a user
+        client.post("/api/auth/register", json=test_user_data)
+        user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+        original_name = user.full_name
+
+        # Update full name
+        response = client.put(
+            f"/api/admin/users/{user.id}/profile",
+            json={"full_name": "Updated Name"},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["full_name"] == "Updated Name"
+        assert data["full_name"] != original_name
+
+        # Verify in database
+        db_session.refresh(user)
+        assert user.full_name == "Updated Name"
+
+    def test_update_user_phone_number(self, client, db_session, authenticated_admin, test_user_data):
+        """Test admin can update user's phone number"""
+        # Create a user
+        client.post("/api/auth/register", json=test_user_data)
+        user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+
+        # Update phone number
+        response = client.put(
+            f"/api/admin/users/{user.id}/profile",
+            json={"phone_number": "+1234567890"},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["phone_number"] == "+1234567890"
+
+        # Verify in database
+        db_session.refresh(user)
+        assert user.phone_number == "+1234567890"
+
+    def test_update_user_max_deviation_km(self, client, db_session, authenticated_admin, test_user_data):
+        """Test admin can update user's max deviation km"""
+        # Create a user
+        client.post("/api/auth/register", json=test_user_data)
+        user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+        original_max_deviation = user.max_deviation_km
+
+        # Update max deviation
+        response = client.put(
+            f"/api/admin/users/{user.id}/profile",
+            json={"max_deviation_km": 100},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["max_deviation_km"] == 100
+        assert data["max_deviation_km"] != original_max_deviation
+
+        # Verify in database
+        db_session.refresh(user)
+        assert user.max_deviation_km == 100
+
+    def test_update_multiple_profile_fields(self, client, db_session, authenticated_admin, test_user_data):
+        """Test admin can update multiple profile fields at once"""
+        # Create a user
+        client.post("/api/auth/register", json=test_user_data)
+        user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+
+        # Update multiple fields
+        response = client.put(
+            f"/api/admin/users/{user.id}/profile",
+            json={
+                "full_name": "New Name",
+                "phone_number": "+9876543210",
+                "max_deviation_km": 250
+            },
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["full_name"] == "New Name"
+        assert data["phone_number"] == "+9876543210"
+        assert data["max_deviation_km"] == 250
+
+        # Verify in database
+        db_session.refresh(user)
+        assert user.full_name == "New Name"
+        assert user.phone_number == "+9876543210"
+        assert user.max_deviation_km == 250
+
+    def test_update_max_deviation_km_min_boundary(self, client, db_session, authenticated_admin, test_user_data):
+        """Test max deviation km minimum boundary (1 km)"""
+        # Create a user
+        client.post("/api/auth/register", json=test_user_data)
+        user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+
+        # Update to minimum value (1 km)
+        response = client.put(
+            f"/api/admin/users/{user.id}/profile",
+            json={"max_deviation_km": 1},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["max_deviation_km"] == 1
+
+    def test_update_max_deviation_km_max_boundary(self, client, db_session, authenticated_admin, test_user_data):
+        """Test max deviation km maximum boundary (500 km)"""
+        # Create a user
+        client.post("/api/auth/register", json=test_user_data)
+        user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+
+        # Update to maximum value (500 km)
+        response = client.put(
+            f"/api/admin/users/{user.id}/profile",
+            json={"max_deviation_km": 500},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["max_deviation_km"] == 500
+
+    def test_update_max_deviation_km_below_minimum(self, client, db_session, authenticated_admin, test_user_data):
+        """Test max deviation km below minimum returns 400"""
+        # Create a user
+        client.post("/api/auth/register", json=test_user_data)
+        user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+
+        # Try to update to below minimum (0 km)
+        response = client.put(
+            f"/api/admin/users/{user.id}/profile",
+            json={"max_deviation_km": 0},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "between 1 and 500" in response.json()["detail"].lower()
+
+    def test_update_max_deviation_km_above_maximum(self, client, db_session, authenticated_admin, test_user_data):
+        """Test max deviation km above maximum returns 400"""
+        # Create a user
+        client.post("/api/auth/register", json=test_user_data)
+        user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+
+        # Try to update to above maximum (501 km)
+        response = client.put(
+            f"/api/admin/users/{user.id}/profile",
+            json={"max_deviation_km": 501},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "between 1 and 500" in response.json()["detail"].lower()
+
+    def test_update_user_profile_not_found(self, client, authenticated_admin):
+        """Test updating non-existent user returns 404"""
+        response = client.put(
+            "/api/admin/users/99999/profile",
+            json={"full_name": "Test Name"},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert "not found" in response.json()["detail"].lower()
+
+    def test_update_user_profile_as_non_admin(self, client, db_session, authenticated_sender, test_user_data):
+        """Test non-admin cannot update user profile"""
+        # Create a user
+        client.post("/api/auth/register", json=test_user_data)
+        user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+
+        # Try to update as non-admin
+        response = client.put(
+            f"/api/admin/users/{user.id}/profile",
+            json={"full_name": "New Name"},
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert "admin" in response.json()["detail"].lower()
+
+    def test_update_user_profile_without_authentication(self, client, db_session, test_user_data):
+        """Test cannot update user profile without authentication"""
+        # Create a user
+        client.post("/api/auth/register", json=test_user_data)
+        user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+
+        # Try to update without authentication
+        response = client.put(
+            f"/api/admin/users/{user.id}/profile",
+            json={"full_name": "New Name"}
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_update_user_profile_updates_timestamp(self, client, db_session, authenticated_admin, test_user_data):
+        """Test updating profile updates the updated_at timestamp"""
+        # Create a user
+        client.post("/api/auth/register", json=test_user_data)
+        user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+        original_updated_at = user.updated_at
+
+        # Update profile
+        response = client.put(
+            f"/api/admin/users/{user.id}/profile",
+            json={"full_name": "Updated Name"},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+
+        # Verify timestamp was updated
+        db_session.refresh(user)
+        assert user.updated_at is not None
+        if original_updated_at:
+            assert user.updated_at > original_updated_at
+
+    def test_update_user_profile_with_empty_phone(self, client, db_session, authenticated_admin, test_user_data):
+        """Test admin can clear phone number by setting it to empty string"""
+        # Create a user with phone number
+        test_user_data_with_phone = test_user_data.copy()
+        test_user_data_with_phone["phone_number"] = "+1234567890"
+        client.post("/api/auth/register", json=test_user_data_with_phone)
+        user = db_session.query(User).filter(User.email == test_user_data_with_phone["email"]).first()
+
+        # Clear phone number
+        response = client.put(
+            f"/api/admin/users/{user.id}/profile",
+            json={"phone_number": ""},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["phone_number"] == ""
+
+
 class TestAdminPackageManagement:
     """Tests for admin package management endpoints"""
 
