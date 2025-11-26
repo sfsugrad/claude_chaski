@@ -52,6 +52,44 @@ export interface TokenResponse {
   token_type: string
 }
 
+export interface PackageCreate {
+  description: string
+  size: 'small' | 'medium' | 'large' | 'extra_large'
+  weight_kg: number
+  pickup_address: string
+  pickup_lat: number
+  pickup_lng: number
+  dropoff_address: string
+  dropoff_lat: number
+  dropoff_lng: number
+  pickup_contact_name?: string
+  pickup_contact_phone?: string
+  dropoff_contact_name?: string
+  dropoff_contact_phone?: string
+  price?: number
+}
+
+export interface PackageResponse {
+  id: number
+  sender_id: number
+  description: string
+  size: string
+  weight_kg: number
+  status: string
+  pickup_address: string
+  pickup_lat: number
+  pickup_lng: number
+  dropoff_address: string
+  dropoff_lat: number
+  dropoff_lng: number
+  pickup_contact_name: string | null
+  pickup_contact_phone: string | null
+  dropoff_contact_name: string | null
+  dropoff_contact_phone: string | null
+  price: number | null
+  created_at: string
+}
+
 // Auth API
 export const authAPI = {
   register: (data: RegisterData) => api.post<UserResponse>('/auth/register', data),
@@ -61,9 +99,9 @@ export const authAPI = {
 
 // Packages API
 export const packagesAPI = {
-  create: (data: any) => api.post('/packages', data),
-  getAll: () => api.get('/packages'),
-  getById: (id: number) => api.get(`/packages/${id}`),
+  create: (data: PackageCreate) => api.post<PackageResponse>('/packages', data),
+  getAll: () => api.get<PackageResponse[]>('/packages'),
+  getById: (id: number) => api.get<PackageResponse>(`/packages/${id}`),
   updateStatus: (id: number, status: string) =>
     api.put(`/packages/${id}/status`, { status }),
 }

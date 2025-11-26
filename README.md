@@ -13,10 +13,13 @@ Chaski is a logistics platform that connects package senders with couriers trave
 - **Role-based Access Control** (sender, courier, or both)
 
 ### For Senders
-- Create package delivery requests with pickup and dropoff addresses
-- Specify package details (size, weight, description)
-- Get matched with couriers traveling along your route
-- Track package status in real-time
+- **Create Package Delivery Requests** with Google Places address autocomplete (coordinates auto-generated)
+- **Smart Address Input**: Type and select from Google Places suggestions for accurate addresses
+- **Specify Package Details**: size (small to extra large), weight, description, optional price
+- **Pickup & Dropoff Information**: full addresses with optional contact details
+- **Get Matched** with couriers traveling along your route
+- **Track Package Status** in real-time (pending, matched, picked_up, in_transit, delivered)
+- **View All Packages** from the dashboard
 
 ### For Couriers
 - Enter your travel route (start and destination)
@@ -26,11 +29,12 @@ Chaski is a logistics platform that connects package senders with couriers trave
 - Update delivery status
 
 ### System
-- Intelligent route matching algorithm
-- Geolocation-based package discovery
-- Configurable deviation distance
-- Real-time matching updates
-- Beautiful, responsive UI with Tailwind CSS
+- **Intelligent Route Matching Algorithm** - Matches packages with couriers on similar routes
+- **Geolocation-Based Package Discovery** - Auto-geocoding from addresses (coordinates generated automatically)
+- **Configurable Deviation Distance** - Couriers set how far they'll deviate from their route
+- **Real-time Matching Updates** - Instant notifications when matches are found
+- **Beautiful, Responsive UI** - Modern design with Tailwind CSS
+- **Type-Safe API** - Full TypeScript interfaces for frontend-backend communication
 
 ## Tech Stack
 
@@ -71,6 +75,8 @@ chaski/
     │   ├── register/    # Registration page
     │   ├── login/       # Login page
     │   ├── dashboard/   # User dashboard
+    │   ├── packages/    # Package management
+    │   │   └── create/  # Package creation form
     │   ├── verify-email/# Email verification page
     │   └── auth/        # OAuth callback handler
     ├── components/      # React components (GoogleSignInButton, etc.)
@@ -193,13 +199,37 @@ chaski/
    npm install
    ```
 
-3. **Create `.env.local` file (optional):**
+3. **Create `.env.local` file:**
    ```bash
-   # Only if you need to override defaults
+   cp .env.example .env.local
+   ```
+
+4. **Configure environment variables in `.env.local`:**
+
+   **Required:**
+   ```env
    NEXT_PUBLIC_API_URL=http://localhost:8000
    ```
 
-4. **Run the development server:**
+   **Optional (but recommended for address autocomplete):**
+   ```env
+   NEXT_PUBLIC_GOOGLE_PLACES_API_KEY=your-google-places-api-key-here
+   ```
+
+   To get a Google Places API key:
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create or select a project
+   - Go to "APIs & Services" → "Library"
+   - Enable "Places API"
+   - Go to "APIs & Services" → "Credentials"
+   - Create an API key
+   - (Recommended) Restrict the API key to:
+     - Website restrictions: Add `http://localhost:3000` for development
+     - API restrictions: Limit to "Places API"
+
+   **Note:** The application works without the Google Places API key, but users will need to manually enter coordinates. With the API key, addresses auto-complete and coordinates are automatically populated.
+
+5. **Run the development server:**
    ```bash
    npm run dev
    ```
@@ -233,10 +263,13 @@ npm run dev
 - `GET /api/auth/google/callback` - Handle Google OAuth callback
 
 ### Packages (Sender)
-- `POST /api/packages` - Create new package
-- `GET /api/packages` - Get user's packages
-- `GET /api/packages/{id}` - Get package details
-- `PUT /api/packages/{id}/status` - Update package status
+- `POST /api/packages` - Create new package (requires sender or both role)
+  - Required: description, size, weight_kg, pickup/dropoff addresses and coordinates
+  - Optional: contact info for pickup/dropoff, price
+  - Validates: weight (0-1000kg), description length (max 500 chars), size enum
+- `GET /api/packages` - Get user's packages (sender's created packages, courier's assigned packages)
+- `GET /api/packages/{id}` - Get package details (with access control)
+- `PUT /api/packages/{id}/status` - Update package status (courier only)
 
 ### Couriers
 - `POST /api/couriers/routes` - Create new route
@@ -270,6 +303,26 @@ npm run dev
    - Receives JWT token
    - Redirects to dashboard
 
+### Package Creation (Senders)
+
+1. **Access Package Creation:**
+   - Login to dashboard at `/dashboard`
+   - Click "Create Package" button (sender or both roles only)
+   - Redirects to `/packages/create`
+
+2. **Fill Package Details:**
+   - **Package Information**: Enter description, select size (small/medium/large/extra_large), specify weight
+   - **Pickup Location**: Enter full pickup address, add optional contact name and phone
+   - **Dropoff Location**: Enter full dropoff address, add optional contact name and phone
+   - **Pricing**: Optionally set a price, or leave empty for courier offers
+   - Coordinates are automatically generated from addresses
+
+3. **Submit Package:**
+   - Form validates all required fields
+   - Package is created with "pending" status
+   - Redirects back to dashboard
+   - Package is now available for courier matching
+
 ## Database Schema
 
 ### Users
@@ -281,12 +334,22 @@ npm run dev
 - Timestamps (created_at, updated_at)
 
 ### Packages
-- Sender and courier IDs
-- Package details (description, size, weight)
-- Pickup location (address, lat/lng, contact)
-- Dropoff location (address, lat/lng, contact)
-- Status (pending, matched, picked_up, in_transit, delivered)
-- Pricing and timestamps
+- Sender and courier IDs (foreign keys to Users)
+- Package details:
+  - Description (max 500 characters)
+  - Size: small, medium, large, extra_large
+  - Weight (0-1000 kg)
+- Pickup location:
+  - Full address (street, city, state, zip)
+  - Coordinates (lat/lng, auto-generated)
+  - Optional contact name and phone
+- Dropoff location:
+  - Full address (street, city, state, zip)
+  - Coordinates (lat/lng, auto-generated)
+  - Optional contact name and phone
+- Status: pending → matched → picked_up → in_transit → delivered
+- Optional pricing (or null for courier offers)
+- Timestamps (created_at, updated_at)
 
 ### Courier Routes
 - Courier ID
@@ -312,7 +375,7 @@ pytest --cov=app tests/
 
 ## Development Roadmap
 
-### Phase 1: Core Features ✅
+### Phase 1: Core Features (In Progress)
 - [x] Basic project structure
 - [x] Database models
 - [x] User authentication with JWT
@@ -320,9 +383,15 @@ pytest --cov=app tests/
 - [x] Google OAuth integration
 - [x] Frontend registration & login
 - [x] User dashboard
-- [ ] Package creation
-- [ ] Route creation
-- [ ] Basic matching algorithm
+- [x] **Package creation** (Backend & Frontend complete)
+  - [x] Full CRUD API endpoints
+  - [x] Package creation form with validation
+  - [x] Auto-geocoding from addresses
+  - [x] Role-based access control
+  - [x] Google Places autocomplete for address input
+- [ ] Route creation for couriers
+- [ ] Package-route matching algorithm
+- [ ] Package listing and management
 
 ### Phase 2: Enhanced Matching
 - [ ] Advanced route matching with real road distances
@@ -345,12 +414,15 @@ pytest --cov=app tests/
 ## Security Features
 
 - **Password Hashing**: Bcrypt with salt
-- **JWT Tokens**: Secure token-based authentication
-- **Email Verification**: Prevents fake accounts
-- **OAuth 2.0**: Industry-standard authentication
-- **CORS Protection**: Configured for frontend origin
+- **JWT Tokens**: Secure token-based authentication with expiration
+- **Email Verification**: Prevents fake accounts with secure token validation
+- **OAuth 2.0**: Industry-standard authentication via Google
+- **Role-Based Access Control**: Package creation restricted to senders, status updates to couriers
+- **Resource Access Control**: Users can only view/modify their own packages
+- **CORS Protection**: Configured for frontend origin only
 - **SQL Injection Protection**: SQLAlchemy ORM parameterization
-- **Input Validation**: Pydantic models for request validation
+- **Input Validation**: Pydantic models for all request/response validation
+- **Field-Level Validation**: Weight limits, description length, enum types enforced
 
 ## Environment Variables
 
@@ -369,6 +441,7 @@ GOOGLE_CLIENT_SECRET=your-client-secret
 ### Frontend (.env.local)
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_GOOGLE_PLACES_API_KEY=your-google-places-api-key-here
 ```
 
 ## Troubleshooting
