@@ -67,6 +67,7 @@ export interface PackageCreate {
   dropoff_contact_name?: string
   dropoff_contact_phone?: string
   price?: number
+  sender_id?: number  // Admin only: specify sender user
 }
 
 export interface PackageResponse {

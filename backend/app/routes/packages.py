@@ -30,6 +30,7 @@ class PackageCreate(BaseModel):
     dropoff_contact_name: str | None = None
     dropoff_contact_phone: str | None = None
     price: float | None = Field(None, ge=0)
+    sender_id: int | None = None  # Admin only: specify sender user
 
 class PackageResponse(BaseModel):
     id: int
@@ -63,13 +64,13 @@ async def create_package(
     """
     Create a new package delivery request.
 
-    Requires authentication. User must have 'sender' or 'both' role.
+    Requires authentication. User must have 'sender', 'both', or 'admin' role.
     """
     # Verify user can send packages
-    if current_user.role.value not in ['sender', 'both']:
+    if current_user.role.value not in ['sender', 'both', 'admin']:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only senders can create packages"
+            detail="Only senders and admins can create packages"
         )
 
     # Validate package size
@@ -81,9 +82,27 @@ async def create_package(
             detail="Invalid package size. Must be: small, medium, large, or extra_large"
         )
 
+    # Determine sender_id: use provided sender_id if admin, otherwise current user
+    sender_id = current_user.id
+    if package_data.sender_id is not None:
+        # Only admins can specify a different sender
+        if current_user.role.value != 'admin':
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admins can create packages for other users"
+            )
+        # Verify the specified sender exists
+        sender = db.query(User).filter(User.id == package_data.sender_id).first()
+        if not sender:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User with ID {package_data.sender_id} not found"
+            )
+        sender_id = package_data.sender_id
+
     # Create package
     new_package = Package(
-        sender_id=current_user.id,
+        sender_id=sender_id,
         description=package_data.description,
         size=package_size,
         weight_kg=package_data.weight_kg,
@@ -116,10 +135,15 @@ async def get_packages(
     """
     Get all packages for current user.
 
+    - If admin: returns all packages
     - If sender: returns packages they've created
     - If courier: returns packages they're delivering
     - If both: returns all their packages
     """
+    # Admins can see all packages
+    if current_user.role.value == 'admin':
+        return db.query(Package).order_by(Package.created_at.desc()).all()
+
     packages = []
 
     if current_user.role.value in ['sender', 'both']:
@@ -156,6 +180,10 @@ async def get_package(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Package not found"
         )
+
+    # Admins can view any package
+    if current_user.role.value == 'admin':
+        return package
 
     # Check if user has access to this package
     if package.sender_id != current_user.id and package.courier_id != current_user.id:

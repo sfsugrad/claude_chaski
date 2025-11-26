@@ -135,3 +135,41 @@ def authenticated_both_role(client):
         "password": user_data["password"]
     })
     return login_response.json()["access_token"]
+
+
+@pytest.fixture
+def test_admin_data():
+    """Sample admin user data for testing"""
+    return {
+        "email": "admin@example.com",
+        "password": "adminpass123",
+        "full_name": "Admin User",
+        "role": "admin"
+    }
+
+
+@pytest.fixture
+def authenticated_admin(client, db_session, test_admin_data):
+    """Create and authenticate an admin user, return token"""
+    from app.models.user import User, UserRole
+    from app.utils.auth import get_password_hash
+
+    # Create admin user directly in database (since registration doesn't allow admin role)
+    admin_user = User(
+        email=test_admin_data["email"],
+        hashed_password=get_password_hash(test_admin_data["password"]),
+        full_name=test_admin_data["full_name"],
+        role=UserRole.ADMIN,
+        is_active=True,
+        is_verified=True,
+        max_deviation_km=5
+    )
+    db_session.add(admin_user)
+    db_session.commit()
+
+    # Login to get token
+    login_response = client.post("/api/auth/login", json={
+        "email": test_admin_data["email"],
+        "password": test_admin_data["password"]
+    })
+    return login_response.json()["access_token"]

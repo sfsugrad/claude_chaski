@@ -7,6 +7,7 @@ class UserRole(str, enum.Enum):
     SENDER = "sender"
     COURIER = "courier"
     BOTH = "both"  # User can be both sender and courier
+    ADMIN = "admin"  # Platform administrator
 
 class User(Base):
     __tablename__ = "users"

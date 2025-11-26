@@ -64,3 +64,27 @@ def get_current_active_user(
     This is an alias for get_current_user since we already check is_active.
     """
     return current_user
+
+
+def get_current_admin_user(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """
+    Dependency to get the current admin user.
+    Ensures the user has ADMIN role.
+
+    Raises:
+        HTTPException: If user is not an admin
+
+    Returns:
+        User: The authenticated admin user
+    """
+    from app.models.user import UserRole
+
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required"
+        )
+
+    return current_user

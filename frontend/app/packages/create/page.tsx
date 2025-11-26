@@ -1,10 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { packagesAPI, PackageCreate } from '@/lib/api'
+import { packagesAPI, PackageCreate, authAPI } from '@/lib/api'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
+import axios from '@/lib/api'
+
+interface User {
+  id: number
+  email: string
+  full_name: string
+  role: string
+}
 
 export default function CreatePackagePage() {
   const router = useRouter()
@@ -23,9 +31,43 @@ export default function CreatePackagePage() {
     dropoff_contact_name: '',
     dropoff_contact_phone: '',
     price: undefined,
+    sender_id: undefined,
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [users, setUsers] = useState<User[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(false)
+
+  useEffect(() => {
+    checkAdminAndLoadUsers()
+  }, [])
+
+  const checkAdminAndLoadUsers = async () => {
+    try {
+      const response = await authAPI.getCurrentUser()
+      const currentUser = response.data
+
+      if (currentUser.role === 'admin' || currentUser.role === 'ADMIN') {
+        setIsAdmin(true)
+        await loadUsers()
+      }
+    } catch (err) {
+      console.error('Error checking user role:', err)
+    }
+  }
+
+  const loadUsers = async () => {
+    setLoadingUsers(true)
+    try {
+      const response = await axios.get('/admin/users')
+      setUsers(response.data)
+    } catch (err) {
+      console.error('Error loading users:', err)
+    } finally {
+      setLoadingUsers(false)
+    }
+  }
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -35,6 +77,8 @@ export default function CreatePackagePage() {
       ...prev,
       [name]: name === 'weight_kg' || name === 'price'
         ? parseFloat(value) || 0
+        : name === 'sender_id'
+        ? value ? parseInt(value) : undefined
         : value,
     }))
   }
@@ -161,6 +205,44 @@ export default function CreatePackagePage() {
                 Package Details
               </h3>
               <div className="space-y-4">
+                {/* Admin Only: Select User */}
+                {isAdmin && (
+                  <div className="bg-purple-50 border border-purple-200 rounded-md p-4">
+                    <label
+                      htmlFor="sender_id"
+                      className="block text-sm font-medium text-purple-900 mb-2"
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-6-3a2 2 0 11-4 0 2 2 0 014 0zm-2 4a5 5 0 00-4.546 2.916A5.986 5.986 0 0010 16a5.986 5.986 0 004.546-2.084A5 5 0 0010 11z" clipRule="evenodd" />
+                        </svg>
+                        Create Package For User (Admin Only)
+                      </span>
+                    </label>
+                    {loadingUsers ? (
+                      <div className="text-sm text-purple-600">Loading users...</div>
+                    ) : (
+                      <select
+                        id="sender_id"
+                        name="sender_id"
+                        value={formData.sender_id || ''}
+                        onChange={handleChange}
+                        className="mt-1 block w-full px-3 py-2 border border-purple-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500 bg-white"
+                      >
+                        <option value="">Select a user (leave empty to create for yourself)</option>
+                        {users.map((user) => (
+                          <option key={user.id} value={user.id}>
+                            {user.full_name} ({user.email}) - {user.role}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <p className="mt-1 text-xs text-purple-700">
+                      As an admin, you can create packages on behalf of other users. Select a user from the list or leave empty to create for yourself.
+                    </p>
+                  </div>
+                )}
+
                 {/* Description */}
                 <div>
                   <label
