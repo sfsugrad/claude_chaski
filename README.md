@@ -28,6 +28,16 @@ Chaski is a logistics platform that connects package senders with couriers trave
 - Accept packages to deliver and earn money
 - Update delivery status
 
+### For Admins
+- **Admin Dashboard** with comprehensive platform statistics
+- **User Management**: View, create, update roles, and delete users
+- **Package Management**: View all packages, filter by status and active state
+- **Package Detail View**: Comprehensive view of all package information
+- **Soft Delete**: Deactivate packages (pending only) instead of hard deletion
+- **Status Filtering**: Filter packages by status (pending, delivered, etc.) and active state
+- **User Creation**: Create users with any role including admin privileges
+- **Platform Statistics**: Real-time metrics on users, packages, and revenue
+
 ### System
 - **Intelligent Route Matching Algorithm** - Matches packages with couriers on similar routes
 - **Geolocation-Based Package Discovery** - Auto-geocoding from addresses (coordinates generated automatically)
@@ -35,6 +45,8 @@ Chaski is a logistics platform that connects package senders with couriers trave
 - **Real-time Matching Updates** - Instant notifications when matches are found
 - **Beautiful, Responsive UI** - Modern design with Tailwind CSS
 - **Type-Safe API** - Full TypeScript interfaces for frontend-backend communication
+- **Admin Dashboard** - Comprehensive admin panel for platform management
+- **Soft Delete Functionality** - Package deactivation with preservation of historical data
 
 ## Tech Stack
 
@@ -63,9 +75,19 @@ chaski/
 ├── backend/              # FastAPI backend
 │   ├── app/
 │   │   ├── models/      # Database models (User, Package, Route)
-│   │   ├── routes/      # API endpoints (auth, packages, couriers, matching)
-│   │   ├── utils/       # Utility functions (auth, email, oauth)
+│   │   ├── routes/      # API endpoints
+│   │   │   ├── auth.py        # Authentication & authorization
+│   │   │   ├── packages.py    # Package management
+│   │   │   ├── couriers.py    # Courier routes
+│   │   │   ├── matching.py    # Package-courier matching
+│   │   │   └── admin.py       # Admin-only endpoints
+│   │   ├── utils/       # Utility functions
+│   │   │   ├── auth.py        # JWT & password hashing
+│   │   │   ├── email.py       # Email sending
+│   │   │   ├── oauth.py       # Google OAuth
+│   │   │   └── dependencies.py # Auth dependencies
 │   │   └── config.py    # Configuration settings
+│   ├── migrations/      # Database migrations
 │   ├── tests/           # Pytest test suite
 │   ├── main.py          # Application entry point
 │   └── requirements.txt # Python dependencies
@@ -75,8 +97,10 @@ chaski/
     │   ├── register/    # Registration page
     │   ├── login/       # Login page
     │   ├── dashboard/   # User dashboard
+    │   ├── admin/       # Admin dashboard
     │   ├── packages/    # Package management
-    │   │   └── create/  # Package creation form
+    │   │   ├── create/  # Package creation form
+    │   │   └── [id]/    # Package detail page
     │   ├── verify-email/# Email verification page
     │   └── auth/        # OAuth callback handler
     ├── components/      # React components (GoogleSignInButton, etc.)
@@ -172,9 +196,13 @@ chaski/
    - Create OAuth client ID (Web application)
    - Add authorized redirect URI: `http://localhost:8000/api/auth/google/callback`
 
-7. **Add verification_token column to database:**
+7. **Run database migrations:**
    ```bash
+   # Add verification_token column to users table
    psql -d chaski_db -c "ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token VARCHAR;"
+
+   # Add is_active column to packages table (for soft delete)
+   PYTHONPATH=/path/to/chaski/backend python3 migrations/add_package_is_active.py
    ```
 
 8. **Run the development server:**
@@ -282,6 +310,18 @@ npm run dev
 - `POST /api/matching/accept-package/{package_id}` - Accept package delivery
 - `POST /api/matching/decline-package/{package_id}` - Decline package
 
+### Admin (Admin Role Required)
+- `GET /api/admin/users` - Get all users with pagination
+- `POST /api/admin/users` - Create new user with any role
+- `GET /api/admin/users/{id}` - Get specific user details
+- `PUT /api/admin/users/{id}` - Update user role
+- `DELETE /api/admin/users/{id}` - Delete user (cascade to packages)
+- `GET /api/admin/packages` - Get all packages with pagination
+- `GET /api/admin/packages/{id}` - Get specific package details
+- `PUT /api/admin/packages/{id}/toggle-active` - Activate/deactivate package (pending only)
+- `DELETE /api/admin/packages/{id}` - Delete package
+- `GET /api/admin/stats` - Get platform statistics (users, packages, revenue)
+
 ## User Flow
 
 ### Registration & Login
@@ -323,6 +363,40 @@ npm run dev
    - Redirects back to dashboard
    - Package is now available for courier matching
 
+### Admin Dashboard (Admins Only)
+
+1. **Access Admin Dashboard:**
+   - Login with admin role credentials
+   - Automatically redirects to `/admin`
+   - View platform overview with real-time statistics
+
+2. **User Management:**
+   - **View All Users**: See complete list with roles, verification status, and join dates
+   - **Create New User**: Click "+ Create User" button
+     - Fill in email, password (min 8 chars), full name, role
+     - Optionally add phone number and max deviation
+     - Users created by admin are automatically verified
+   - **Update User Role**: Select new role from dropdown (sender, courier, both, admin)
+   - **Delete User**: Remove user account (cannot delete self)
+
+3. **Package Management:**
+   - **View All Packages**: See all packages in the system with sender information
+   - **Filter Packages**:
+     - By status: pending, matched, picked_up, in_transit, delivered, cancelled
+     - By active state: active, inactive, or all
+   - **Package Details**: Click package ID to view comprehensive information
+     - Package details (size, weight, price)
+     - Sender and courier information
+     - Pickup and dropoff locations with coordinates
+     - Contact information
+   - **Deactivate Package**: Soft delete for pending packages only (preserves data)
+   - **Activate Package**: Re-enable deactivated packages
+
+4. **Platform Statistics:**
+   - Total users breakdown by role (senders, couriers, both, admins)
+   - Package metrics (total, active, completed, pending)
+   - Total revenue from completed deliveries
+
 ## Database Schema
 
 ### Users
@@ -349,7 +423,11 @@ npm run dev
   - Optional contact name and phone
 - Status: pending → matched → picked_up → in_transit → delivered
 - Optional pricing (or null for courier offers)
-- Timestamps (created_at, updated_at)
+- **is_active**: Boolean flag for soft delete (default: true)
+  - Only pending packages can be deactivated
+  - Inactive packages are hidden from regular views
+  - Data preserved for historical records
+- Timestamps (created_at, updated_at, pickup_time, delivery_time)
 
 ### Courier Routes
 - Courier ID
@@ -389,9 +467,20 @@ pytest --cov=app tests/
   - [x] Auto-geocoding from addresses
   - [x] Role-based access control
   - [x] Google Places autocomplete for address input
+- [x] **Admin Dashboard** (Complete)
+  - [x] Platform statistics and metrics
+  - [x] User management (view, create, update, delete)
+  - [x] Package management with filtering
+  - [x] Package detail view
+  - [x] Soft delete for packages
+  - [x] Admin-only access control
+- [x] **Package Information Pages**
+  - [x] Comprehensive package detail page
+  - [x] Pickup and dropoff location display
+  - [x] Sender and courier information
 - [ ] Route creation for couriers
 - [ ] Package-route matching algorithm
-- [ ] Package listing and management
+- [ ] Package listing and management for users
 
 ### Phase 2: Enhanced Matching
 - [ ] Advanced route matching with real road distances
@@ -417,12 +506,21 @@ pytest --cov=app tests/
 - **JWT Tokens**: Secure token-based authentication with expiration
 - **Email Verification**: Prevents fake accounts with secure token validation
 - **OAuth 2.0**: Industry-standard authentication via Google
-- **Role-Based Access Control**: Package creation restricted to senders, status updates to couriers
-- **Resource Access Control**: Users can only view/modify their own packages
+- **Role-Based Access Control**:
+  - Package creation restricted to senders
+  - Status updates restricted to couriers
+  - Admin endpoints require admin role
+  - Users cannot escalate their own privileges
+- **Resource Access Control**:
+  - Users can only view/modify their own packages
+  - Admins have full access to all resources
+  - Self-protection: Admins cannot delete themselves or remove their own admin role
 - **CORS Protection**: Configured for frontend origin only
 - **SQL Injection Protection**: SQLAlchemy ORM parameterization
 - **Input Validation**: Pydantic models for all request/response validation
 - **Field-Level Validation**: Weight limits, description length, enum types enforced
+- **Soft Delete**: Data preservation through deactivation rather than permanent deletion
+- **Business Rule Enforcement**: Only pending packages can be deactivated
 
 ## Environment Variables
 

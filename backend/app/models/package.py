@@ -47,6 +47,7 @@ class Package(Base):
     # Status and pricing
     status = Column(SQLEnum(PackageStatus), default=PackageStatus.PENDING)
     price = Column(Float)  # Price sender is willing to pay
+    is_active = Column(Boolean, default=True)  # Soft delete flag
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())

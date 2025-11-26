@@ -17,10 +17,14 @@ interface User {
 interface Package {
   id: number
   sender_id: number
-  pickup_location: string
-  dropoff_location: string
+  description: string
+  size: string
+  weight_kg: number
+  pickup_address: string
+  dropoff_address: string
   status: string
   price: number
+  is_active: boolean
   created_at: string
 }
 
@@ -57,6 +61,17 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'packages'>('overview')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [activeFilter, setActiveFilter] = useState<string>('all')
+  const [showCreateUserModal, setShowCreateUserModal] = useState(false)
+  const [newUserData, setNewUserData] = useState({
+    email: '',
+    password: '',
+    full_name: '',
+    role: 'sender',
+    phone_number: '',
+    max_deviation_km: 5
+  })
 
   useEffect(() => {
     checkAuth()
@@ -139,6 +154,65 @@ export default function AdminPage() {
       console.error('Error deleting user:', err)
       alert('Failed to delete user')
     }
+  }
+
+  const handleTogglePackageActive = async (packageId: number, currentStatus: boolean) => {
+    const action = currentStatus ? 'deactivate' : 'activate'
+    if (!confirm(`Are you sure you want to ${action} this package?`)) {
+      return
+    }
+
+    try {
+      await axios.put(`/admin/packages/${packageId}/toggle-active`, {
+        is_active: !currentStatus
+      })
+      await loadData()
+      alert(`Package ${action}d successfully`)
+    } catch (err: any) {
+      console.error('Error toggling package status:', err)
+      const errorMessage = err.response?.data?.detail || `Failed to ${action} package`
+      alert(errorMessage)
+    }
+  }
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      await axios.post('/admin/users', newUserData)
+      await loadData()
+      setShowCreateUserModal(false)
+      setNewUserData({
+        email: '',
+        password: '',
+        full_name: '',
+        role: 'sender',
+        phone_number: '',
+        max_deviation_km: 5
+      })
+      alert('User created successfully')
+    } catch (err: any) {
+      console.error('Error creating user:', err)
+      const errorMessage = err.response?.data?.detail || 'Failed to create user'
+      alert(errorMessage)
+    }
+  }
+
+  const getFilteredPackages = () => {
+    let filtered = packages
+
+    // Filter by status
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(pkg => pkg.status.toLowerCase() === statusFilter.toLowerCase())
+    }
+
+    // Filter by active/inactive
+    if (activeFilter === 'active') {
+      filtered = filtered.filter(pkg => pkg.is_active)
+    } else if (activeFilter === 'inactive') {
+      filtered = filtered.filter(pkg => !pkg.is_active)
+    }
+
+    return filtered
   }
 
   if (loading) {
@@ -329,8 +403,16 @@ export default function AdminPage() {
           <div>
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold">User Management</h2>
-              <div className="text-gray-600">
-                Total Users: {users.length}
+              <div className="flex items-center gap-4">
+                <div className="text-gray-600">
+                  Total Users: {users.length}
+                </div>
+                <button
+                  onClick={() => setShowCreateUserModal(true)}
+                  className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition"
+                >
+                  + Create User
+                </button>
               </div>
             </div>
 
@@ -434,14 +516,63 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {packages.length === 0 ? (
+            {/* Filters */}
+            <div className="bg-white rounded-lg shadow p-4 mb-6">
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700">Status:</label>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="matched">Matched</option>
+                    <option value="picked_up">Picked Up</option>
+                    <option value="in_transit">In Transit</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700">Active Status:</label>
+                  <select
+                    value={activeFilter}
+                    onChange={(e) => setActiveFilter(e.target.value)}
+                    className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="all">All Packages</option>
+                    <option value="active">Active Only</option>
+                    <option value="inactive">Inactive Only</option>
+                  </select>
+                </div>
+
+                <div className="text-sm text-gray-600 ml-auto">
+                  Showing {getFilteredPackages().length} of {packages.length} packages
+                </div>
+              </div>
+            </div>
+
+            {getFilteredPackages().length === 0 ? (
               <div className="bg-white rounded-lg shadow p-8 text-center">
                 <div className="text-gray-600 mb-4">
-                  Admin API endpoints not yet implemented
+                  {packages.length === 0
+                    ? 'No packages found'
+                    : 'No packages match the selected filters'}
                 </div>
-                <div className="text-sm text-gray-500">
-                  Package management features will be available once backend admin routes are created
-                </div>
+                {packages.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setStatusFilter('all')
+                      setActiveFilter('all')
+                    }}
+                    className="text-purple-600 hover:text-purple-700 text-sm underline"
+                  >
+                    Clear filters
+                  </button>
+                )}
               </div>
             ) : (
               <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -452,10 +583,16 @@ export default function AdminPage() {
                         Package ID
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Route
+                        Sender
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Description
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                         Status
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Active
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                         Price
@@ -463,32 +600,80 @@ export default function AdminPage() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                         Created
                       </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {packages.map((pkg) => (
-                      <tr key={pkg.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          #{pkg.id}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-500">
-                          <div>{pkg.pickup_location}</div>
-                          <div className="text-gray-400">↓</div>
-                          <div>{pkg.dropoff_location}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                            {pkg.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          ${pkg.price}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {new Date(pkg.created_at).toLocaleDateString()}
-                        </td>
-                      </tr>
-                    ))}
+                    {getFilteredPackages().map((pkg) => {
+                      const sender = users.find(u => u.id === pkg.sender_id)
+                      return (
+                        <tr key={pkg.id} className={!pkg.is_active ? 'bg-gray-50 opacity-60' : ''}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <a
+                              href={`/packages/${pkg.id}`}
+                              className="text-purple-600 hover:text-purple-700 font-semibold"
+                            >
+                              #{pkg.id}
+                            </a>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <div className="font-medium">{sender?.full_name || 'Unknown'}</div>
+                            <div className="text-gray-500 text-xs">{sender?.email}</div>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            <div className="max-w-xs truncate">{pkg.description}</div>
+                            <div className="text-xs text-gray-400 mt-1">
+                              {pkg.size} · {pkg.weight_kg}kg
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                              {pkg.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                              pkg.is_active
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {pkg.is_active ? 'Active' : 'Inactive'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            ${pkg.price?.toFixed(2) || '0.00'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {new Date(pkg.created_at).toLocaleDateString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            {pkg.is_active ? (
+                              pkg.status.toLowerCase() === 'pending' ? (
+                                <button
+                                  onClick={() => handleTogglePackageActive(pkg.id, pkg.is_active)}
+                                  className="text-red-600 hover:text-red-900 font-medium"
+                                >
+                                  Deactivate
+                                </button>
+                              ) : (
+                                <span className="text-gray-400 text-xs" title="Only pending packages can be deactivated">
+                                  Cannot deactivate
+                                </span>
+                              )
+                            ) : (
+                              <button
+                                onClick={() => handleTogglePackageActive(pkg.id, pkg.is_active)}
+                                className="text-green-600 hover:text-green-900 font-medium"
+                              >
+                                Activate
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -496,6 +681,130 @@ export default function AdminPage() {
           </div>
         )}
       </div>
+
+      {/* Create User Modal */}
+      {showCreateUserModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold">Create New User</h3>
+              <button
+                onClick={() => setShowCreateUserModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateUser} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email *
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={newUserData.email}
+                  onChange={(e) => setNewUserData({ ...newUserData, email: e.target.value })}
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="user@example.com"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Password *
+                </label>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  value={newUserData.password}
+                  onChange={(e) => setNewUserData({ ...newUserData, password: e.target.value })}
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="At least 8 characters"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Full Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newUserData.full_name}
+                  onChange={(e) => setNewUserData({ ...newUserData, full_name: e.target.value })}
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="John Doe"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Role *
+                </label>
+                <select
+                  required
+                  value={newUserData.role}
+                  onChange={(e) => setNewUserData({ ...newUserData, role: e.target.value })}
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="sender">Sender</option>
+                  <option value="courier">Courier</option>
+                  <option value="both">Both</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Phone Number
+                </label>
+                <input
+                  type="tel"
+                  value={newUserData.phone_number}
+                  onChange={(e) => setNewUserData({ ...newUserData, phone_number: e.target.value })}
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="+1234567890"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Max Deviation (km)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="50"
+                  value={newUserData.max_deviation_km}
+                  onChange={(e) => setNewUserData({ ...newUserData, max_deviation_km: parseInt(e.target.value) || 5 })}
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="submit"
+                  className="flex-1 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition"
+                >
+                  Create User
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateUserModal(false)}
+                  className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400 transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

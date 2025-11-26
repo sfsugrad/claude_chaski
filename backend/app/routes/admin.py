@@ -44,6 +44,7 @@ class PackageAdminResponse(BaseModel):
     dropoff_lng: float
     status: str
     price: float | None
+    is_active: bool
     created_at: datetime
 
     class Config:
@@ -65,6 +66,15 @@ class PlatformStats(BaseModel):
 
 class UpdateUserRole(BaseModel):
     role: str
+
+
+class CreateUserRequest(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: str
+    role: str
+    phone_number: str | None = None
+    max_deviation_km: int = 5
 
 
 # Admin User Management Endpoints
@@ -89,6 +99,74 @@ async def get_all_users(
     """
     users = db.query(User).offset(skip).limit(limit).all()
     return users
+
+
+@router.post("/users", status_code=status.HTTP_201_CREATED, response_model=UserAdminResponse)
+async def create_user(
+    user_data: CreateUserRequest,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Create a new user (admin only).
+
+    Allows admins to create users with any role, including other admins.
+
+    Args:
+        user_data: User creation data
+        db: Database session
+        admin: Current admin user
+
+    Returns:
+        Created user details
+
+    Raises:
+        HTTPException: If email already exists or invalid role
+    """
+    from app.utils.auth import get_password_hash
+
+    # Check if user with email already exists
+    existing_user = db.query(User).filter(User.email == user_data.email).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+
+    # Validate role
+    role_upper = user_data.role.upper()
+    try:
+        user_role = UserRole[role_upper]
+    except KeyError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid role. Must be one of: SENDER, COURIER, BOTH, ADMIN"
+        )
+
+    # Validate password length
+    if len(user_data.password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 8 characters long"
+        )
+
+    # Create new user
+    new_user = User(
+        email=user_data.email,
+        hashed_password=get_password_hash(user_data.password),
+        full_name=user_data.full_name,
+        role=user_role,
+        phone_number=user_data.phone_number,
+        max_deviation_km=user_data.max_deviation_km,
+        is_verified=True,  # Admin-created users are auto-verified
+        is_active=True
+    )
+
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    return new_user
 
 
 @router.get("/users/{user_id}", response_model=UserAdminResponse)
@@ -298,6 +376,57 @@ async def delete_package(
     db.commit()
 
     return None
+
+
+class TogglePackageActive(BaseModel):
+    is_active: bool
+
+
+@router.put("/packages/{package_id}/toggle-active", response_model=PackageAdminResponse)
+async def toggle_package_active(
+    package_id: int,
+    toggle_data: TogglePackageActive,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Toggle package active status (admin only).
+
+    This provides soft delete functionality - inactive packages are hidden
+    from regular views but preserved in the database.
+
+    Args:
+        package_id: Package ID
+        toggle_data: New active status
+        db: Database session
+        admin: Current admin user
+
+    Returns:
+        Updated package details
+
+    Raises:
+        HTTPException: If package not found
+    """
+    package = db.query(Package).filter(Package.id == package_id).first()
+    if not package:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Package not found"
+        )
+
+    # Only allow deactivating packages that are in PENDING status
+    if not toggle_data.is_active and package.status != PackageStatus.PENDING:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only pending packages can be deactivated. Package is currently in '{}' status.".format(package.status.value)
+        )
+
+    package.is_active = toggle_data.is_active
+    package.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(package)
+
+    return package
 
 
 # Admin Statistics Endpoint

@@ -1,0 +1,102 @@
+[
+  {
+    "email": "admin@chaski.com",
+    "password": "admin123",
+    "full_name": "Admin User",
+    "phone_number": "+1234567890",
+    "role": "admin",
+    "is_active": true,
+    "is_verified": true,
+    "max_deviation_km": 5
+  },
+  {
+    "email": "john.sender@example.com",
+    "password": "sender123",
+    "full_name": "John Sender",
+    "phone_number": "+1234567891",
+    "role": "sender",
+    "is_active": true,
+    "is_verified": true,
+    "max_deviation_km": 5
+  },
+  {
+    "email": "jane.sender@example.com",
+    "password": "sender123",
+    "full_name": "Jane Sender",
+    "phone_number": "+1234567892",
+    "role": "sender",
+    "is_active": true,
+    "is_verified": true,
+    "max_deviation_km": 5
+  },
+  {
+    "email": "mike.courier@example.com",
+    "password": "courier123",
+    "full_name": "Mike Courier",
+    "phone_number": "+1234567893",
+    "role": "courier",
+    "is_active": true,
+    "is_verified": true,
+    "max_deviation_km": 10
+  },
+  {
+    "email": "sarah.courier@example.com",
+    "password": "courier123",
+    "full_name": "Sarah Courier",
+    "phone_number": "+1234567894",
+    "role": "courier",
+    "is_active": true,
+    "is_verified": true,
+    "max_deviation_km": 8
+  },
+  {
+    "email": "alex.both@example.com",
+    "password": "both123",
+    "full_name": "Alex Both",
+    "phone_number": "+1234567895",
+    "role": "both",
+    "is_active": true,
+    "is_verified": true,
+    "max_deviation_km": 7
+  },
+  {
+    "email": "emma.both@example.com",
+    "password": "both123",
+    "full_name": "Emma Both",
+    "phone_number": "+1234567896",
+    "role": "both",
+    "is_active": true,
+    "is_verified": true,
+    "max_deviation_km": 6
+  },
+  {
+    "email": "david.sender@example.com",
+    "password": "sender123",
+    "full_name": "David Johnson",
+    "phone_number": "+1234567897",
+    "role": "sender",
+    "is_active": true,
+    "is_verified": true,
+    "max_deviation_km": 5
+  },
+  {
+    "email": "lisa.courier@example.com",
+    "password": "courier123",
+    "full_name": "Lisa Anderson",
+    "phone_number": "+1234567898",
+    "role": "courier",
+    "is_active": true,
+    "is_verified": true,
+    "max_deviation_km": 15
+  },
+  {
+    "email": "unverified.user@example.com",
+    "password": "unverified123",
+    "full_name": "Unverified User",
+    "phone_number": "+1234567899",
+    "role": "sender",
+    "is_active": true,
+    "is_verified": false,
+    "max_deviation_km": 5
+  }
+]
