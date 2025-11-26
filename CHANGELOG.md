@@ -4,6 +4,70 @@ All notable changes to the Chaski project will be documented in this file.
 
 ## [Unreleased]
 
+### Added - User Soft Delete & Filtering (2025-01-26)
+
+#### Backend
+- **User Soft Delete** (`app/routes/admin.py`)
+  - `PUT /api/admin/users/{user_id}/toggle-active` - Toggle user active/inactive status
+  - `ToggleUserActive` request model for activation/deactivation
+  - Self-protection: Admins cannot deactivate their own account
+  - Inactive users cannot log in (authentication will fail)
+  - All user data preserved in database for historical records
+  - Users can be reactivated at any time
+
+#### Frontend
+- **User Filtering** (`app/admin/page.tsx`)
+  - Filter by **Role**: All, Sender, Courier, Both, Admin
+  - Filter by **Verification**: All, Verified Only, Unverified Only
+  - Filter by **Active Status**: All, Active Only, Inactive Only
+  - Real-time user count: "Showing X of Y users"
+  - Clear filters button to reset all filters
+  - Empty state with filter reset option
+
+- **Enhanced User Management Table**
+  - Added **Active Status** column with color-coded badges (green/red)
+  - Renamed **Status** column to **Verification** for clarity
+  - **Deactivate** button (red) for active users
+  - **Activate** button (green) for inactive users
+  - Visual indicator: Inactive users shown with grayed-out rows
+  - Role selector disabled for inactive users
+  - Replaced hard delete with soft delete functionality
+
+#### Security Enhancements
+- Admins cannot deactivate their own account
+- Inactive users blocked from authentication
+- Data preservation through soft delete
+- Self-protection rules prevent privilege removal
+
+#### Testing
+- **Comprehensive Test Suite** (`tests/test_admin.py`)
+  - `TestAdminUserToggleActive` class with 12 test cases
+  - **Basic Functionality Tests**:
+    - Toggle user to inactive (deactivate)
+    - Toggle user to active (reactivate)
+  - **Self-Protection Tests**:
+    - Admin cannot deactivate their own account
+    - Admin can activate themselves (edge case)
+  - **Authentication Blocking Tests**:
+    - Inactive users cannot log in
+    - Reactivated users can log in again
+  - **Error Handling Tests**:
+    - 404 for non-existent users
+    - 403 for non-admin users attempting toggle
+    - 401 for unauthenticated requests
+  - **Data Integrity Tests**:
+    - Deactivating user preserves all data and packages
+    - Timestamp updates on status change
+    - Multiple users can be toggled independently
+  - All 12 tests passing with 100% coverage of toggle-active endpoint
+
+### Changed
+- **User Management**: Replaced "Delete" action with "Deactivate/Activate"
+- **DELETE /api/admin/users/{id}**: Marked as deprecated (kept for backwards compatibility)
+- **User filtering**: Added `getFilteredUsers()` function with multi-criteria filtering
+
+---
+
 ### Added - Admin Dashboard (2025-01-26)
 
 #### Backend
@@ -12,7 +76,7 @@ All notable changes to the Chaski project will be documented in this file.
   - `POST /api/admin/users` - Create new user with any role (including admin)
   - `GET /api/admin/users/{id}` - Get specific user details
   - `PUT /api/admin/users/{id}` - Update user role
-  - `DELETE /api/admin/users/{id}` - Delete user (cascades to packages)
+  - `DELETE /api/admin/users/{id}` - Delete user (DEPRECATED - use toggle-active instead)
   - `GET /api/admin/packages` - List all packages with pagination
   - `GET /api/admin/packages/{id}` - Get specific package details
   - `PUT /api/admin/packages/{id}/toggle-active` - Soft delete/activate packages

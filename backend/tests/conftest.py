@@ -173,3 +173,45 @@ def authenticated_admin(client, db_session, test_admin_data):
         "password": test_admin_data["password"]
     })
     return login_response.json()["access_token"]
+
+
+@pytest.fixture
+def test_verified_user(db_session):
+    """Create a verified user and return the User object"""
+    from app.models.user import User, UserRole
+    from app.utils.auth import get_password_hash
+
+    user = User(
+        email="verified@example.com",
+        hashed_password=get_password_hash("password123"),
+        full_name="Verified User",
+        role=UserRole.SENDER,
+        is_active=True,
+        is_verified=True,
+        max_deviation_km=5
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
+
+
+@pytest.fixture
+def test_admin(db_session):
+    """Create an admin user and return the User object"""
+    from app.models.user import User, UserRole
+    from app.utils.auth import get_password_hash
+
+    admin = User(
+        email="testadmin@example.com",
+        hashed_password=get_password_hash("adminpass123"),
+        full_name="Test Admin",
+        role=UserRole.ADMIN,
+        is_active=True,
+        is_verified=True,
+        max_deviation_km=5
+    )
+    db_session.add(admin)
+    db_session.commit()
+    db_session.refresh(admin)
+    return admin

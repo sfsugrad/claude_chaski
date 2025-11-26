@@ -252,6 +252,57 @@ async def update_user_role(
     return user
 
 
+class ToggleUserActive(BaseModel):
+    is_active: bool
+
+
+@router.put("/users/{user_id}/toggle-active", response_model=UserAdminResponse)
+async def toggle_user_active(
+    user_id: int,
+    toggle_data: ToggleUserActive,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Toggle user active status (admin only).
+
+    This provides soft delete functionality - inactive users cannot log in
+    but their data is preserved in the database.
+
+    Args:
+        user_id: User ID
+        toggle_data: New active status
+        db: Database session
+        admin: Current admin user
+
+    Returns:
+        Updated user details
+
+    Raises:
+        HTTPException: If user not found or trying to deactivate self
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    # Prevent admin from deactivating themselves
+    if user.id == admin.id and not toggle_data.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot deactivate your own account"
+        )
+
+    user.is_active = toggle_data.is_active
+    user.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(user)
+
+    return user
+
+
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(
     user_id: int,
@@ -259,7 +310,7 @@ async def delete_user(
     admin: User = Depends(get_current_admin_user)
 ):
     """
-    Delete a user (admin only).
+    Delete a user (admin only) - DEPRECATED, use toggle-active instead.
     Cascades to delete related packages.
 
     Args:

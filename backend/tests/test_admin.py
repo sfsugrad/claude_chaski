@@ -266,6 +266,270 @@ class TestAdminUserManagement:
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
+class TestAdminUserToggleActive:
+    """Tests for admin user toggle-active (soft delete) functionality"""
+
+    def test_toggle_user_to_inactive(self, client, db_session, authenticated_admin, test_user_data):
+        """Test admin can deactivate a user"""
+        # Create a user
+        client.post("/api/auth/register", json=test_user_data)
+        user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+        assert user.is_active is True
+
+        # Deactivate user
+        response = client.put(
+            f"/api/admin/users/{user.id}/toggle-active",
+            json={"is_active": False},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["is_active"] is False
+        assert data["id"] == user.id
+
+        # Verify in database
+        db_session.refresh(user)
+        assert user.is_active is False
+
+    def test_toggle_user_to_active(self, client, db_session, authenticated_admin, test_user_data):
+        """Test admin can reactivate an inactive user"""
+        # Create and deactivate a user
+        client.post("/api/auth/register", json=test_user_data)
+        user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+        user.is_active = False
+        db_session.commit()
+
+        # Reactivate user
+        response = client.put(
+            f"/api/admin/users/{user.id}/toggle-active",
+            json={"is_active": True},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["is_active"] is True
+
+        # Verify in database
+        db_session.refresh(user)
+        assert user.is_active is True
+
+    def test_admin_cannot_deactivate_self(self, client, db_session, authenticated_admin, test_admin_data):
+        """Test admin cannot deactivate their own account"""
+        admin_user = db_session.query(User).filter(User.email == test_admin_data["email"]).first()
+
+        response = client.put(
+            f"/api/admin/users/{admin_user.id}/toggle-active",
+            json={"is_active": False},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "cannot deactivate your own account" in response.json()["detail"].lower()
+
+        # Verify user is still active in database
+        db_session.refresh(admin_user)
+        assert admin_user.is_active is True
+
+    def test_admin_can_activate_self(self, client, db_session, authenticated_admin, test_admin_data):
+        """Test admin can activate themselves (edge case, but should work)"""
+        admin_user = db_session.query(User).filter(User.email == test_admin_data["email"]).first()
+
+        response = client.put(
+            f"/api/admin/users/{admin_user.id}/toggle-active",
+            json={"is_active": True},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        # Should succeed since they're trying to activate (not deactivate)
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["is_active"] is True
+
+    def test_inactive_user_cannot_login(self, client, db_session, test_user_data):
+        """Test inactive users cannot authenticate"""
+        # Create and verify user
+        client.post("/api/auth/register", json=test_user_data)
+        user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+        user.is_verified = True
+        db_session.commit()
+
+        # Login successfully
+        login_response = client.post("/api/auth/login", json={
+            "email": test_user_data["email"],
+            "password": test_user_data["password"]
+        })
+        assert login_response.status_code == status.HTTP_200_OK
+
+        # Deactivate user
+        user.is_active = False
+        db_session.commit()
+
+        # Try to login again - should fail (could be 401 or 403 depending on auth implementation)
+        login_response = client.post("/api/auth/login", json={
+            "email": test_user_data["email"],
+            "password": test_user_data["password"]
+        })
+
+        assert login_response.status_code in [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN]
+        detail = login_response.json()["detail"].lower()
+        assert "inactive" in detail or "disabled" in detail or "not active" in detail
+
+    def test_toggle_user_not_found(self, client, authenticated_admin):
+        """Test toggling non-existent user returns 404"""
+        response = client.put(
+            "/api/admin/users/99999/toggle-active",
+            json={"is_active": False},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert "not found" in response.json()["detail"].lower()
+
+    def test_toggle_user_as_non_admin(self, client, authenticated_sender):
+        """Test non-admin cannot toggle user active status"""
+        response = client.put(
+            "/api/admin/users/1/toggle-active",
+            json={"is_active": False},
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_toggle_user_without_authentication(self, client):
+        """Test cannot toggle user status without authentication"""
+        response = client.put(
+            "/api/admin/users/1/toggle-active",
+            json={"is_active": False}
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_deactivate_user_preserves_data(self, client, db_session, authenticated_admin, authenticated_sender, test_package_data):
+        """Test deactivating user preserves their packages and data"""
+        # Sender creates a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+
+        # Get sender user
+        sender_user = db_session.query(User).filter(User.email == "test@example.com").first()
+        user_id = sender_user.id
+
+        # Deactivate sender
+        response = client.put(
+            f"/api/admin/users/{user_id}/toggle-active",
+            json={"is_active": False},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+
+        # Verify user still exists but is inactive
+        user = db_session.query(User).filter(User.id == user_id).first()
+        assert user is not None
+        assert user.is_active is False
+
+        # Verify package still exists
+        package = db_session.query(Package).filter(Package.id == package_id).first()
+        assert package is not None
+        assert package.sender_id == user_id
+
+    def test_reactivate_user_restores_access(self, client, db_session, authenticated_admin, test_user_data):
+        """Test reactivated user can log in again"""
+        # Create, verify, and deactivate user
+        client.post("/api/auth/register", json=test_user_data)
+        user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+        user.is_verified = True
+        user.is_active = False
+        db_session.commit()
+
+        # Verify cannot login while inactive (could be 401 or 403)
+        login_response = client.post("/api/auth/login", json={
+            "email": test_user_data["email"],
+            "password": test_user_data["password"]
+        })
+        assert login_response.status_code in [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN]
+
+        # Reactivate user
+        client.put(
+            f"/api/admin/users/{user.id}/toggle-active",
+            json={"is_active": True},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        # Verify can login after reactivation
+        login_response = client.post("/api/auth/login", json={
+            "email": test_user_data["email"],
+            "password": test_user_data["password"]
+        })
+        assert login_response.status_code == status.HTTP_200_OK
+        assert "access_token" in login_response.json()
+
+    def test_toggle_user_updates_timestamp(self, client, db_session, authenticated_admin, test_user_data):
+        """Test toggling user active status updates the updated_at timestamp"""
+        from datetime import datetime
+
+        # Create user
+        client.post("/api/auth/register", json=test_user_data)
+        user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+
+        # Toggle user status
+        response = client.put(
+            f"/api/admin/users/{user.id}/toggle-active",
+            json={"is_active": False},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+
+        # Verify timestamp was set in response
+        data = response.json()
+        assert "updated_at" in data
+        assert data["updated_at"] is not None
+
+    def test_toggle_multiple_users(self, client, db_session, authenticated_admin):
+        """Test admin can toggle multiple users independently"""
+        from app.models.user import User, UserRole
+        from app.utils.auth import get_password_hash
+
+        # Create multiple users
+        users = []
+        for i in range(3):
+            user = User(
+                email=f"user{i}@test.com",
+                hashed_password=get_password_hash("password"),
+                full_name=f"User {i}",
+                role=UserRole.SENDER,
+                is_active=True,
+                max_deviation_km=5
+            )
+            db_session.add(user)
+            users.append(user)
+        db_session.commit()
+
+        # Deactivate first two users
+        for user in users[:2]:
+            response = client.put(
+                f"/api/admin/users/{user.id}/toggle-active",
+                json={"is_active": False},
+                headers={"Authorization": f"Bearer {authenticated_admin}"}
+            )
+            assert response.status_code == status.HTTP_200_OK
+
+        # Verify status of all users
+        db_session.refresh(users[0])
+        db_session.refresh(users[1])
+        db_session.refresh(users[2])
+
+        assert users[0].is_active is False
+        assert users[1].is_active is False
+        assert users[2].is_active is True
+
+
 class TestAdminPackageManagement:
     """Tests for admin package management endpoints"""
 

@@ -63,6 +63,9 @@ export default function AdminPage() {
   const [error, setError] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [activeFilter, setActiveFilter] = useState<string>('all')
+  const [userRoleFilter, setUserRoleFilter] = useState<string>('all')
+  const [userVerificationFilter, setUserVerificationFilter] = useState<string>('all')
+  const [userActiveFilter, setUserActiveFilter] = useState<string>('all')
   const [showCreateUserModal, setShowCreateUserModal] = useState(false)
   const [newUserData, setNewUserData] = useState({
     email: '',
@@ -141,18 +144,22 @@ export default function AdminPage() {
     }
   }
 
-  const handleDeleteUser = async (userId: number) => {
-    if (!confirm('Are you sure you want to delete this user?')) {
+  const handleToggleUserActive = async (userId: number, currentStatus: boolean) => {
+    const action = currentStatus ? 'deactivate' : 'activate'
+    if (!confirm(`Are you sure you want to ${action} this user?`)) {
       return
     }
 
     try {
-      await axios.delete(`/admin/users/${userId}`)
+      await axios.put(`/admin/users/${userId}/toggle-active`, {
+        is_active: !currentStatus
+      })
       await loadData()
-      alert('User deleted successfully')
-    } catch (err) {
-      console.error('Error deleting user:', err)
-      alert('Failed to delete user')
+      alert(`User ${action}d successfully`)
+    } catch (err: any) {
+      console.error('Error toggling user status:', err)
+      const errorMessage = err.response?.data?.detail || `Failed to ${action} user`
+      alert(errorMessage)
     }
   }
 
@@ -195,6 +202,31 @@ export default function AdminPage() {
       const errorMessage = err.response?.data?.detail || 'Failed to create user'
       alert(errorMessage)
     }
+  }
+
+  const getFilteredUsers = () => {
+    let filtered = users
+
+    // Filter by role
+    if (userRoleFilter !== 'all') {
+      filtered = filtered.filter(u => u.role.toLowerCase() === userRoleFilter.toLowerCase())
+    }
+
+    // Filter by verification status
+    if (userVerificationFilter === 'verified') {
+      filtered = filtered.filter(u => u.is_verified)
+    } else if (userVerificationFilter === 'unverified') {
+      filtered = filtered.filter(u => !u.is_verified)
+    }
+
+    // Filter by active status
+    if (userActiveFilter === 'active') {
+      filtered = filtered.filter(u => u.is_active)
+    } else if (userActiveFilter === 'inactive') {
+      filtered = filtered.filter(u => !u.is_active)
+    }
+
+    return filtered
   }
 
   const getFilteredPackages = () => {
@@ -416,7 +448,77 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {users.length === 0 ? (
+            {/* Filters */}
+            <div className="bg-white rounded-lg shadow p-4 mb-6">
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700">Role:</label>
+                  <select
+                    value={userRoleFilter}
+                    onChange={(e) => setUserRoleFilter(e.target.value)}
+                    className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="all">All Roles</option>
+                    <option value="sender">Sender</option>
+                    <option value="courier">Courier</option>
+                    <option value="both">Both</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700">Verification:</label>
+                  <select
+                    value={userVerificationFilter}
+                    onChange={(e) => setUserVerificationFilter(e.target.value)}
+                    className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="all">All Users</option>
+                    <option value="verified">Verified Only</option>
+                    <option value="unverified">Unverified Only</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700">Status:</label>
+                  <select
+                    value={userActiveFilter}
+                    onChange={(e) => setUserActiveFilter(e.target.value)}
+                    className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="all">All Users</option>
+                    <option value="active">Active Only</option>
+                    <option value="inactive">Inactive Only</option>
+                  </select>
+                </div>
+
+                <div className="text-sm text-gray-600 ml-auto">
+                  Showing {getFilteredUsers().length} of {users.length} users
+                </div>
+              </div>
+            </div>
+
+            {getFilteredUsers().length === 0 ? (
+              <div className="bg-white rounded-lg shadow p-8 text-center">
+                <div className="text-gray-600 mb-4">
+                  {users.length === 0
+                    ? 'No users found'
+                    : 'No users match the selected filters'}
+                </div>
+                {users.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setUserRoleFilter('all')
+                      setUserVerificationFilter('all')
+                      setUserActiveFilter('all')
+                    }}
+                    className="text-purple-600 hover:text-purple-700 text-sm underline"
+                  >
+                    Clear filters
+                  </button>
+                )}
+              </div>
+            ) : users.length === 0 ? (
               <div className="bg-white rounded-lg shadow p-8 text-center">
                 <div className="text-gray-600 mb-4">
                   Admin API endpoints not yet implemented
@@ -437,7 +539,10 @@ export default function AdminPage() {
                         Role
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Status
+                        Verification
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Active
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                         Joined
@@ -448,8 +553,8 @@ export default function AdminPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {users.map((u) => (
-                      <tr key={u.id}>
+                    {getFilteredUsers().map((u) => (
+                      <tr key={u.id} className={!u.is_active ? 'bg-gray-50 opacity-60' : ''}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900">
                             {u.full_name}
@@ -461,6 +566,7 @@ export default function AdminPage() {
                             value={u.role}
                             onChange={(e) => handleRoleChange(u.id, e.target.value)}
                             className="text-sm border rounded px-2 py-1"
+                            disabled={!u.is_active}
                           >
                             <option value="sender">Sender</option>
                             <option value="courier">Courier</option>
@@ -479,16 +585,34 @@ export default function AdminPage() {
                             {u.is_verified ? 'Verified' : 'Unverified'}
                           </span>
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                            u.is_active
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {u.is_active ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {new Date(u.created_at).toLocaleDateString()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <button
-                            onClick={() => handleDeleteUser(u.id)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            Delete
-                          </button>
+                          {u.is_active ? (
+                            <button
+                              onClick={() => handleToggleUserActive(u.id, u.is_active)}
+                              className="text-red-600 hover:text-red-900 font-medium"
+                            >
+                              Deactivate
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleToggleUserActive(u.id, u.is_active)}
+                              className="text-green-600 hover:text-green-900 font-medium"
+                            >
+                              Activate
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
