@@ -1,0 +1,406 @@
+import pytest
+from fastapi import status
+from datetime import timedelta
+
+from app.utils.auth import create_access_token, get_password_hash
+from app.models.user import User, UserRole
+
+
+class TestUserRegistration:
+    """Tests for user registration endpoint"""
+
+    def test_register_sender_success(self, client, test_user_data):
+        """Test successful registration of a sender"""
+        response = client.post("/api/auth/register", json=test_user_data)
+
+        assert response.status_code == status.HTTP_201_CREATED
+        data = response.json()
+
+        assert data["email"] == test_user_data["email"]
+        assert data["full_name"] == test_user_data["full_name"]
+        assert data["role"] == test_user_data["role"]
+        assert data["phone_number"] == test_user_data["phone_number"]
+        assert data["max_deviation_km"] == test_user_data["max_deviation_km"]
+        assert data["is_active"] is True
+        assert data["is_verified"] is False
+        assert "id" in data
+        assert "created_at" in data
+        assert "password" not in data  # Password should not be in response
+        assert "hashed_password" not in data
+
+    def test_register_courier_success(self, client, test_courier_data):
+        """Test successful registration of a courier"""
+        response = client.post("/api/auth/register", json=test_courier_data)
+
+        assert response.status_code == status.HTTP_201_CREATED
+        data = response.json()
+
+        assert data["email"] == test_courier_data["email"]
+        assert data["role"] == "courier"
+        assert data["max_deviation_km"] == test_courier_data["max_deviation_km"]
+
+    def test_register_both_role_success(self, client):
+        """Test successful registration with 'both' role"""
+        user_data = {
+            "email": "both@example.com",
+            "password": "password123",
+            "full_name": "Both User",
+            "role": "both"
+        }
+        response = client.post("/api/auth/register", json=user_data)
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response.json()["role"] == "both"
+
+    def test_register_duplicate_email(self, client, test_user_data):
+        """Test registration with duplicate email fails"""
+        # First registration
+        client.post("/api/auth/register", json=test_user_data)
+
+        # Second registration with same email
+        response = client.post("/api/auth/register", json=test_user_data)
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "already registered" in response.json()["detail"].lower()
+
+    def test_register_invalid_email(self, client, test_user_data):
+        """Test registration with invalid email format"""
+        test_user_data["email"] = "invalid-email"
+        response = client.post("/api/auth/register", json=test_user_data)
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_register_password_too_short(self, client, test_user_data):
+        """Test registration with password shorter than 8 characters"""
+        test_user_data["password"] = "short"
+        response = client.post("/api/auth/register", json=test_user_data)
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_register_invalid_role(self, client, test_user_data):
+        """Test registration with invalid role"""
+        test_user_data["role"] = "invalid_role"
+        response = client.post("/api/auth/register", json=test_user_data)
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_register_missing_required_fields(self, client):
+        """Test registration with missing required fields"""
+        incomplete_data = {
+            "email": "test@example.com",
+            "password": "password123"
+            # Missing full_name and role
+        }
+        response = client.post("/api/auth/register", json=incomplete_data)
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_register_without_optional_fields(self, client):
+        """Test registration without optional fields succeeds"""
+        minimal_data = {
+            "email": "minimal@example.com",
+            "password": "password123",
+            "full_name": "Minimal User",
+            "role": "sender"
+            # No phone_number, max_deviation_km
+        }
+        response = client.post("/api/auth/register", json=minimal_data)
+
+        assert response.status_code == status.HTTP_201_CREATED
+        data = response.json()
+        assert data["phone_number"] is None
+        assert data["max_deviation_km"] == 5  # Default value
+
+    def test_register_password_is_hashed(self, client, db_session, test_user_data):
+        """Test that password is properly hashed in database"""
+        response = client.post("/api/auth/register", json=test_user_data)
+        assert response.status_code == status.HTTP_201_CREATED
+
+        # Query database directly
+        user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+
+        assert user is not None
+        assert user.hashed_password != test_user_data["password"]
+        assert user.hashed_password.startswith("$2b$")  # bcrypt hash prefix
+
+
+class TestUserLogin:
+    """Tests for user login endpoint"""
+
+    def test_login_success(self, client, test_user_data):
+        """Test successful login"""
+        # Register user first
+        client.post("/api/auth/register", json=test_user_data)
+
+        # Login
+        login_data = {
+            "email": test_user_data["email"],
+            "password": test_user_data["password"]
+        }
+        response = client.post("/api/auth/login", json=login_data)
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+
+        assert "access_token" in data
+        assert "token_type" in data
+        assert data["token_type"] == "bearer"
+        assert len(data["access_token"]) > 0
+
+    def test_login_invalid_email(self, client):
+        """Test login with non-existent email"""
+        login_data = {
+            "email": "nonexistent@example.com",
+            "password": "password123"
+        }
+        response = client.post("/api/auth/login", json=login_data)
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        assert "incorrect" in response.json()["detail"].lower()
+
+    def test_login_wrong_password(self, client, test_user_data):
+        """Test login with incorrect password"""
+        # Register user first
+        client.post("/api/auth/register", json=test_user_data)
+
+        # Login with wrong password
+        login_data = {
+            "email": test_user_data["email"],
+            "password": "wrongpassword"
+        }
+        response = client.post("/api/auth/login", json=login_data)
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        assert "incorrect" in response.json()["detail"].lower()
+
+    def test_login_inactive_user(self, client, db_session, test_user_data):
+        """Test login with inactive user"""
+        # Register user
+        client.post("/api/auth/register", json=test_user_data)
+
+        # Deactivate user
+        user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+        user.is_active = False
+        db_session.commit()
+
+        # Try to login
+        login_data = {
+            "email": test_user_data["email"],
+            "password": test_user_data["password"]
+        }
+        response = client.post("/api/auth/login", json=login_data)
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert "inactive" in response.json()["detail"].lower()
+
+    def test_login_missing_credentials(self, client):
+        """Test login with missing credentials"""
+        response = client.post("/api/auth/login", json={})
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_login_jwt_token_contains_user_info(self, client, test_user_data):
+        """Test that JWT token contains correct user information"""
+        # Register user
+        client.post("/api/auth/register", json=test_user_data)
+
+        # Login
+        login_data = {
+            "email": test_user_data["email"],
+            "password": test_user_data["password"]
+        }
+        response = client.post("/api/auth/login", json=login_data)
+
+        assert response.status_code == status.HTTP_200_OK
+        token = response.json()["access_token"]
+
+        # Decode token (without verification for testing)
+        import base64
+        import json
+        payload = token.split('.')[1]
+        # Add padding if needed
+        payload += '=' * (4 - len(payload) % 4)
+        decoded = json.loads(base64.urlsafe_b64decode(payload))
+
+        assert decoded["sub"] == test_user_data["email"]
+        assert decoded["role"] == test_user_data["role"]
+        assert "exp" in decoded
+
+
+class TestGetCurrentUser:
+    """Tests for get current user endpoint"""
+
+    def test_get_current_user_success(self, client, test_user_data):
+        """Test getting current user with valid token"""
+        # Register and login
+        client.post("/api/auth/register", json=test_user_data)
+        login_response = client.post("/api/auth/login", json={
+            "email": test_user_data["email"],
+            "password": test_user_data["password"]
+        })
+        token = login_response.json()["access_token"]
+
+        # Get current user
+        response = client.get(
+            "/api/auth/me",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+
+        assert data["email"] == test_user_data["email"]
+        assert data["full_name"] == test_user_data["full_name"]
+        assert data["role"] == test_user_data["role"]
+        assert "id" in data
+        assert "password" not in data
+        assert "hashed_password" not in data
+
+    def test_get_current_user_no_token(self, client):
+        """Test getting current user without token"""
+        response = client.get("/api/auth/me")
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert "not authenticated" in response.json()["detail"].lower()
+
+    def test_get_current_user_invalid_token(self, client):
+        """Test getting current user with invalid token"""
+        response = client.get(
+            "/api/auth/me",
+            headers={"Authorization": "Bearer invalid_token"}
+        )
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_get_current_user_malformed_token(self, client):
+        """Test getting current user with malformed authorization header"""
+        response = client.get(
+            "/api/auth/me",
+            headers={"Authorization": "InvalidFormat"}
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_get_current_user_expired_token(self, client, db_session, test_user_data):
+        """Test getting current user with expired token"""
+        # Create user
+        client.post("/api/auth/register", json=test_user_data)
+
+        # Create expired token
+        expired_token = create_access_token(
+            data={"sub": test_user_data["email"], "role": test_user_data["role"]},
+            expires_delta=timedelta(seconds=-1)  # Already expired
+        )
+
+        response = client.get(
+            "/api/auth/me",
+            headers={"Authorization": f"Bearer {expired_token}"}
+        )
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_get_current_user_deleted_user(self, client, db_session, test_user_data):
+        """Test getting current user when user has been deleted"""
+        # Register and login
+        client.post("/api/auth/register", json=test_user_data)
+        login_response = client.post("/api/auth/login", json={
+            "email": test_user_data["email"],
+            "password": test_user_data["password"]
+        })
+        token = login_response.json()["access_token"]
+
+        # Delete user from database
+        user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+        db_session.delete(user)
+        db_session.commit()
+
+        # Try to get current user
+        response = client.get(
+            "/api/auth/me",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_get_current_user_inactive_user(self, client, db_session, test_user_data):
+        """Test getting current user when user is inactive"""
+        # Register and login
+        client.post("/api/auth/register", json=test_user_data)
+        login_response = client.post("/api/auth/login", json={
+            "email": test_user_data["email"],
+            "password": test_user_data["password"]
+        })
+        token = login_response.json()["access_token"]
+
+        # Deactivate user
+        user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+        user.is_active = False
+        db_session.commit()
+
+        # Try to get current user
+        response = client.get(
+            "/api/auth/me",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert "inactive" in response.json()["detail"].lower()
+
+
+class TestAuthenticationWorkflow:
+    """Integration tests for complete authentication workflow"""
+
+    def test_complete_auth_workflow(self, client, test_user_data):
+        """Test complete authentication workflow from registration to authenticated request"""
+        # Step 1: Register
+        register_response = client.post("/api/auth/register", json=test_user_data)
+        assert register_response.status_code == status.HTTP_201_CREATED
+        user_id = register_response.json()["id"]
+
+        # Step 2: Login
+        login_response = client.post("/api/auth/login", json={
+            "email": test_user_data["email"],
+            "password": test_user_data["password"]
+        })
+        assert login_response.status_code == status.HTTP_200_OK
+        token = login_response.json()["access_token"]
+
+        # Step 3: Access protected endpoint
+        me_response = client.get(
+            "/api/auth/me",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert me_response.status_code == status.HTTP_200_OK
+        assert me_response.json()["id"] == user_id
+
+    def test_multiple_users_registration_and_login(self, client, test_user_data, test_courier_data):
+        """Test multiple users can register and login independently"""
+        # Register two users
+        response1 = client.post("/api/auth/register", json=test_user_data)
+        response2 = client.post("/api/auth/register", json=test_courier_data)
+
+        assert response1.status_code == status.HTTP_201_CREATED
+        assert response2.status_code == status.HTTP_201_CREATED
+
+        # Login as first user
+        login1 = client.post("/api/auth/login", json={
+            "email": test_user_data["email"],
+            "password": test_user_data["password"]
+        })
+        token1 = login1.json()["access_token"]
+
+        # Login as second user
+        login2 = client.post("/api/auth/login", json={
+            "email": test_courier_data["email"],
+            "password": test_courier_data["password"]
+        })
+        token2 = login2.json()["access_token"]
+
+        # Verify each token returns correct user
+        me1 = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token1}"})
+        me2 = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token2}"})
+
+        assert me1.json()["email"] == test_user_data["email"]
+        assert me2.json()["email"] == test_courier_data["email"]
+        assert me1.json()["role"] == "sender"
+        assert me2.json()["role"] == "courier"

@@ -20,11 +20,43 @@ api.interceptors.request.use((config) => {
 
 export default api
 
+// Types
+export interface RegisterData {
+  email: string
+  password: string
+  full_name: string
+  role: 'sender' | 'courier' | 'both'
+  phone_number?: string
+  max_deviation_km?: number
+}
+
+export interface LoginData {
+  email: string
+  password: string
+}
+
+export interface UserResponse {
+  id: number
+  email: string
+  full_name: string
+  role: string
+  phone_number: string | null
+  is_active: boolean
+  is_verified: boolean
+  max_deviation_km: number
+  created_at: string
+}
+
+export interface TokenResponse {
+  access_token: string
+  token_type: string
+}
+
 // Auth API
 export const authAPI = {
-  register: (data: any) => api.post('/auth/register', data),
-  login: (data: any) => api.post('/auth/login', data),
-  getCurrentUser: () => api.get('/auth/me'),
+  register: (data: RegisterData) => api.post<UserResponse>('/auth/register', data),
+  login: (data: LoginData) => api.post<TokenResponse>('/auth/login', data),
+  getCurrentUser: () => api.get<UserResponse>('/auth/me'),
 }
 
 // Packages API
