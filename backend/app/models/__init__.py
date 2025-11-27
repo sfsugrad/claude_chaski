@@ -1,3 +1,3 @@
-from app.models import base, user, package, notification, rating, message
+from app.models import base, user, package, notification, rating, message, audit_log
 
-__all__ = ["base", "user", "package", "notification", "rating", "message"]
+__all__ = ["base", "user", "package", "notification", "rating", "message", "audit_log"]

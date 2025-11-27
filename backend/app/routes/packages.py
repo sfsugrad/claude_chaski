@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.package import Package, PackageSize, PackageStatus
@@ -11,6 +11,12 @@ from app.utils.email import (
     send_package_in_transit_email,
     send_package_delivered_email,
     send_package_cancelled_email,
+)
+from app.services.audit_service import (
+    log_package_create,
+    log_package_update,
+    log_package_status_change,
+    log_package_cancel,
 )
 from pydantic import BaseModel, Field
 from typing import List
@@ -102,6 +108,7 @@ def package_to_response(package: Package, db: Session) -> PackageResponse:
 
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=PackageResponse)
 async def create_package(
+    request: Request,
     package_data: PackageCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -168,6 +175,13 @@ async def create_package(
     db.add(new_package)
     db.commit()
     db.refresh(new_package)
+
+    # Audit log package creation
+    log_package_create(
+        db, current_user, new_package.id,
+        {"description": new_package.description, "size": new_package.size.value, "sender_id": sender_id},
+        request
+    )
 
     return new_package
 
@@ -268,6 +282,7 @@ class StatusUpdate(BaseModel):
 
 @router.put("/{package_id}", response_model=PackageResponse)
 async def update_package(
+    request: Request,
     package_id: int,
     package_update: PackageUpdate,
     current_user: User = Depends(get_current_user),
@@ -304,12 +319,17 @@ async def update_package(
             detail=f"Cannot edit package with status '{package.status.value}'. Only pending packages can be edited."
         )
 
+    # Track changes for audit log
+    changes = {}
+
     # Update fields if provided
     if package_update.description is not None:
+        changes["description"] = {"old": package.description, "new": package_update.description}
         package.description = package_update.description
 
     if package_update.size is not None:
         try:
+            changes["size"] = {"old": package.size.value, "new": package_update.size}
             package.size = PackageSize(package_update.size)
         except ValueError:
             raise HTTPException(
@@ -318,32 +338,43 @@ async def update_package(
             )
 
     if package_update.weight_kg is not None:
+        changes["weight_kg"] = {"old": package.weight_kg, "new": package_update.weight_kg}
         package.weight_kg = package_update.weight_kg
 
     if package_update.pickup_contact_name is not None:
+        changes["pickup_contact_name"] = {"old": package.pickup_contact_name, "new": package_update.pickup_contact_name}
         package.pickup_contact_name = package_update.pickup_contact_name
 
     if package_update.pickup_contact_phone is not None:
+        changes["pickup_contact_phone"] = {"old": package.pickup_contact_phone, "new": package_update.pickup_contact_phone}
         package.pickup_contact_phone = package_update.pickup_contact_phone
 
     if package_update.dropoff_contact_name is not None:
+        changes["dropoff_contact_name"] = {"old": package.dropoff_contact_name, "new": package_update.dropoff_contact_name}
         package.dropoff_contact_name = package_update.dropoff_contact_name
 
     if package_update.dropoff_contact_phone is not None:
+        changes["dropoff_contact_phone"] = {"old": package.dropoff_contact_phone, "new": package_update.dropoff_contact_phone}
         package.dropoff_contact_phone = package_update.dropoff_contact_phone
 
     if package_update.price is not None:
+        changes["price"] = {"old": package.price, "new": package_update.price}
         package.price = package_update.price
 
     package.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(package)
 
+    # Audit log package update
+    if changes:
+        log_package_update(db, current_user, package_id, changes, request)
+
     return package
 
 
 @router.put("/{package_id}/status")
 async def update_package_status(
+    request: Request,
     package_id: int,
     status_update: StatusUpdate,
     background_tasks: BackgroundTasks,
@@ -383,6 +414,9 @@ async def update_package_status(
     package.status = new_status
     package.updated_at = datetime.utcnow()
     db.commit()
+
+    # Audit log status change
+    log_package_status_change(db, current_user, package_id, old_status.value, new_status.value, request)
 
     # Get sender info for notifications
     sender = db.query(User).filter(User.id == package.sender_id).first()
@@ -455,6 +489,7 @@ async def update_package_status(
 
 @router.put("/{package_id}/cancel", response_model=PackageResponse)
 async def cancel_package(
+    request: Request,
     package_id: int,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
@@ -498,6 +533,9 @@ async def cancel_package(
     package.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(package)
+
+    # Audit log package cancellation
+    log_package_cancel(db, current_user, package_id, "User cancelled", request)
 
     # Notify the courier if package was matched
     if courier_id:

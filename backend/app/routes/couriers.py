@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from app.database import get_db
@@ -6,12 +6,13 @@ from app.models.package import CourierRoute, Package, PackageStatus
 from app.models.user import User, UserRole
 from app.models.notification import NotificationType
 from app.utils.dependencies import get_current_user
+from app.utils.geo import haversine_distance
 from app.routes.notifications import create_notification, create_notification_with_broadcast
 from app.utils.email import send_route_match_found_email
+from app.services.audit_service import log_route_create, log_route_update, log_route_delete
 from pydantic import BaseModel, Field
 from typing import List
 from datetime import datetime
-from math import radians, cos, sin, asin, sqrt
 from shapely.geometry import LineString, Point
 from shapely.ops import nearest_points
 
@@ -62,17 +63,6 @@ def verify_courier_role(user: User):
         )
 
 
-def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Calculate the great circle distance between two points in kilometers."""
-    lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
-    dlon = lon2 - lon1
-    dlat = lat2 - lat1
-    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
-    c = 2 * asin(sqrt(a))
-    r = 6371
-    return c * r
-
-
 def count_matching_packages(db: Session, route: CourierRoute) -> int:
     """Count packages that match a courier route."""
     route_line = LineString([
@@ -113,6 +103,7 @@ def count_matching_packages(db: Session, route: CourierRoute) -> int:
 
 @router.post("/routes", status_code=status.HTTP_201_CREATED, response_model=RouteResponse)
 async def create_route(
+    request: Request,
     route: RouteCreate,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
@@ -153,6 +144,13 @@ async def create_route(
     db.add(new_route)
     db.commit()
     db.refresh(new_route)
+
+    # Audit log route creation
+    log_route_create(
+        db, current_user, new_route.id,
+        {"start": route.start_address, "end": route.end_address, "max_deviation_km": route.max_deviation_km},
+        request
+    )
 
     # Check for matching packages and notify courier
     matching_count = count_matching_packages(db, new_route)
@@ -227,6 +225,7 @@ async def get_route(
 
 @router.put("/routes/{route_id}", response_model=RouteResponse)
 async def update_route(
+    request: Request,
     route_id: int,
     route_update: RouteUpdate,
     current_user: User = Depends(get_current_user),
@@ -253,26 +252,39 @@ async def update_route(
             detail="Route not found"
         )
 
+    # Track changes for audit log
+    changes = {}
+
     # Update fields if provided
     if route_update.end_address is not None:
+        changes["end_address"] = {"old": route.end_address, "new": route_update.end_address}
         route.end_address = route_update.end_address
     if route_update.end_lat is not None:
+        changes["end_lat"] = {"old": route.end_lat, "new": route_update.end_lat}
         route.end_lat = route_update.end_lat
     if route_update.end_lng is not None:
+        changes["end_lng"] = {"old": route.end_lng, "new": route_update.end_lng}
         route.end_lng = route_update.end_lng
     if route_update.max_deviation_km is not None:
+        changes["max_deviation_km"] = {"old": route.max_deviation_km, "new": route_update.max_deviation_km}
         route.max_deviation_km = route_update.max_deviation_km
     if route_update.departure_time is not None:
+        changes["departure_time"] = {"old": str(route.departure_time), "new": str(route_update.departure_time)}
         route.departure_time = route_update.departure_time
 
     db.commit()
     db.refresh(route)
+
+    # Audit log route update
+    if changes:
+        log_route_update(db, current_user, route_id, changes, request)
 
     return route
 
 
 @router.delete("/routes/{route_id}")
 async def delete_route(
+    request: Request,
     route_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -296,6 +308,9 @@ async def delete_route(
     # Soft delete
     route.is_active = False
     db.commit()
+
+    # Audit log route deletion
+    log_route_delete(db, current_user, route_id, request)
 
     return {"message": "Route deactivated successfully"}
 

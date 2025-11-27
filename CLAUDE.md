@@ -64,13 +64,13 @@ npm run lint
 - `main.py` - FastAPI app entry point with middleware (CORS, security headers, rate limiting, sessions)
 - `app/config.py` - Environment settings via pydantic-settings
 - `app/database.py` - SQLAlchemy database connection and session management
-- `app/models/` - SQLAlchemy models (User, Package, Notification, CourierRoute, Rating, Message)
+- `app/models/` - SQLAlchemy models (User, Package, Notification, CourierRoute, Rating, Message, AuditLog)
 - `app/routes/` - API endpoints organized by domain:
-  - `auth.py` - Registration, login, email verification, OAuth
+  - `auth.py` - Registration, login, email verification, password reset, OAuth
   - `packages.py` - Package CRUD for senders
   - `couriers.py` - Route management for couriers
   - `matching.py` - Package-courier matching algorithm
-  - `admin.py` - Admin-only user/package management
+  - `admin.py` - Admin-only user/package management, audit logs
   - `notifications.py` - User notification management
   - `ratings.py` - Rating and review system
   - `messages.py` - In-app messaging between sender and courier
@@ -79,17 +79,22 @@ npm run lint
   - `dependencies.py` - FastAPI dependencies (`get_current_user`, `get_current_admin_user`)
   - `auth.py` - JWT token and password hashing
   - `email.py` - Email sending via FastAPI-Mail (includes event notification emails)
-  - `geo.py` - Geospatial calculations for route matching
+  - `geo.py` - Geospatial calculations for route matching (centralized `haversine_distance` function)
   - `oauth.py` - Google OAuth configuration
 - `app/services/` - Business logic services:
   - `websocket_manager.py` - WebSocket connection manager and broadcast functions
   - `matching_job.py` - Background job for automatic package-route matching (can run as standalone script)
   - `route_optimizer.py` - Route optimization algorithms
+  - `audit_service.py` - Audit logging service for sensitive operations
 - `test_data/` - JSON fixtures and loader script for seeding the database
 
 ### Frontend Structure
 - `app/` - Next.js 14 App Router pages
-- `lib/api.ts` - Axios client with auth interceptor and TypeScript interfaces for all API types
+- `lib/api.ts` - Centralized API client with:
+  - Axios instance with auth interceptor and `withCredentials: true`
+  - TypeScript interfaces for all API types
+  - Organized API modules: `authAPI`, `packagesAPI`, `couriersAPI`, `matchingAPI`, `notificationsAPI`, `ratingsAPI`, `messagesAPI`, `adminAPI`, `verificationAPI`
+  - All API calls should go through these modules (no direct axios calls in components)
 - `hooks/` - Custom React hooks:
   - `useWebSocket.ts` - WebSocket connection hook with auto-reconnect
 - `contexts/` - React contexts:
@@ -99,10 +104,11 @@ npm run lint
 ### Key Patterns
 
 **Authentication Flow:**
-1. JWT tokens stored in localStorage
-2. `lib/api.ts` interceptor adds Bearer token to all requests
-3. Backend `get_current_user` dependency validates tokens
+1. JWT tokens stored in httpOnly cookies (set by server)
+2. `lib/api.ts` configured with `withCredentials: true` to send cookies
+3. Backend `get_current_user` dependency validates tokens from cookies
 4. Role-based access: sender, courier, both, admin
+5. Password reset via email with secure time-limited tokens (1 hour expiry)
 
 **Database:**
 - PostgreSQL with PostGIS for geospatial queries
@@ -113,16 +119,21 @@ npm run lint
 - Pydantic models for request/response validation
 - Role-based guards via FastAPI dependencies
 
+**Code Organization Best Practices:**
+- Backend: Shared utilities (like `haversine_distance`) are centralized in `app/utils/` - import from there instead of duplicating
+- Frontend: All API calls go through `lib/api.ts` modules - no direct axios/fetch calls in components
+- TypeScript types for API responses are defined in `lib/api.ts` and should be reused
+
 ### Testing
 
-**Backend (527 tests):** Pytest with fixtures in `tests/conftest.py` providing:
+**Backend (565 tests):** Pytest with fixtures in `tests/conftest.py` providing:
 - `client` - TestClient with database override
 - `authenticated_sender`, `authenticated_courier`, `authenticated_both_role`, `authenticated_admin` - Pre-authenticated tokens
 - `test_package_data`, `test_user_data`, `test_courier_data` - Sample data fixtures
 - `test_verified_user`, `test_admin` - User objects (not tokens) for direct database operations
 
 Test files:
-- `test_auth.py` - Authentication endpoints (register, login, OAuth)
+- `test_auth.py` - Authentication endpoints (register, login, password reset, OAuth)
 - `test_packages.py` - Package CRUD and status management
 - `test_couriers.py` - Courier route management
 - `test_matching.py` - Package-courier matching
@@ -136,8 +147,9 @@ Test files:
 - `test_email_utils.py` - Email templates and sending
 - `test_websocket_manager.py` - Connection manager
 - `test_dependencies.py` - FastAPI auth dependencies
+- `test_audit_log.py` - Audit logging model, service, and endpoints
 
-**Frontend (497 tests):** Jest with React Testing Library. Test files colocated in `__tests__/` directories.
+**Frontend (534 tests):** Jest with React Testing Library. Test files colocated in `__tests__/` directories.
 
 Test coverage:
 - `lib/__tests__/api.test.ts` - API client endpoints
@@ -146,6 +158,8 @@ Test coverage:
 - `app/__tests__/page.test.tsx` - Home page
 - `app/login/__tests__/` - Login page
 - `app/register/__tests__/` - Registration page
+- `app/forgot-password/__tests__/` - Forgot password page
+- `app/reset-password/__tests__/` - Reset password page
 - `app/dashboard/__tests__/` - Dashboard page
 - `app/messages/__tests__/` - Messages page
 - `app/courier/__tests__/` - Courier dashboard
@@ -169,7 +183,7 @@ Users have one role: `sender`, `courier`, `both`, or `admin`
 
 ## Current Features
 
-- **Authentication**: Email/password, JWT tokens, email verification, Google OAuth
+- **Authentication**: Email/password, JWT tokens (httpOnly cookies), email verification, password reset, Google OAuth
 - **Package Management**: Full CRUD, status tracking, cancel functionality
 - **Courier Routes**: Create/update/delete routes, one active route per courier
 - **Matching Algorithm**: Geospatial matching using haversine/cross-track distance
@@ -197,6 +211,13 @@ Users have one role: `sender`, `courier`, `both`, or `admin`
   - Frontend: ChatWindow component, dedicated /messages page, chat in package detail page
   - Messages icon in navbar with unread badge
   - Comprehensive test suite (11 tests)
+- **Audit Logging**:
+  - Backend: AuditLog model, audit_service.py with convenience functions
+  - Tracks sensitive operations: authentication (login/register/password reset), admin actions (user/package management), package operations (create/update/status change/cancel), courier routes (create/update/delete)
+  - Captures: user_id, action, resource_type, resource_id, details (JSON), IP address, user agent, success/failure status
+  - Admin endpoints: `GET /api/admin/audit-logs` (with filtering), `GET /api/admin/audit-logs/actions`, `GET /api/admin/audit-logs/{id}`
+  - 28 action types defined in AuditAction enum
+  - Comprehensive test suite (28 tests)
 
 ## Pending Features
 

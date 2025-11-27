@@ -1,11 +1,24 @@
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from app.database import get_db
 from app.models.user import User, UserRole
 from app.models.package import Package, PackageStatus
+from app.models.audit_log import AuditLog, AuditAction
 from app.utils.dependencies import get_current_admin_user
+from app.services.audit_service import (
+    log_user_create,
+    log_user_update,
+    log_user_role_change,
+    log_user_deactivate,
+    log_user_activate,
+    log_user_delete,
+    log_package_delete,
+    log_package_deactivate,
+    log_admin_stats_access,
+    log_matching_job_run,
+)
 from pydantic import BaseModel, EmailStr
 from typing import List
 
@@ -77,6 +90,29 @@ class CreateUserRequest(BaseModel):
     max_deviation_km: int = 5
 
 
+class AuditLogResponse(BaseModel):
+    id: int
+    user_id: int | None
+    user_email: str | None
+    action: str
+    resource_type: str | None
+    resource_id: int | None
+    details: dict | None
+    ip_address: str | None
+    user_agent: str | None
+    success: str
+    error_message: str | None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AuditLogListResponse(BaseModel):
+    total: int
+    logs: List[AuditLogResponse]
+
+
 # Admin User Management Endpoints
 @router.get("/users", response_model=List[UserAdminResponse])
 async def get_all_users(
@@ -103,6 +139,7 @@ async def get_all_users(
 
 @router.post("/users", status_code=status.HTTP_201_CREATED, response_model=UserAdminResponse)
 async def create_user(
+    request: Request,
     user_data: CreateUserRequest,
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
@@ -166,6 +203,9 @@ async def create_user(
     db.commit()
     db.refresh(new_user)
 
+    # Audit log user creation
+    log_user_create(db, admin, new_user, request)
+
     return new_user
 
 
@@ -200,6 +240,7 @@ async def get_user_by_id(
 
 @router.put("/users/{user_id}", response_model=UserAdminResponse)
 async def update_user_role(
+    request: Request,
     user_id: int,
     role_update: UpdateUserRole,
     db: Session = Depends(get_db),
@@ -244,10 +285,14 @@ async def update_user_role(
             detail=f"Invalid role. Must be one of: SENDER, COURIER, BOTH, ADMIN"
         )
 
+    old_role = user.role.value
     user.role = new_role
     user.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(user)
+
+    # Audit log role change
+    log_user_role_change(db, admin, user, old_role, new_role.value, request)
 
     return user
 
@@ -264,6 +309,7 @@ class UpdateUserProfile(BaseModel):
 
 @router.put("/users/{user_id}/profile", response_model=UserAdminResponse)
 async def update_user_profile(
+    request: Request,
     user_id: int,
     profile_update: UpdateUserProfile,
     db: Session = Depends(get_db),
@@ -293,11 +339,16 @@ async def update_user_profile(
             detail="User not found"
         )
 
+    # Track changes for audit log
+    changes = {}
+
     # Update fields if provided
     if profile_update.full_name is not None:
+        changes["full_name"] = {"old": user.full_name, "new": profile_update.full_name}
         user.full_name = profile_update.full_name
 
     if profile_update.phone_number is not None:
+        changes["phone_number"] = {"old": user.phone_number, "new": profile_update.phone_number}
         user.phone_number = profile_update.phone_number
 
     if profile_update.max_deviation_km is not None:
@@ -307,17 +358,23 @@ async def update_user_profile(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Max deviation must be between 1 and 500 km"
             )
+        changes["max_deviation_km"] = {"old": user.max_deviation_km, "new": profile_update.max_deviation_km}
         user.max_deviation_km = profile_update.max_deviation_km
 
     user.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(user)
 
+    # Audit log profile update
+    if changes:
+        log_user_update(db, admin, user, changes, request)
+
     return user
 
 
 @router.put("/users/{user_id}/toggle-active", response_model=UserAdminResponse)
 async def toggle_user_active(
+    request: Request,
     user_id: int,
     toggle_data: ToggleUserActive,
     db: Session = Depends(get_db),
@@ -360,11 +417,18 @@ async def toggle_user_active(
     db.commit()
     db.refresh(user)
 
+    # Audit log activation/deactivation
+    if toggle_data.is_active:
+        log_user_activate(db, admin, user, request)
+    else:
+        log_user_deactivate(db, admin, user, request)
+
     return user
 
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(
+    request: Request,
     user_id: int,
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
@@ -395,6 +459,9 @@ async def delete_user(
             detail="Cannot delete your own account"
         )
 
+    # Store user info before deletion for audit log
+    deleted_user_email = user.email
+
     # Delete related packages first (or rely on cascade delete if configured)
     db.query(Package).filter(
         or_(Package.sender_id == user_id, Package.courier_id == user_id)
@@ -402,6 +469,9 @@ async def delete_user(
 
     db.delete(user)
     db.commit()
+
+    # Audit log user deletion
+    log_user_delete(db, admin, user_id, deleted_user_email, request)
 
     return None
 
@@ -461,6 +531,7 @@ async def get_package_by_id(
 
 @router.delete("/packages/{package_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_package(
+    request: Request,
     package_id: int,
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
@@ -486,6 +557,9 @@ async def delete_package(
     db.delete(package)
     db.commit()
 
+    # Audit log package deletion
+    log_package_delete(db, admin, package_id, request)
+
     return None
 
 
@@ -495,6 +569,7 @@ class TogglePackageActive(BaseModel):
 
 @router.put("/packages/{package_id}/toggle-active", response_model=PackageAdminResponse)
 async def toggle_package_active(
+    request: Request,
     package_id: int,
     toggle_data: TogglePackageActive,
     db: Session = Depends(get_db),
@@ -537,12 +612,17 @@ async def toggle_package_active(
     db.commit()
     db.refresh(package)
 
+    # Audit log package deactivation (only log deactivation, not reactivation)
+    if not toggle_data.is_active:
+        log_package_deactivate(db, admin, package_id, request)
+
     return package
 
 
 # Admin Statistics Endpoint
 @router.get("/stats", response_model=PlatformStats)
 async def get_platform_stats(
+    request: Request,
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
 ):
@@ -589,6 +669,9 @@ async def get_platform_stats(
 
     # Revenue statistics (sum of all package prices)
     total_revenue = db.query(func.sum(Package.price)).scalar() or 0.0
+
+    # Audit log stats access
+    log_admin_stats_access(db, admin, request)
 
     return PlatformStats(
         total_users=total_users,
@@ -640,7 +723,9 @@ class MatchingJobResult(BaseModel):
 
 @router.post("/jobs/run-matching", response_model=MatchingJobResult)
 async def run_matching_job_endpoint(
+    http_request: Request,
     request: RunMatchingJobRequest,
+    db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
 ):
     """
@@ -663,6 +748,11 @@ async def run_matching_job_endpoint(
         dry_run=request.dry_run
     )
 
+    # Audit log matching job execution
+    log_matching_job_run(
+        db, admin, results['notifications_created'], request.dry_run, http_request
+    )
+
     return MatchingJobResult(
         started_at=results['started_at'],
         completed_at=results['completed_at'],
@@ -671,4 +761,142 @@ async def run_matching_job_endpoint(
         notifications_created=results['notifications_created'],
         notifications_skipped=results['notifications_skipped'],
         route_details=results['route_details']
+    )
+
+
+# Audit Log Endpoints
+@router.get("/audit-logs", response_model=AuditLogListResponse)
+async def get_audit_logs(
+    skip: int = 0,
+    limit: int = 100,
+    action: str | None = None,
+    user_id: int | None = None,
+    resource_type: str | None = None,
+    resource_id: int | None = None,
+    success: str | None = None,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Get audit logs (admin only).
+
+    Query params:
+    - skip: Number of records to skip (pagination)
+    - limit: Maximum number of records to return (max 500)
+    - action: Filter by action type (e.g., 'login_success', 'user_create')
+    - user_id: Filter by user ID who performed the action
+    - resource_type: Filter by resource type (e.g., 'user', 'package', 'route')
+    - resource_id: Filter by resource ID
+    - success: Filter by success status ('success', 'failed', 'denied')
+
+    Returns:
+        List of audit logs with total count
+    """
+    # Limit max to prevent excessive queries
+    limit = min(limit, 500)
+
+    query = db.query(AuditLog)
+
+    # Apply filters
+    if action:
+        try:
+            action_enum = AuditAction(action)
+            query = query.filter(AuditLog.action == action_enum)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid action type: {action}"
+            )
+
+    if user_id:
+        query = query.filter(AuditLog.user_id == user_id)
+
+    if resource_type:
+        query = query.filter(AuditLog.resource_type == resource_type)
+
+    if resource_id:
+        query = query.filter(AuditLog.resource_id == resource_id)
+
+    if success:
+        query = query.filter(AuditLog.success == success)
+
+    # Get total count before pagination
+    total = query.count()
+
+    # Apply pagination and ordering
+    logs = query.order_by(AuditLog.created_at.desc()).offset(skip).limit(limit).all()
+
+    # Convert to response format
+    log_responses = [
+        AuditLogResponse(
+            id=log.id,
+            user_id=log.user_id,
+            user_email=log.user_email,
+            action=log.action.value,
+            resource_type=log.resource_type,
+            resource_id=log.resource_id,
+            details=log.details,
+            ip_address=log.ip_address,
+            user_agent=log.user_agent,
+            success=log.success,
+            error_message=log.error_message,
+            created_at=log.created_at
+        )
+        for log in logs
+    ]
+
+    return AuditLogListResponse(total=total, logs=log_responses)
+
+
+@router.get("/audit-logs/actions", response_model=List[str])
+async def get_audit_log_actions(
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Get list of all available audit log action types (admin only).
+
+    Returns:
+        List of action type strings
+    """
+    return [action.value for action in AuditAction]
+
+
+@router.get("/audit-logs/{log_id}", response_model=AuditLogResponse)
+async def get_audit_log_by_id(
+    log_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Get a specific audit log by ID (admin only).
+
+    Args:
+        log_id: Audit log ID
+
+    Returns:
+        Audit log details
+
+    Raises:
+        HTTPException: If audit log not found
+    """
+    log = db.query(AuditLog).filter(AuditLog.id == log_id).first()
+    if not log:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Audit log not found"
+        )
+
+    return AuditLogResponse(
+        id=log.id,
+        user_id=log.user_id,
+        user_email=log.user_email,
+        action=log.action.value,
+        resource_type=log.resource_type,
+        resource_id=log.resource_id,
+        details=log.details,
+        ip_address=log.ip_address,
+        user_agent=log.user_agent,
+        success=log.success,
+        error_message=log.error_message,
+        created_at=log.created_at
     )

@@ -2,8 +2,8 @@ import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
+from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from slowapi import Limiter
@@ -15,14 +15,51 @@ from app.models.user import User, UserRole
 from app.models.rating import Rating
 from app.utils.auth import get_password_hash, verify_password, create_access_token
 from app.utils.dependencies import get_current_user
-from app.utils.email import send_verification_email, send_welcome_email, generate_verification_token
+from app.utils.email import send_verification_email, send_welcome_email, send_password_reset_email, generate_verification_token
 from app.utils.oauth import oauth
+from app.services.audit_service import (
+    log_login_success,
+    log_login_failed,
+    log_registration,
+    log_password_reset_request,
+    log_password_reset_complete,
+    log_email_verification,
+    log_oauth_login,
+)
 from pydantic import BaseModel, EmailStr, Field
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address, enabled=settings.ENVIRONMENT != "test")
+
+# Cookie configuration
+COOKIE_NAME = "access_token"
+COOKIE_MAX_AGE = settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60  # Convert to seconds
+
+
+def set_auth_cookie(response: Response, token: str) -> None:
+    """Set the JWT token in an httpOnly cookie."""
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=token,
+        max_age=COOKIE_MAX_AGE,
+        httponly=True,
+        secure=settings.ENVIRONMENT == "production",
+        samesite="lax",
+        path="/",
+    )
+
+
+def clear_auth_cookie(response: Response) -> None:
+    """Clear the authentication cookie."""
+    response.delete_cookie(
+        key=COOKIE_NAME,
+        httponly=True,
+        secure=settings.ENVIRONMENT == "production",
+        samesite="lax",
+        path="/",
+    )
 
 # Request/Response Models
 class UserRegister(BaseModel):
@@ -41,6 +78,10 @@ class Token(BaseModel):
     access_token: str
     token_type: str
 
+
+class LoginResponse(BaseModel):
+    message: str
+
 class UserResponse(BaseModel):
     id: int
     email: str
@@ -56,6 +97,15 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=8, description="Password must be at least 8 characters")
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED, response_model=UserResponse)
@@ -111,26 +161,30 @@ async def register(request: Request, user_data: UserRegister, db: Session = Depe
     db.commit()
     db.refresh(new_user)
 
+    # Audit log registration
+    log_registration(db, new_user, request)
+
     # Send verification email
     await send_verification_email(new_user.email, verification_token, new_user.full_name)
 
     return new_user
 
 
-@router.post("/login", response_model=Token)
+@router.post("/login", response_model=LoginResponse)
 @limiter.limit("10/minute")  # Max 10 login attempts per minute per IP
-async def login(request: Request, credentials: UserLogin, db: Session = Depends(get_db)):
+async def login(request: Request, response: Response, credentials: UserLogin, db: Session = Depends(get_db)):
     """
-    Login and get JWT access token.
+    Login and get JWT access token set in httpOnly cookie.
 
     - **email**: Registered email address
     - **password**: User's password
 
-    Returns a JWT token valid for 30 minutes (default).
+    Sets JWT token in httpOnly cookie valid for 30 minutes (default).
     """
     # Find user by email
     user = db.query(User).filter(User.email == credentials.email).first()
     if not user:
+        log_login_failed(db, credentials.email, request, "user_not_found")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
@@ -139,6 +193,7 @@ async def login(request: Request, credentials: UserLogin, db: Session = Depends(
 
     # Verify password
     if not verify_password(credentials.password, user.hashed_password):
+        log_login_failed(db, credentials.email, request, "invalid_password")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
@@ -147,6 +202,7 @@ async def login(request: Request, credentials: UserLogin, db: Session = Depends(
 
     # Check if user is active
     if not user.is_active:
+        log_login_failed(db, credentials.email, request, "account_inactive")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is inactive"
@@ -159,10 +215,13 @@ async def login(request: Request, credentials: UserLogin, db: Session = Depends(
         expires_delta=access_token_expires
     )
 
-    return {
-        "access_token": access_token,
-        "token_type": "bearer"
-    }
+    # Set JWT in httpOnly cookie
+    set_auth_cookie(response, access_token)
+
+    # Audit log successful login
+    log_login_success(db, user, request, "password")
+
+    return {"message": "Login successful"}
 
 
 @router.get("/me", response_model=UserResponse)
@@ -232,6 +291,9 @@ async def verify_email(token: str, db: Session = Depends(get_db)):
     user.verification_token = None
     user.verification_token_expires_at = None
     db.commit()
+
+    # Audit log email verification
+    log_email_verification(db, user)
 
     # Send welcome email
     await send_welcome_email(user.email, user.full_name)
@@ -325,6 +387,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
 
         # Check if user exists
         user = db.query(User).filter(User.email == email).first()
+        is_new_user = False
 
         if not user:
             # Create new user with Google account
@@ -340,6 +403,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
             db.add(user)
             db.commit()
             db.refresh(user)
+            is_new_user = True
         else:
             # User exists, mark as verified if using Google
             if not user.is_verified:
@@ -353,11 +417,104 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
             expires_delta=access_token_expires
         )
 
-        # Redirect to frontend with token
-        frontend_url = f"{settings.FRONTEND_URL}/auth/callback?token={access_token}"
-        return RedirectResponse(url=frontend_url)
+        # Audit log OAuth login
+        log_oauth_login(db, user, "google", is_new_user, request)
+
+        # Redirect to frontend with token in httpOnly cookie
+        frontend_url = f"{settings.FRONTEND_URL}/auth/callback"
+        response = RedirectResponse(url=frontend_url)
+        set_auth_cookie(response, access_token)
+        return response
 
     except Exception as e:
         # Redirect to frontend with error
         error_url = f"{settings.FRONTEND_URL}/login?error=oauth_failed"
         return RedirectResponse(url=error_url)
+
+
+@router.post("/forgot-password")
+@limiter.limit("3/minute")  # Max 3 password reset requests per minute per IP
+async def forgot_password(request: Request, data: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """
+    Request a password reset email.
+
+    - **email**: User's email address
+
+    Note: Returns success message regardless of whether email exists to prevent user enumeration.
+    """
+    user = db.query(User).filter(User.email == data.email).first()
+
+    # Always return success to prevent user enumeration
+    if not user:
+        return {"message": "If an account exists with this email, a password reset link has been sent."}
+
+    # Check if user is active
+    if not user.is_active:
+        return {"message": "If an account exists with this email, a password reset link has been sent."}
+
+    # Generate password reset token (expires in 1 hour)
+    reset_token = generate_verification_token()
+    user.password_reset_token = reset_token
+    user.password_reset_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    db.commit()
+
+    # Audit log password reset request
+    log_password_reset_request(db, user, request)
+
+    # Send password reset email
+    try:
+        await send_password_reset_email(user.email, reset_token, user.full_name)
+    except Exception as exc:  # pragma: no cover - network/email provider issues
+        logger.warning("Failed to send password reset email for %s: %s", user.email, exc)
+
+    return {"message": "If an account exists with this email, a password reset link has been sent."}
+
+
+@router.post("/reset-password")
+async def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """
+    Reset password using the reset token.
+
+    - **token**: Password reset token from email
+    - **new_password**: New password (minimum 8 characters)
+    """
+    # Find user by reset token
+    user = db.query(User).filter(User.password_reset_token == data.token).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired password reset token"
+        )
+
+    # Check if token has expired
+    if user.password_reset_token_expires_at:
+        # Handle both naive and aware datetimes (SQLite stores naive, PostgreSQL stores aware)
+        expires_at = user.password_reset_token_expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if expires_at < datetime.now(timezone.utc):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Password reset token has expired. Please request a new one."
+            )
+
+    # Update password and clear reset token
+    user.hashed_password = get_password_hash(data.new_password)
+    user.password_reset_token = None
+    user.password_reset_token_expires_at = None
+    db.commit()
+
+    # Audit log password reset completion
+    log_password_reset_complete(db, user)
+
+    return {"message": "Password has been reset successfully. You can now log in with your new password."}
+
+
+@router.post("/logout", response_model=LoginResponse)
+async def logout(response: Response):
+    """
+    Logout user by clearing the authentication cookie.
+    """
+    clear_auth_cookie(response)
+    return {"message": "Logged out successfully"}
