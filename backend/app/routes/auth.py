@@ -1,7 +1,9 @@
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from app.database import get_db
 from app.models.user import User, UserRole
 from app.utils.auth import get_password_hash, verify_password, create_access_token
@@ -13,6 +15,7 @@ from pydantic import BaseModel, EmailStr, Field
 import secrets
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 # Request/Response Models
 class UserRegister(BaseModel):
@@ -47,7 +50,8 @@ class UserResponse(BaseModel):
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED, response_model=UserResponse)
-async def register(user_data: UserRegister, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")  # Max 5 registrations per minute per IP
+async def register(request: Request, user_data: UserRegister, db: Session = Depends(get_db)):
     """
     Register a new user (sender, courier, or both).
 
@@ -78,8 +82,9 @@ async def register(user_data: UserRegister, db: Session = Depends(get_db)):
     # Hash password
     hashed_password = get_password_hash(user_data.password)
 
-    # Generate verification token
+    # Generate verification token (expires in 24 hours)
     verification_token = generate_verification_token()
+    verification_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
 
     # Create new user
     new_user = User(
@@ -89,7 +94,8 @@ async def register(user_data: UserRegister, db: Session = Depends(get_db)):
         role=user_role,
         phone_number=user_data.phone_number,
         max_deviation_km=user_data.max_deviation_km or 5,
-        verification_token=verification_token
+        verification_token=verification_token,
+        verification_token_expires_at=verification_token_expires_at
     )
 
     db.add(new_user)
@@ -103,7 +109,8 @@ async def register(user_data: UserRegister, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-async def login(credentials: UserLogin, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")  # Max 10 login attempts per minute per IP
+async def login(request: Request, credentials: UserLogin, db: Session = Depends(get_db)):
     """
     Login and get JWT access token.
 
@@ -181,9 +188,17 @@ async def verify_email(token: str, db: Session = Depends(get_db)):
             detail="Email already verified"
         )
 
+    # Check if token has expired
+    if user.verification_token_expires_at and user.verification_token_expires_at < datetime.now(timezone.utc):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Verification token has expired. Please request a new verification email."
+        )
+
     # Mark user as verified and clear the token
     user.is_verified = True
     user.verification_token = None
+    user.verification_token_expires_at = None
     db.commit()
 
     # Send welcome email
@@ -196,36 +211,39 @@ async def verify_email(token: str, db: Session = Depends(get_db)):
 
 
 @router.post("/resend-verification")
-async def resend_verification_email(email: EmailStr, db: Session = Depends(get_db)):
+@limiter.limit("3/minute")  # Max 3 resend attempts per minute per IP
+async def resend_verification_email(request: Request, email: EmailStr, db: Session = Depends(get_db)):
     """
     Resend verification email to user.
 
     - **email**: User's email address
+
+    Note: Returns success message regardless of whether email exists to prevent user enumeration.
     """
     user = db.query(User).filter(User.email == email).first()
 
+    # Always return success to prevent user enumeration
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
+        return {
+            "message": "If the email is registered and not verified, a verification email has been sent."
+        }
 
     if user.is_verified:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already verified"
-        )
+        return {
+            "message": "If the email is registered and not verified, a verification email has been sent."
+        }
 
-    # Generate new verification token
+    # Generate new verification token (expires in 24 hours)
     verification_token = generate_verification_token()
     user.verification_token = verification_token
+    user.verification_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
     db.commit()
 
     # Send verification email
     await send_verification_email(user.email, verification_token, user.full_name)
 
     return {
-        "message": "Verification email sent successfully"
+        "message": "If the email is registered and not verified, a verification email has been sent."
     }
 
 

@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from typing import Optional
+import secrets
 
 class Settings(BaseSettings):
     # Database
@@ -9,6 +10,31 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "your-secret-key-change-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+
+    def validate_secret_key(self) -> None:
+        """Validate that SECRET_KEY has been changed from default"""
+        insecure_keys = [
+            "your-secret-key-change-in-production",
+            "change-me",
+            "secret",
+            "password",
+            "secret-key"
+        ]
+        if self.SECRET_KEY in insecure_keys or len(self.SECRET_KEY) < 32:
+            if self.ENVIRONMENT == "production":
+                raise ValueError(
+                    "CRITICAL SECURITY ERROR: SECRET_KEY must be changed from default "
+                    "and must be at least 32 characters long for production use. "
+                    f"Generate a secure key with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+                )
+            else:
+                # In development, generate a random key if using default
+                import warnings
+                warnings.warn(
+                    "WARNING: Using insecure SECRET_KEY. For production, set a secure SECRET_KEY "
+                    "in your .env file (at least 32 characters).",
+                    UserWarning
+                )
 
     # API Keys
     GOOGLE_MAPS_API_KEY: Optional[str] = None
@@ -41,3 +67,5 @@ class Settings(BaseSettings):
         env_file = ".env"
 
 settings = Settings()
+# Validate SECRET_KEY on startup
+settings.validate_secret_key()

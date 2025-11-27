@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
@@ -245,7 +245,7 @@ async def update_user_role(
         )
 
     user.role = new_role
-    user.updated_at = datetime.utcnow()
+    user.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(user)
 
@@ -309,7 +309,7 @@ async def update_user_profile(
             )
         user.max_deviation_km = profile_update.max_deviation_km
 
-    user.updated_at = datetime.utcnow()
+    user.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(user)
 
@@ -356,7 +356,7 @@ async def toggle_user_active(
         )
 
     user.is_active = toggle_data.is_active
-    user.updated_at = datetime.utcnow()
+    user.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(user)
 
@@ -533,7 +533,7 @@ async def toggle_package_active(
         )
 
     package.is_active = toggle_data.is_active
-    package.updated_at = datetime.utcnow()
+    package.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(package)
 

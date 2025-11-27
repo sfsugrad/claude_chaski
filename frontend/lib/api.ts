@@ -107,20 +107,70 @@ export const packagesAPI = {
     api.put(`/packages/${id}/status`, { status }),
 }
 
+// Route Types
+export interface RouteCreate {
+  start_address: string
+  start_lat: number
+  start_lng: number
+  end_address: string
+  end_lat: number
+  end_lng: number
+  max_deviation_km: number
+  departure_time?: string
+}
+
+export interface RouteResponse {
+  id: number
+  courier_id: number
+  start_address: string
+  start_lat: number
+  start_lng: number
+  end_address: string
+  end_lat: number
+  end_lng: number
+  max_deviation_km: number
+  departure_time: string | null
+  is_active: boolean
+  created_at: string
+}
+
+export interface MatchedPackage {
+  package_id: number
+  sender_id: number
+  description: string
+  size: string
+  weight_kg: number
+  pickup_address: string
+  pickup_lat: number
+  pickup_lng: number
+  dropoff_address: string
+  dropoff_lat: number
+  dropoff_lng: number
+  price: number | null
+  distance_from_route_km: number
+  estimated_detour_km: number
+  pickup_contact_name: string | null
+  pickup_contact_phone: string | null
+  dropoff_contact_name: string | null
+  dropoff_contact_phone: string | null
+}
+
 // Couriers API
 export const couriersAPI = {
-  createRoute: (data: any) => api.post('/couriers/routes', data),
-  getRoutes: () => api.get('/couriers/routes'),
-  getRoute: (id: number) => api.get(`/couriers/routes/${id}`),
+  createRoute: (data: RouteCreate) => api.post<RouteResponse>('/couriers/routes', data),
+  getRoutes: () => api.get<RouteResponse[]>('/couriers/routes'),
+  getRoute: (id: number) => api.get<RouteResponse>(`/couriers/routes/${id}`),
   deleteRoute: (id: number) => api.delete(`/couriers/routes/${id}`),
 }
 
 // Matching API
 export const matchingAPI = {
   getPackagesAlongRoute: (routeId: number) =>
-    api.get(`/matching/packages-along-route/${routeId}`),
+    api.get<MatchedPackage[]>(`/matching/packages-along-route/${routeId}`),
   acceptPackage: (packageId: number) =>
     api.post(`/matching/accept-package/${packageId}`),
   declinePackage: (packageId: number) =>
     api.post(`/matching/decline-package/${packageId}`),
+  getOptimizedRoute: (routeId: number) =>
+    api.get(`/matching/optimized-route/${routeId}`),
 }

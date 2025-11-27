@@ -1,167 +1,198 @@
-import Link from 'next/link'
+'use client'
 
-export default function CourierPage() {
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { couriersAPI, authAPI, RouteResponse } from '@/lib/api'
+
+export default function CourierDashboard() {
+  const [routes, setRoutes] = useState<RouteResponse[]>([])
+  const [activeRoute, setActiveRoute] = useState<RouteResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const router = useRouter()
+
+  useEffect(() => {
+    checkAuthAndLoadData()
+  }, [])
+
+  const checkAuthAndLoadData = async () => {
+    try {
+      // Verify user is courier or both
+      const userResponse = await authAPI.getCurrentUser()
+      const user = userResponse.data
+
+      if (user.role !== 'courier' && user.role !== 'both') {
+        router.push('/')
+        return
+      }
+
+      await loadRoutes()
+    } catch (err) {
+      setError('Failed to load data. Please log in.')
+      router.push('/login')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadRoutes = async () => {
+    try {
+      const response = await couriersAPI.getRoutes()
+      const allRoutes = response.data
+      setRoutes(allRoutes)
+
+      const active = allRoutes.find((r: RouteResponse) => r.is_active)
+      setActiveRoute(active || null)
+    } catch (err) {
+      console.error('Failed to load routes:', err)
+      setError('Failed to load routes')
+    }
+  }
+
+  const deleteRoute = async (routeId: number) => {
+    if (!confirm('Are you sure you want to deactivate this route?')) return
+
+    try {
+      await couriersAPI.deleteRoute(routeId)
+      await loadRoutes()
+    } catch (err) {
+      alert('Failed to delete route')
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center">Loading...</div>
+      </div>
+    )
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-green-50 to-white">
-      <div className="container mx-auto px-4 py-16">
-        <div className="max-w-4xl mx-auto">
-          {/* Header */}
-          <div className="text-center mb-12">
-            <div className="text-6xl mb-4">🚗</div>
-            <h1 className="text-5xl font-bold text-gray-900 mb-4">
-              Earn Money as a Courier
-            </h1>
-            <p className="text-xl text-gray-600">
-              Turn your travels into income by delivering packages along your route
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="container mx-auto px-4">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold">Courier Dashboard</h1>
+          <Link
+            href="/courier/routes/create"
+            className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium"
+          >
+            Create New Route
+          </Link>
+        </div>
+
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            {error}
+          </div>
+        )}
+
+        {/* Active Route Section */}
+        {activeRoute && (
+          <div className="bg-green-50 border-2 border-green-200 rounded-lg p-6 mb-8">
+            <div className="flex justify-between items-start">
+              <div>
+                <h2 className="text-xl font-bold text-green-800 mb-2">
+                  Active Route
+                </h2>
+                <div className="space-y-2">
+                  <p><strong>From:</strong> {activeRoute.start_address}</p>
+                  <p><strong>To:</strong> {activeRoute.end_address}</p>
+                  <p><strong>Max Deviation:</strong> {activeRoute.max_deviation_km} km</p>
+                  {activeRoute.departure_time && (
+                    <p><strong>Departure:</strong> {new Date(activeRoute.departure_time).toLocaleString()}</p>
+                  )}
+                  <p className="text-sm text-gray-600">Created: {new Date(activeRoute.created_at).toLocaleString()}</p>
+                </div>
+              </div>
+              <div className="space-x-2">
+                <Link
+                  href={`/courier/routes/${activeRoute.id}/matches`}
+                  className="inline-block bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
+                >
+                  View Matches
+                </Link>
+                <button
+                  onClick={() => deleteRoute(activeRoute.id)}
+                  className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors"
+                >
+                  Deactivate
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* No Active Route Message */}
+        {!activeRoute && routes.length > 0 && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-8">
+            <p className="text-yellow-800">
+              You don't have an active route. Create a new route to start finding package matches!
             </p>
           </div>
+        )}
 
-          {/* Features */}
-          <div className="grid md:grid-cols-3 gap-8 mb-12">
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <div className="text-3xl mb-3">💵</div>
-              <h3 className="text-xl font-bold mb-2">Extra Income</h3>
-              <p className="text-gray-600">
-                Earn money on trips you're already making
-              </p>
-            </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <div className="text-3xl mb-3">📅</div>
-              <h3 className="text-xl font-bold mb-2">Flexible Schedule</h3>
-              <p className="text-gray-600">
-                Choose which packages to deliver based on your route
-              </p>
-            </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <div className="text-3xl mb-3">✅</div>
-              <h3 className="text-xl font-bold mb-2">Easy to Start</h3>
-              <p className="text-gray-600">
-                Simple registration and instant matching with packages
-              </p>
-            </div>
+        {/* First Time User Message */}
+        {routes.length === 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
+            <h2 className="text-xl font-bold text-blue-800 mb-2">Welcome to Chaski!</h2>
+            <p className="text-blue-700">
+              Get started by creating your first route. We'll match you with packages along your way.
+            </p>
           </div>
+        )}
 
-          {/* How It Works */}
-          <div className="bg-white rounded-lg shadow-lg p-8 mb-12">
-            <h2 className="text-3xl font-bold text-center mb-8">How It Works</h2>
-            <div className="space-y-6">
-              <div className="flex items-start">
-                <div className="bg-green-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-4 flex-shrink-0">
-                  1
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold mb-2">Create Your Profile</h3>
-                  <p className="text-gray-600">
-                    Sign up as a courier and set up your profile with vehicle details
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start">
-                <div className="bg-green-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-4 flex-shrink-0">
-                  2
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold mb-2">Share Your Route</h3>
-                  <p className="text-gray-600">
-                    Enter your travel plans and get matched with packages along your way
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start">
-                <div className="bg-green-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-4 flex-shrink-0">
-                  3
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold mb-2">Accept Deliveries</h3>
-                  <p className="text-gray-600">
-                    Review package details and accept deliveries that fit your schedule
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start">
-                <div className="bg-green-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-4 flex-shrink-0">
-                  4
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold mb-2">Deliver & Get Paid</h3>
-                  <p className="text-gray-600">
-                    Complete the delivery and receive payment directly to your account
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Benefits Section */}
-          <div className="bg-green-50 rounded-lg p-8 mb-12">
-            <h2 className="text-2xl font-bold text-center mb-6">Why Become a Chaski Courier?</h2>
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="flex items-start">
-                <div className="text-2xl mr-3">✓</div>
-                <div>
-                  <h3 className="font-bold mb-1">No Extra Detours</h3>
-                  <p className="text-gray-600">Only deliver packages that match your existing route</p>
-                </div>
-              </div>
-              <div className="flex items-start">
-                <div className="text-2xl mr-3">✓</div>
-                <div>
-                  <h3 className="font-bold mb-1">Be Your Own Boss</h3>
-                  <p className="text-gray-600">Choose when and where you want to deliver</p>
-                </div>
-              </div>
-              <div className="flex items-start">
-                <div className="text-2xl mr-3">✓</div>
-                <div>
-                  <h3 className="font-bold mb-1">Safe & Secure</h3>
-                  <p className="text-gray-600">All packages are insured and senders are verified</p>
-                </div>
-              </div>
-              <div className="flex items-start">
-                <div className="text-2xl mr-3">✓</div>
-                <div>
-                  <h3 className="font-bold mb-1">Quick Payments</h3>
-                  <p className="text-gray-600">Get paid immediately after successful delivery</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* CTA Buttons */}
-          <div className="text-center space-y-4">
-            <div>
-              <Link
-                href="/register"
-                className="inline-block bg-green-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-green-700 transition shadow-lg"
-              >
-                Start Earning - Become a Courier
-              </Link>
-            </div>
-            <div>
-              <p className="text-gray-600">
-                Already have an account?{' '}
-                <Link
-                  href="/login"
-                  className="text-green-600 hover:underline font-semibold"
+        {/* Route History */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-bold mb-4">Route History</h2>
+          {routes.length === 0 ? (
+            <p className="text-gray-600">No routes yet. Create your first route to start earning!</p>
+          ) : (
+            <div className="space-y-4">
+              {routes.map((route) => (
+                <div
+                  key={route.id}
+                  className={`border rounded-lg p-4 ${
+                    route.is_active ? 'border-green-300 bg-green-50' : 'border-gray-200'
+                  }`}
                 >
-                  Sign In
-                </Link>
-              </p>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-semibold">{route.start_address} &rarr; {route.end_address}</p>
+                      <p className="text-sm text-gray-600">
+                        Created: {new Date(route.created_at).toLocaleDateString()}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Deviation: {route.max_deviation_km} km
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Status: {route.is_active ? '🟢 Active' : '⚫ Inactive'}
+                      </p>
+                    </div>
+                    <div className="space-x-2">
+                      {route.is_active && (
+                        <Link
+                          href={`/courier/routes/${route.id}/matches`}
+                          className="inline-block text-blue-600 hover:text-blue-800 text-sm font-medium"
+                        >
+                          View Matches
+                        </Link>
+                      )}
+                      {!route.is_active && (
+                        <button
+                          onClick={() => deleteRoute(route.id)}
+                          className="text-red-600 hover:text-red-800 text-sm font-medium"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="pt-4">
-              <Link
-                href="/"
-                className="text-gray-600 hover:text-gray-900"
-              >
-                ← Back to Home
-              </Link>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
