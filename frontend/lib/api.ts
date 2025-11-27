@@ -164,6 +164,7 @@ export const couriersAPI = {
   getRoutes: () => api.get<RouteResponse[]>('/couriers/routes'),
   getRoute: (id: number) => api.get<RouteResponse>(`/couriers/routes/${id}`),
   deleteRoute: (id: number) => api.delete(`/couriers/routes/${id}`),
+  activateRoute: (id: number) => api.put<RouteResponse>(`/couriers/routes/${id}/activate`),
 }
 
 // Matching API

@@ -1013,3 +1013,290 @@ class TestRouteIntegration:
 
         assert len(courier1_routes.json()) == 1
         assert len(courier2_routes.json()) == 1
+
+
+class TestActivateRoute:
+    """Tests for activate route endpoint"""
+
+    def test_activate_route_success(self, client, authenticated_courier, test_route_data):
+        """Test successful activation of an inactive route"""
+        # Create first route (will become inactive when we create second)
+        create_response1 = client.post(
+            "/api/couriers/routes",
+            json=test_route_data,
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
+        route1_id = create_response1.json()["id"]
+        assert create_response1.json()["is_active"] is True
+
+        # Create second route (first becomes inactive)
+        test_route_data["end_address"] = "Different destination"
+        test_route_data["end_lat"] = 41.0
+        create_response2 = client.post(
+            "/api/couriers/routes",
+            json=test_route_data,
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
+        route2_id = create_response2.json()["id"]
+
+        # Verify first route is inactive
+        get_response = client.get(
+            f"/api/couriers/routes/{route1_id}",
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
+        assert get_response.json()["is_active"] is False
+
+        # Activate the first route
+        activate_response = client.put(
+            f"/api/couriers/routes/{route1_id}/activate",
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
+
+        assert activate_response.status_code == status.HTTP_200_OK
+        assert activate_response.json()["is_active"] is True
+        assert activate_response.json()["id"] == route1_id
+
+        # Verify second route is now inactive
+        get_response2 = client.get(
+            f"/api/couriers/routes/{route2_id}",
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
+        assert get_response2.json()["is_active"] is False
+
+    def test_activate_route_deactivates_current_active(self, client, authenticated_courier, test_route_data):
+        """Test that activating a route deactivates the currently active route"""
+        # Create three routes
+        route_ids = []
+        for i in range(3):
+            test_route_data["end_address"] = f"Destination {i}"
+            test_route_data["end_lat"] = 40.0 + i
+            response = client.post(
+                "/api/couriers/routes",
+                json=test_route_data,
+                headers={"Authorization": f"Bearer {authenticated_courier}"}
+            )
+            route_ids.append(response.json()["id"])
+
+        # Last route (route_ids[2]) should be active
+        # Activate first route (route_ids[0])
+        activate_response = client.put(
+            f"/api/couriers/routes/{route_ids[0]}/activate",
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
+        assert activate_response.status_code == status.HTTP_200_OK
+
+        # Get all routes and verify only one is active
+        all_routes = client.get(
+            "/api/couriers/routes",
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
+        routes = all_routes.json()
+        active_routes = [r for r in routes if r["is_active"]]
+
+        assert len(active_routes) == 1
+        assert active_routes[0]["id"] == route_ids[0]
+
+    def test_activate_already_active_route(self, client, authenticated_courier, test_route_data):
+        """Test that activating an already active route returns error"""
+        # Create a route (automatically active)
+        create_response = client.post(
+            "/api/couriers/routes",
+            json=test_route_data,
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
+        route_id = create_response.json()["id"]
+
+        # Try to activate an already active route
+        activate_response = client.put(
+            f"/api/couriers/routes/{route_id}/activate",
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
+
+        assert activate_response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "already active" in activate_response.json()["detail"].lower()
+
+    def test_activate_route_not_found(self, client, authenticated_courier):
+        """Test activating a non-existent route"""
+        response = client.put(
+            "/api/couriers/routes/99999/activate",
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert "not found" in response.json()["detail"].lower()
+
+    def test_activate_route_unauthorized_other_courier(self, client, authenticated_courier, authenticated_both_role, test_route_data):
+        """Test that couriers cannot activate other couriers' routes"""
+        # Courier 1 creates a route
+        create_response = client.post(
+            "/api/couriers/routes",
+            json=test_route_data,
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
+        route_id = create_response.json()["id"]
+
+        # Deactivate it by creating another route
+        test_route_data["end_address"] = "Different destination"
+        client.post(
+            "/api/couriers/routes",
+            json=test_route_data,
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
+
+        # Courier 2 tries to activate Courier 1's route
+        response = client.put(
+            f"/api/couriers/routes/{route_id}/activate",
+            headers={"Authorization": f"Bearer {authenticated_both_role}"}
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_activate_route_without_authentication(self, client):
+        """Test activating route without authentication"""
+        response = client.put("/api/couriers/routes/1/activate")
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_activate_route_fails_as_sender(self, client, authenticated_sender):
+        """Test that senders cannot activate routes"""
+        response = client.put(
+            "/api/couriers/routes/1/activate",
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_activate_route_with_both_role(self, client, authenticated_both_role, test_route_data):
+        """Test that users with 'both' role can activate routes"""
+        # Create two routes
+        create_response1 = client.post(
+            "/api/couriers/routes",
+            json=test_route_data,
+            headers={"Authorization": f"Bearer {authenticated_both_role}"}
+        )
+        route1_id = create_response1.json()["id"]
+
+        test_route_data["end_address"] = "Different destination"
+        client.post(
+            "/api/couriers/routes",
+            json=test_route_data,
+            headers={"Authorization": f"Bearer {authenticated_both_role}"}
+        )
+
+        # Activate first route
+        activate_response = client.put(
+            f"/api/couriers/routes/{route1_id}/activate",
+            headers={"Authorization": f"Bearer {authenticated_both_role}"}
+        )
+
+        assert activate_response.status_code == status.HTTP_200_OK
+        assert activate_response.json()["is_active"] is True
+
+    def test_activate_route_when_no_active_routes(self, client, authenticated_courier, test_route_data):
+        """Test activating a route when there are no currently active routes"""
+        # Create a route
+        create_response = client.post(
+            "/api/couriers/routes",
+            json=test_route_data,
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
+        route_id = create_response.json()["id"]
+
+        # Deactivate it via delete
+        client.delete(
+            f"/api/couriers/routes/{route_id}",
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
+
+        # Verify no active routes
+        active_routes = client.get(
+            "/api/couriers/routes?active_only=true",
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
+        assert len(active_routes.json()) == 0
+
+        # Activate the route
+        activate_response = client.put(
+            f"/api/couriers/routes/{route_id}/activate",
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
+
+        assert activate_response.status_code == status.HTTP_200_OK
+        assert activate_response.json()["is_active"] is True
+
+        # Verify one active route now
+        active_routes = client.get(
+            "/api/couriers/routes?active_only=true",
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
+        assert len(active_routes.json()) == 1
+
+    def test_activate_route_returns_complete_route_data(self, client, authenticated_courier, test_route_data):
+        """Test that activate route returns complete route data"""
+        # Create two routes
+        create_response = client.post(
+            "/api/couriers/routes",
+            json=test_route_data,
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
+        route1_id = create_response.json()["id"]
+
+        test_route_data["end_address"] = "Different destination"
+        client.post(
+            "/api/couriers/routes",
+            json=test_route_data,
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
+
+        # Activate first route
+        activate_response = client.put(
+            f"/api/couriers/routes/{route1_id}/activate",
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
+
+        data = activate_response.json()
+
+        # Verify all expected fields are present
+        assert "id" in data
+        assert "courier_id" in data
+        assert "start_address" in data
+        assert "start_lat" in data
+        assert "start_lng" in data
+        assert "end_address" in data
+        assert "end_lat" in data
+        assert "end_lng" in data
+        assert "max_deviation_km" in data
+        assert "departure_time" in data
+        assert "is_active" in data
+        assert "created_at" in data
+
+    def test_activate_multiple_times(self, client, authenticated_courier, test_route_data):
+        """Test activating different routes multiple times"""
+        # Create three routes
+        route_ids = []
+        for i in range(3):
+            test_route_data["end_address"] = f"Destination {i}"
+            test_route_data["end_lat"] = 40.0 + i
+            response = client.post(
+                "/api/couriers/routes",
+                json=test_route_data,
+                headers={"Authorization": f"Bearer {authenticated_courier}"}
+            )
+            route_ids.append(response.json()["id"])
+
+        # Activate routes in different order: 0 -> 1 -> 0 -> 2
+        for target_route_id in [route_ids[0], route_ids[1], route_ids[0], route_ids[2]]:
+            activate_response = client.put(
+                f"/api/couriers/routes/{target_route_id}/activate",
+                headers={"Authorization": f"Bearer {authenticated_courier}"}
+            )
+            assert activate_response.status_code == status.HTTP_200_OK
+            assert activate_response.json()["is_active"] is True
+
+            # Verify only one active route
+            all_routes = client.get(
+                "/api/couriers/routes",
+                headers={"Authorization": f"Bearer {authenticated_courier}"}
+            )
+            active_count = sum(1 for r in all_routes.json() if r["is_active"])
+            assert active_count == 1

@@ -298,3 +298,78 @@ async def delete_route(
     db.commit()
 
     return {"message": "Route deactivated successfully"}
+
+
+@router.put("/routes/{route_id}/activate", response_model=RouteResponse)
+async def activate_route(
+    route_id: int,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Activate an inactive route from history.
+
+    Business Rules:
+    - Only courier/both roles can activate routes
+    - Route must belong to the current user
+    - Route must be inactive
+    - Deactivates any existing active routes (one active route at a time)
+    """
+    verify_courier_role(current_user)
+
+    # Find the route
+    route = db.query(CourierRoute).filter(
+        and_(
+            CourierRoute.id == route_id,
+            CourierRoute.courier_id == current_user.id
+        )
+    ).first()
+
+    if not route:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Route not found"
+        )
+
+    if route.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Route is already active"
+        )
+
+    # Deactivate any existing active routes (one active route per courier)
+    db.query(CourierRoute).filter(
+        and_(
+            CourierRoute.courier_id == current_user.id,
+            CourierRoute.is_active == True
+        )
+    ).update({"is_active": False})
+
+    # Activate the selected route
+    route.is_active = True
+    db.commit()
+    db.refresh(route)
+
+    # Check for matching packages and notify courier
+    matching_count = count_matching_packages(db, route)
+    if matching_count > 0:
+        # Create in-app notification
+        create_notification(
+            db=db,
+            user_id=current_user.id,
+            notification_type=NotificationType.ROUTE_MATCH_FOUND,
+            message=f"Found {matching_count} package(s) along your reactivated route from {route.start_address[:30]} to {route.end_address[:30]}",
+            package_id=None
+        )
+        # Send email notification in background
+        background_tasks.add_task(
+            send_route_match_found_email,
+            courier_email=current_user.email,
+            courier_name=current_user.full_name,
+            matching_packages_count=matching_count,
+            route_origin=route.start_address,
+            route_destination=route.end_address
+        )
+
+    return route

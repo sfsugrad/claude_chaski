@@ -64,6 +64,23 @@ export default function CourierDashboard() {
     }
   }
 
+  const activateRoute = async (routeId: number) => {
+    const hasActiveRoute = routes.some(r => r.is_active)
+    const message = hasActiveRoute
+      ? 'This will deactivate your current active route. Continue?'
+      : 'Activate this route?'
+
+    if (!confirm(message)) return
+
+    try {
+      await couriersAPI.activateRoute(routeId)
+      await loadRoutes()
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.detail || 'Failed to activate route'
+      alert(errorMessage)
+    }
+  }
+
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -185,12 +202,20 @@ export default function CourierDashboard() {
                         </Link>
                       )}
                       {!route.is_active && (
-                        <button
-                          onClick={() => deleteRoute(route.id)}
-                          className="text-red-600 hover:text-red-800 text-sm font-medium"
-                        >
-                          Delete
-                        </button>
+                        <>
+                          <button
+                            onClick={() => activateRoute(route.id)}
+                            className="text-green-600 hover:text-green-800 text-sm font-medium"
+                          >
+                            Activate
+                          </button>
+                          <button
+                            onClick={() => deleteRoute(route.id)}
+                            className="text-red-600 hover:text-red-800 text-sm font-medium"
+                          >
+                            Delete
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>
