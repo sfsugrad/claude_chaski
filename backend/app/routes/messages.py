@@ -69,13 +69,42 @@ def check_message_access(package: Package, user: User) -> bool:
     return False
 
 
-def get_other_user(package: Package, current_user: User, db: Session) -> User | None:
-    """Get the other participant in the conversation."""
+def get_other_user_for_conversation(package: Package, current_user: User, db: Session) -> User | None:
+    """Get the other participant in the conversation.
+
+    For pending packages without a courier, we look at who sent messages
+    to determine the other participant.
+    """
     if current_user.id == package.sender_id:
-        # Sender wants to see the courier
-        other_id = package.courier_id
+        # Sender wants to see who they're chatting with
+        if package.courier_id:
+            # Assigned courier
+            other_id = package.courier_id
+        else:
+            # Pending package - find the courier who messaged
+            other_message = db.query(Message).filter(
+                Message.package_id == package.id,
+                Message.sender_id != current_user.id
+            ).first()
+            if other_message:
+                other_id = other_message.sender_id
+            else:
+                return None
     else:
         # Courier (or potential courier) wants to see the sender
+        other_id = package.sender_id
+
+    if other_id is None:
+        return None
+
+    return db.query(User).filter(User.id == other_id).first()
+
+
+def get_other_user(package: Package, current_user: User, db: Session) -> User | None:
+    """Get the other participant for sending messages (simple version)."""
+    if current_user.id == package.sender_id:
+        other_id = package.courier_id
+    else:
         other_id = package.sender_id
 
     if other_id is None:
@@ -125,7 +154,7 @@ async def get_conversations(
         if not package:
             continue
 
-        other_user = get_other_user(package, current_user, db)
+        other_user = get_other_user_for_conversation(package, current_user, db)
         if not other_user:
             continue
 
