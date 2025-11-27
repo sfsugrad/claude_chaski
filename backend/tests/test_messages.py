@@ -520,3 +520,54 @@ class TestMessagesAPI:
         assert data["conversations"][0]["package_id"] == package.id
         assert data["conversations"][0]["other_user_name"] == courier.full_name
         assert data["conversations"][0]["unread_count"] == 1
+
+    def test_courier_sees_conversations_for_pending_packages_they_messaged(self, client, db_session, authenticated_sender, authenticated_courier, test_package_data):
+        """Test that couriers can see conversations for pending packages they messaged about"""
+        from app.models.user import User
+        from app.models.package import Package, PackageStatus
+        from app.models.message import Message
+
+        sender = db_session.query(User).filter(User.email == "test@example.com").first()
+        courier = db_session.query(User).filter(User.email == "courier@example.com").first()
+
+        # Create a pending package with NO courier assigned
+        package = Package(
+            sender_id=sender.id,
+            courier_id=None,  # No courier assigned
+            description=test_package_data["description"],
+            size=test_package_data["size"],
+            weight_kg=test_package_data["weight_kg"],
+            pickup_address=test_package_data["pickup_address"],
+            pickup_lat=test_package_data["pickup_lat"],
+            pickup_lng=test_package_data["pickup_lng"],
+            dropoff_address=test_package_data["dropoff_address"],
+            dropoff_lat=test_package_data["dropoff_lat"],
+            dropoff_lng=test_package_data["dropoff_lng"],
+            status=PackageStatus.PENDING
+        )
+        db_session.add(package)
+        db_session.commit()
+
+        # Courier sends a message about the pending package
+        msg1 = Message(package_id=package.id, sender_id=courier.id, content="Hi, I have a question")
+        db_session.add(msg1)
+        db_session.commit()
+
+        # Sender responds
+        msg2 = Message(package_id=package.id, sender_id=sender.id, content="Sure, what's your question?")
+        db_session.add(msg2)
+        db_session.commit()
+
+        # Courier should see this conversation in their list
+        response = client.get(
+            "/api/messages/conversations",
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        assert len(data["conversations"]) == 1
+        assert data["conversations"][0]["package_id"] == package.id
+        assert data["conversations"][0]["other_user_name"] == sender.full_name
+        assert data["conversations"][0]["unread_count"] == 1  # Sender's response is unread

@@ -122,10 +122,14 @@ async def get_conversations(
 ):
     """
     Get all conversations (packages with messages) for the current user.
-    Returns packages where the user is sender or courier and has messages.
+    Returns packages where the user is sender, courier, or has sent messages.
     """
-    # Find packages where user is sender or courier that have messages
-    # Subquery to get packages with messages involving this user
+    # Find package IDs where user has sent or received messages
+    # This includes: sender, assigned courier, or courier who messaged a pending package
+    packages_user_messaged = db.query(Message.package_id).filter(
+        Message.sender_id == current_user.id
+    ).distinct().subquery()
+
     packages_with_messages = db.query(
         Message.package_id,
         func.max(Message.created_at).label('last_message_at'),
@@ -133,7 +137,8 @@ async def get_conversations(
     ).join(Package).filter(
         or_(
             Package.sender_id == current_user.id,
-            Package.courier_id == current_user.id
+            Package.courier_id == current_user.id,
+            Message.package_id.in_(packages_user_messaged)  # Include packages where user sent messages
         )
     ).group_by(Message.package_id).subquery()
 
