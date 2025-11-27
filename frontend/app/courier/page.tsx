@@ -3,11 +3,13 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { couriersAPI, authAPI, RouteResponse } from '@/lib/api'
+import { couriersAPI, authAPI, RouteResponse, UserResponse } from '@/lib/api'
+import Navbar from '@/components/Navbar'
 
 export default function CourierDashboard() {
   const [routes, setRoutes] = useState<RouteResponse[]>([])
   const [activeRoute, setActiveRoute] = useState<RouteResponse | null>(null)
+  const [user, setUser] = useState<UserResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const router = useRouter()
@@ -20,9 +22,10 @@ export default function CourierDashboard() {
     try {
       // Verify user is courier or both
       const userResponse = await authAPI.getCurrentUser()
-      const user = userResponse.data
+      const userData = userResponse.data
+      setUser(userData)
 
-      if (user.role !== 'courier' && user.role !== 'both') {
+      if (userData.role !== 'courier' && userData.role !== 'both') {
         router.push('/')
         return
       }
@@ -70,8 +73,10 @@ export default function CourierDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="container mx-auto px-4">
+    <div className="min-h-screen bg-gray-50">
+      <Navbar user={user} />
+
+      <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Courier Dashboard</h1>
           <Link

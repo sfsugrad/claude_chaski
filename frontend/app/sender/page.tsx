@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { packagesAPI, authAPI, PackageResponse, UserResponse } from '@/lib/api'
+import Navbar from '@/components/Navbar'
 
 type StatusFilter = 'all' | 'pending' | 'matched' | 'picked_up' | 'in_transit' | 'delivered' | 'cancelled'
 
@@ -119,20 +120,13 @@ export default function SenderDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow">
+      <Navbar user={user} />
+
+      {/* Page Header */}
+      <div className="bg-white shadow-sm border-b">
         <div className="container mx-auto px-4 py-6">
           <div className="flex justify-between items-center">
             <div>
-              <Link
-                href="/dashboard"
-                className="text-blue-600 hover:text-blue-700 text-sm flex items-center gap-1 mb-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                Back to Dashboard
-              </Link>
               <h1 className="text-3xl font-bold text-gray-900">My Packages</h1>
               <p className="text-gray-600 mt-1">Track and manage your deliveries</p>
             </div>

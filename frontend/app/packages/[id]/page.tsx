@@ -315,8 +315,8 @@ export default function PackageDetailPage() {
                       type="number"
                       step="0.01"
                       min="0"
-                      value={editedPackage.price !== undefined ? editedPackage.price : ''}
-                      onChange={(e) => setEditedPackage({ ...editedPackage, price: parseFloat(e.target.value) })}
+                      value={editedPackage.price ?? ''}
+                      onChange={(e) => setEditedPackage({ ...editedPackage, price: e.target.value ? parseFloat(e.target.value) : null })}
                       className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
                     />
                   ) : (

@@ -9,6 +9,13 @@ jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
 }))
 
+// Mock the Navbar component to avoid NotificationDropdown dependencies
+jest.mock('@/components/Navbar', () => {
+  return function MockNavbar({ user }: { user: any }) {
+    return <nav data-testid="navbar">{user?.full_name}</nav>
+  }
+})
+
 // Mock the API modules
 jest.mock('@/lib/api', () => ({
   packagesAPI: {
@@ -135,7 +142,7 @@ describe('SenderDashboard', () => {
       render(<SenderDashboard />)
 
       await waitFor(() => {
-        expect(screen.getByText('Back to Dashboard')).toBeInTheDocument()
+        expect(screen.getByText('My Packages')).toBeInTheDocument()
       })
     })
 

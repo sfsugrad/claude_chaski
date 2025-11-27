@@ -177,3 +177,42 @@ export const matchingAPI = {
   getOptimizedRoute: (routeId: number) =>
     api.get(`/matching/optimized-route/${routeId}`),
 }
+
+// Notification Types
+export type NotificationType =
+  | 'package_matched'
+  | 'package_picked_up'
+  | 'package_in_transit'
+  | 'package_delivered'
+  | 'package_cancelled'
+  | 'new_match_available'
+  | 'system'
+
+export interface NotificationResponse {
+  id: number
+  user_id: number
+  type: NotificationType
+  title: string
+  message: string
+  is_read: boolean
+  package_id: number | null
+  created_at: string
+}
+
+export interface NotificationCountResponse {
+  unread_count: number
+}
+
+// Notifications API
+export const notificationsAPI = {
+  getAll: (unreadOnly: boolean = false) =>
+    api.get<NotificationResponse[]>(`/notifications${unreadOnly ? '?unread_only=true' : ''}`),
+  getUnreadCount: () =>
+    api.get<NotificationCountResponse>('/notifications/unread-count'),
+  markAsRead: (id: number) =>
+    api.put<NotificationResponse>(`/notifications/${id}/read`),
+  markAllAsRead: () =>
+    api.put('/notifications/read-all'),
+  delete: (id: number) =>
+    api.delete(`/notifications/${id}`),
+}

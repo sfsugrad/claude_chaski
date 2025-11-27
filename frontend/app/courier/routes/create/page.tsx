@@ -100,6 +100,8 @@ export default function CreateRoutePage() {
               Start Address *
             </label>
             <AddressAutocomplete
+              id="start_address"
+              name="start_address"
               value={formData.start_address}
               onChange={handleStartAddressChange}
               placeholder="Enter your starting point..."
@@ -114,6 +116,8 @@ export default function CreateRoutePage() {
               Destination Address *
             </label>
             <AddressAutocomplete
+              id="end_address"
+              name="end_address"
               value={formData.end_address}
               onChange={handleEndAddressChange}
               placeholder="Enter your destination..."

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { authAPI, UserResponse } from '@/lib/api'
 import Link from 'next/link'
+import Navbar from '@/components/Navbar'
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -32,11 +33,6 @@ export default function DashboardPage() {
     fetchUser()
   }, [router])
 
-  const handleLogout = () => {
-    localStorage.removeItem('token')
-    router.push('/')
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center">
@@ -51,24 +47,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
-      <nav className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-gray-900">Chaski</h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-gray-700">{user.full_name}</span>
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Navbar user={user} />
 
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
