@@ -184,8 +184,9 @@ class TestMatchingAlgorithm:
             headers={"Authorization": f"Bearer {other_token}"}
         )
 
-        assert response.status_code == 403
-        assert "your own routes" in response.json()["detail"]
+        # Returns 404 instead of 403 for security (doesn't reveal route exists)
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"].lower()
 
     def test_accept_package_success(
         self, client, courier_token, package_along_route, db_session
@@ -258,7 +259,7 @@ class TestMatchingAlgorithm:
         )
 
         assert response.status_code == 400
-        assert "not available" in response.json()["detail"]
+        assert "already matched" in response.json()["detail"].lower()
 
     def test_decline_package_success(
         self, client, courier_token, package_along_route, courier_user, db_session

@@ -1,13 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from app.database import get_db
-from app.models.package import CourierRoute
+from app.models.package import CourierRoute, Package, PackageStatus
 from app.models.user import User, UserRole
+from app.models.notification import NotificationType
 from app.utils.dependencies import get_current_user
+from app.routes.notifications import create_notification
+from app.utils.email import send_route_match_found_email
 from pydantic import BaseModel, Field
 from typing import List
 from datetime import datetime
+from math import radians, cos, sin, asin, sqrt
+from shapely.geometry import LineString, Point
+from shapely.ops import nearest_points
 
 router = APIRouter()
 
@@ -56,9 +62,59 @@ def verify_courier_role(user: User):
         )
 
 
+def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Calculate the great circle distance between two points in kilometers."""
+    lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    c = 2 * asin(sqrt(a))
+    r = 6371
+    return c * r
+
+
+def count_matching_packages(db: Session, route: CourierRoute) -> int:
+    """Count packages that match a courier route."""
+    route_line = LineString([
+        (route.start_lng, route.start_lat),
+        (route.end_lng, route.end_lat)
+    ])
+
+    pending_packages = db.query(Package).filter(
+        and_(
+            Package.status == PackageStatus.PENDING,
+            Package.is_active == True
+        )
+    ).all()
+
+    count = 0
+    for package in pending_packages:
+        pickup_point = Point(package.pickup_lng, package.pickup_lat)
+        dropoff_point = Point(package.dropoff_lng, package.dropoff_lat)
+
+        pickup_nearest = nearest_points(route_line, pickup_point)[0]
+        dropoff_nearest = nearest_points(route_line, dropoff_point)[0]
+
+        pickup_distance = haversine_distance(
+            pickup_point.y, pickup_point.x,
+            pickup_nearest.y, pickup_nearest.x
+        )
+        dropoff_distance = haversine_distance(
+            dropoff_point.y, dropoff_point.x,
+            dropoff_nearest.y, dropoff_nearest.x
+        )
+
+        max_distance = max(pickup_distance, dropoff_distance)
+        if max_distance <= route.max_deviation_km:
+            count += 1
+
+    return count
+
+
 @router.post("/routes", status_code=status.HTTP_201_CREATED, response_model=RouteResponse)
 async def create_route(
     route: RouteCreate,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -97,6 +153,27 @@ async def create_route(
     db.add(new_route)
     db.commit()
     db.refresh(new_route)
+
+    # Check for matching packages and notify courier
+    matching_count = count_matching_packages(db, new_route)
+    if matching_count > 0:
+        # Create in-app notification
+        create_notification(
+            db=db,
+            user_id=current_user.id,
+            notification_type=NotificationType.ROUTE_MATCH_FOUND,
+            message=f"Found {matching_count} package(s) along your route from {route.start_address[:30]} to {route.end_address[:30]}",
+            package_id=None
+        )
+        # Send email notification in background
+        background_tasks.add_task(
+            send_route_match_found_email,
+            courier_email=current_user.email,
+            courier_name=current_user.full_name,
+            matching_packages_count=matching_count,
+            route_origin=route.start_address,
+            route_destination=route.end_address
+        )
 
     return new_route
 

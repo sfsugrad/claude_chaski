@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from app.database import get_db
@@ -10,7 +10,14 @@ from shapely.ops import nearest_points
 
 from app.models.package import Package, PackageStatus, CourierRoute
 from app.models.user import User, UserRole
+from app.models.notification import NotificationType
 from app.utils.dependencies import get_current_user
+from app.routes.notifications import create_notification
+from app.utils.email import (
+    send_package_matched_email,
+    send_package_accepted_email,
+    send_package_declined_email,
+)
 
 router = APIRouter()
 
@@ -188,6 +195,7 @@ async def get_packages_along_route(
 @router.post("/accept-package/{package_id}")
 async def accept_package(
     package_id: int,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -220,12 +228,36 @@ async def accept_package(
             detail=f"Package is already {package.status.value}"
         )
 
+    # Get sender info for notifications
+    sender = db.query(User).filter(User.id == package.sender_id).first()
+
     # Assign courier and update status
     package.courier_id = current_user.id
     package.status = PackageStatus.MATCHED
 
     db.commit()
     db.refresh(package)
+
+    # Create in-app notification for sender
+    create_notification(
+        db=db,
+        user_id=package.sender_id,
+        notification_type=NotificationType.PACKAGE_MATCHED,
+        message=f"Your package '{package.description[:50]}' has been matched with courier {current_user.full_name}",
+        package_id=package.id
+    )
+
+    # Send email notification in background
+    if sender:
+        background_tasks.add_task(
+            send_package_accepted_email,
+            sender_email=sender.email,
+            sender_name=sender.full_name,
+            courier_name=current_user.full_name,
+            courier_phone=current_user.phone_number,
+            package_description=package.description,
+            package_id=package.id
+        )
 
     return {
         "message": "Package accepted successfully",
@@ -237,6 +269,7 @@ async def accept_package(
 @router.post("/decline-package/{package_id}")
 async def decline_package(
     package_id: int,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -273,12 +306,34 @@ async def decline_package(
             detail=f"Package cannot be declined. Current status: {package.status.value}"
         )
 
+    # Get sender info for notifications
+    sender = db.query(User).filter(User.id == package.sender_id).first()
+
     # Return package to pending status
     package.courier_id = None
     package.status = PackageStatus.PENDING
 
     db.commit()
     db.refresh(package)
+
+    # Create in-app notification for sender
+    create_notification(
+        db=db,
+        user_id=package.sender_id,
+        notification_type=NotificationType.PACKAGE_DECLINED,
+        message=f"The courier has declined your package '{package.description[:50]}'. We're finding another courier for you.",
+        package_id=package.id
+    )
+
+    # Send email notification in background
+    if sender:
+        background_tasks.add_task(
+            send_package_declined_email,
+            sender_email=sender.email,
+            sender_name=sender.full_name,
+            package_description=package.description,
+            package_id=package.id
+        )
 
     return {
         "message": "Package declined successfully",

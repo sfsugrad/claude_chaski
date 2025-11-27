@@ -1,9 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.package import Package, PackageSize, PackageStatus
 from app.models.user import User
+from app.models.notification import NotificationType
 from app.utils.dependencies import get_current_user
+from app.routes.notifications import create_notification
+from app.utils.email import (
+    send_package_picked_up_email,
+    send_package_in_transit_email,
+    send_package_delivered_email,
+    send_package_cancelled_email,
+)
 from pydantic import BaseModel, Field
 from typing import List
 from datetime import datetime
@@ -292,6 +300,7 @@ async def update_package(
 async def update_package_status(
     package_id: int,
     status_update: StatusUpdate,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -324,8 +333,76 @@ async def update_package_status(
             detail="Invalid status"
         )
 
+    old_status = package.status
     package.status = new_status
+    package.updated_at = datetime.utcnow()
     db.commit()
+
+    # Get sender info for notifications
+    sender = db.query(User).filter(User.id == package.sender_id).first()
+
+    # Send notifications based on new status
+    if new_status == PackageStatus.PICKED_UP and old_status != PackageStatus.PICKED_UP:
+        # Create in-app notification
+        create_notification(
+            db=db,
+            user_id=package.sender_id,
+            notification_type=NotificationType.PACKAGE_PICKED_UP,
+            message=f"Your package '{package.description[:50]}' has been picked up by the courier",
+            package_id=package.id
+        )
+        # Send email
+        if sender:
+            background_tasks.add_task(
+                send_package_picked_up_email,
+                sender_email=sender.email,
+                sender_name=sender.full_name,
+                courier_name=current_user.full_name,
+                package_description=package.description,
+                dropoff_address=package.dropoff_address,
+                package_id=package.id
+            )
+
+    elif new_status == PackageStatus.IN_TRANSIT and old_status != PackageStatus.IN_TRANSIT:
+        # Create in-app notification
+        create_notification(
+            db=db,
+            user_id=package.sender_id,
+            notification_type=NotificationType.PACKAGE_IN_TRANSIT,
+            message=f"Your package '{package.description[:50]}' is now in transit",
+            package_id=package.id
+        )
+        # Send email
+        if sender:
+            background_tasks.add_task(
+                send_package_in_transit_email,
+                sender_email=sender.email,
+                sender_name=sender.full_name,
+                package_description=package.description,
+                dropoff_address=package.dropoff_address,
+                package_id=package.id
+            )
+
+    elif new_status == PackageStatus.DELIVERED and old_status != PackageStatus.DELIVERED:
+        # Create in-app notification
+        create_notification(
+            db=db,
+            user_id=package.sender_id,
+            notification_type=NotificationType.PACKAGE_DELIVERED,
+            message=f"Your package '{package.description[:50]}' has been delivered successfully!",
+            package_id=package.id
+        )
+        # Send email
+        if sender:
+            background_tasks.add_task(
+                send_package_delivered_email,
+                sender_email=sender.email,
+                sender_name=sender.full_name,
+                package_description=package.description,
+                dropoff_address=package.dropoff_address,
+                courier_name=current_user.full_name,
+                package_id=package.id
+            )
 
     return {"message": "Package status updated successfully", "status": new_status.value}
 
@@ -333,6 +410,7 @@ async def update_package_status(
 @router.put("/{package_id}/cancel", response_model=PackageResponse)
 async def cancel_package(
     package_id: int,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -367,9 +445,43 @@ async def cancel_package(
             detail=f"Cannot cancel package with status '{package.status.value}'. Only pending or matched packages can be cancelled."
         )
 
+    # Store courier_id before cancelling (for notification)
+    courier_id = package.courier_id
+
     package.status = PackageStatus.CANCELLED
     package.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(package)
+
+    # Notify the courier if package was matched
+    if courier_id:
+        courier = db.query(User).filter(User.id == courier_id).first()
+        if courier:
+            # Create in-app notification for courier
+            create_notification(
+                db=db,
+                user_id=courier_id,
+                notification_type=NotificationType.PACKAGE_CANCELLED,
+                message=f"Package '{package.description[:50]}' has been cancelled by the sender",
+                package_id=package.id
+            )
+            # Send email to courier
+            background_tasks.add_task(
+                send_package_cancelled_email,
+                recipient_email=courier.email,
+                recipient_name=courier.full_name,
+                package_description=package.description,
+                cancellation_reason="Cancelled by sender",
+                package_id=package.id
+            )
+
+    # Create in-app notification for sender (confirmation)
+    create_notification(
+        db=db,
+        user_id=package.sender_id,
+        notification_type=NotificationType.PACKAGE_CANCELLED,
+        message=f"Your package '{package.description[:50]}' has been cancelled",
+        package_id=package.id
+    )
 
     return package

@@ -99,42 +99,74 @@ def test_package_data():
 
 
 @pytest.fixture
-def authenticated_sender(client, test_user_data):
+def authenticated_sender(client, db_session, test_user_data):
     """Create and authenticate a sender user, return token"""
-    client.post("/api/auth/register", json=test_user_data)
-    login_response = client.post("/api/auth/login", json={
-        "email": test_user_data["email"],
-        "password": test_user_data["password"]
-    })
-    return login_response.json()["access_token"]
+    from app.models.user import User, UserRole
+    from app.utils.auth import get_password_hash, create_access_token
+
+    # Create user directly in database to avoid rate limiting
+    user = User(
+        email=test_user_data["email"],
+        hashed_password=get_password_hash(test_user_data["password"]),
+        full_name=test_user_data["full_name"],
+        role=UserRole.SENDER,
+        phone_number=test_user_data.get("phone_number"),
+        is_active=True,
+        is_verified=True,
+        max_deviation_km=test_user_data.get("max_deviation_km", 5)
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    # Create token directly
+    return create_access_token(data={"sub": user.email})
 
 
 @pytest.fixture
-def authenticated_courier(client, test_courier_data):
+def authenticated_courier(client, db_session, test_courier_data):
     """Create and authenticate a courier user, return token"""
-    client.post("/api/auth/register", json=test_courier_data)
-    login_response = client.post("/api/auth/login", json={
-        "email": test_courier_data["email"],
-        "password": test_courier_data["password"]
-    })
-    return login_response.json()["access_token"]
+    from app.models.user import User, UserRole
+    from app.utils.auth import get_password_hash, create_access_token
+
+    # Create user directly in database to avoid rate limiting
+    user = User(
+        email=test_courier_data["email"],
+        hashed_password=get_password_hash(test_courier_data["password"]),
+        full_name=test_courier_data["full_name"],
+        role=UserRole.COURIER,
+        phone_number=test_courier_data.get("phone_number"),
+        is_active=True,
+        is_verified=True,
+        max_deviation_km=test_courier_data.get("max_deviation_km", 5)
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    # Create token directly
+    return create_access_token(data={"sub": user.email})
 
 
 @pytest.fixture
-def authenticated_both_role(client):
+def authenticated_both_role(client, db_session):
     """Create and authenticate a user with 'both' role, return token"""
-    user_data = {
-        "email": "both@example.com",
-        "password": "bothpass123",
-        "full_name": "Both User",
-        "role": "both"
-    }
-    client.post("/api/auth/register", json=user_data)
-    login_response = client.post("/api/auth/login", json={
-        "email": user_data["email"],
-        "password": user_data["password"]
-    })
-    return login_response.json()["access_token"]
+    from app.models.user import User, UserRole
+    from app.utils.auth import get_password_hash, create_access_token
+
+    # Create user directly in database to avoid rate limiting
+    user = User(
+        email="both@example.com",
+        hashed_password=get_password_hash("bothpass123"),
+        full_name="Both User",
+        role=UserRole.BOTH,
+        is_active=True,
+        is_verified=True,
+        max_deviation_km=5
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    # Create token directly
+    return create_access_token(data={"sub": user.email})
 
 
 @pytest.fixture
@@ -152,7 +184,7 @@ def test_admin_data():
 def authenticated_admin(client, db_session, test_admin_data):
     """Create and authenticate an admin user, return token"""
     from app.models.user import User, UserRole
-    from app.utils.auth import get_password_hash
+    from app.utils.auth import get_password_hash, create_access_token
 
     # Create admin user directly in database (since registration doesn't allow admin role)
     admin_user = User(
@@ -167,12 +199,8 @@ def authenticated_admin(client, db_session, test_admin_data):
     db_session.add(admin_user)
     db_session.commit()
 
-    # Login to get token
-    login_response = client.post("/api/auth/login", json={
-        "email": test_admin_data["email"],
-        "password": test_admin_data["password"]
-    })
-    return login_response.json()["access_token"]
+    # Create token directly to avoid rate limiting
+    return create_access_token(data={"sub": admin_user.email})
 
 
 @pytest.fixture
