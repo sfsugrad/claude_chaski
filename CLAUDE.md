@@ -61,7 +61,7 @@ npm run lint
 - `main.py` - FastAPI app entry point with middleware (CORS, security headers, rate limiting, sessions)
 - `app/config.py` - Environment settings via pydantic-settings
 - `app/database.py` - SQLAlchemy database connection and session management
-- `app/models/` - SQLAlchemy models (User, Package, Notification, CourierRoute)
+- `app/models/` - SQLAlchemy models (User, Package, Notification, CourierRoute, Rating)
 - `app/routes/` - API endpoints organized by domain:
   - `auth.py` - Registration, login, email verification, OAuth
   - `packages.py` - Package CRUD for senders
@@ -69,6 +69,7 @@ npm run lint
   - `matching.py` - Package-courier matching algorithm
   - `admin.py` - Admin-only user/package management
   - `notifications.py` - User notification management
+  - `ratings.py` - Rating and review system
 - `app/utils/` - Shared utilities:
   - `dependencies.py` - FastAPI dependencies (`get_current_user`, `get_current_admin_user`)
   - `auth.py` - JWT token and password hashing
@@ -123,11 +124,15 @@ Users have one role: `sender`, `courier`, `both`, or `admin`
 - **Courier Routes**: Create/update/delete routes, one active route per courier
 - **Matching Algorithm**: Geospatial matching using haversine/cross-track distance
 - **Admin Dashboard**: User management, package management, platform statistics
-- **Notification System**: Backend complete with API, email notifications, and integration tests
+- **Notification System**: Full backend API, email notifications, frontend dropdown with unread badge
+- **Rating & Review System**:
+  - Backend: Rating model, API endpoints (create rating, get user ratings, get pending ratings)
+  - Frontend: StarRating component, RatingModal for post-delivery ratings, reviews page at /profile/reviews
+  - User ratings displayed in navbar with link to reviews page
+  - Automatic rating prompts on dashboard after package delivery
 
 ## Pending Features
 
-- Frontend notification UI (dropdown component, badge in nav)
 - Real-time updates (WebSockets)
-- Rating & review system
-- Payment integration
+- Payment integration (Stripe)
+- Mobile app (React Native)
