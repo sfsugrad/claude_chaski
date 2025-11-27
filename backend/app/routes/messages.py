@@ -52,15 +52,30 @@ class ConversationListResponse(BaseModel):
 
 def check_message_access(package: Package, user: User) -> bool:
     """Check if user has access to messages for this package."""
-    # Only sender and courier can access messages
-    return user.id == package.sender_id or user.id == package.courier_id
+    from app.models.user import UserRole
+
+    # Sender always has access
+    if user.id == package.sender_id:
+        return True
+
+    # Assigned courier has access
+    if package.courier_id and user.id == package.courier_id:
+        return True
+
+    # For pending packages, any courier can message (to ask questions before accepting)
+    if package.status.value == 'pending' and user.role in [UserRole.COURIER, UserRole.BOTH]:
+        return True
+
+    return False
 
 
 def get_other_user(package: Package, current_user: User, db: Session) -> User | None:
     """Get the other participant in the conversation."""
     if current_user.id == package.sender_id:
+        # Sender wants to see the courier
         other_id = package.courier_id
     else:
+        # Courier (or potential courier) wants to see the sender
         other_id = package.sender_id
 
     if other_id is None:

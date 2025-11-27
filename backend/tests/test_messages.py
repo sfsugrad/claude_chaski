@@ -402,3 +402,75 @@ class TestMessagesAPI:
         )
 
         assert response.status_code == 403
+
+    def test_courier_can_message_pending_package(self, client, db_session, authenticated_sender, authenticated_courier, test_package_data):
+        """Test that any courier can message about pending packages (to ask questions before accepting)"""
+        from app.models.user import User
+        from app.models.package import Package, PackageStatus
+
+        sender = db_session.query(User).filter(User.email == "test@example.com").first()
+
+        # Create a pending package with NO courier assigned
+        package = Package(
+            sender_id=sender.id,
+            courier_id=None,  # No courier assigned yet
+            description=test_package_data["description"],
+            size=test_package_data["size"],
+            weight_kg=test_package_data["weight_kg"],
+            pickup_address=test_package_data["pickup_address"],
+            pickup_lat=test_package_data["pickup_lat"],
+            pickup_lng=test_package_data["pickup_lng"],
+            dropoff_address=test_package_data["dropoff_address"],
+            dropoff_lat=test_package_data["dropoff_lat"],
+            dropoff_lng=test_package_data["dropoff_lng"],
+            status=PackageStatus.PENDING
+        )
+        db_session.add(package)
+        db_session.commit()
+
+        # Courier (not assigned) should be able to send a message
+        response = client.post(
+            f"/api/messages/package/{package.id}",
+            json={"content": "Hi, I have a question about this package before accepting"},
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["content"] == "Hi, I have a question about this package before accepting"
+
+    def test_courier_cannot_message_matched_package_if_not_assigned(self, client, db_session, authenticated_sender, authenticated_courier, authenticated_both_role, test_package_data):
+        """Test that couriers cannot message about matched packages if they're not the assigned courier"""
+        from app.models.user import User
+        from app.models.package import Package, PackageStatus
+
+        sender = db_session.query(User).filter(User.email == "test@example.com").first()
+        # Use the "both role" user as the assigned courier
+        assigned_courier = db_session.query(User).filter(User.email == "both@example.com").first()
+
+        # Create a matched package with a DIFFERENT courier assigned
+        package = Package(
+            sender_id=sender.id,
+            courier_id=assigned_courier.id,  # Different courier is assigned
+            description=test_package_data["description"],
+            size=test_package_data["size"],
+            weight_kg=test_package_data["weight_kg"],
+            pickup_address=test_package_data["pickup_address"],
+            pickup_lat=test_package_data["pickup_lat"],
+            pickup_lng=test_package_data["pickup_lng"],
+            dropoff_address=test_package_data["dropoff_address"],
+            dropoff_lat=test_package_data["dropoff_lat"],
+            dropoff_lng=test_package_data["dropoff_lng"],
+            status=PackageStatus.MATCHED
+        )
+        db_session.add(package)
+        db_session.commit()
+
+        # A different courier should NOT be able to send a message
+        response = client.post(
+            f"/api/messages/package/{package.id}",
+            json={"content": "I shouldn't be able to send this"},
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
+
+        assert response.status_code == 403
