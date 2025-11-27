@@ -7,6 +7,7 @@ This directory contains test data fixtures for the Chaski application.
 - `users.json` - Test users with different roles (admin, sender, courier, both)
 - `packages.json` - Test packages with various statuses and sizes
 - `courier_routes.json` - Test courier routes for matching packages
+- `notifications.json` - Test notifications for common package lifecycle events
 - `load_test_data.py` - Python script to load the test data into the database
 
 ## Loading Test Data
@@ -22,8 +23,9 @@ The script will:
 1. Ask if you want to clear existing data
 2. Create database tables if they don't exist
 3. Load users (with hashed passwords)
-4. Load packages
+4. Load packages and build a mapping of IDs
 5. Load courier routes
+6. Load notifications linked to users and packages
 
 ## Test User Credentials
 
@@ -58,6 +60,12 @@ After loading, you can use these credentials to log in:
 - 1 In transit package
 - 1 Delivered package
 - 1 Cancelled package
+
+### Notifications (12 total)
+- Package lifecycle updates (matched, accepted, picked up, in transit, delivered, cancelled)
+- Route match suggestions for couriers
+- System announcements
+- Mix of read/unread states for testing inbox and filtering
 
 Package sizes range from small (0.3kg) to extra large (65kg).
 

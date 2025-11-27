@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from app.database import SessionLocal, engine
 from app.models.user import User, UserRole
 from app.models.package import Package, PackageStatus, PackageSize, CourierRoute
+from app.models.notification import Notification, NotificationType
 from app.models.base import Base
 from app.utils.auth import get_password_hash
 
@@ -67,8 +68,14 @@ def load_packages(db: Session, data_file: Path, user_id_mapping: dict):
         created_packages.append(package)
 
     db.commit()
+
+    # Create mapping from expected ID (1-based index) to actual ID
+    package_id_mapping = {
+        idx: package.id for idx, package in enumerate(created_packages, start=1)
+    }
+
     print(f"Created {len(created_packages)} packages")
-    return created_packages
+    return created_packages, package_id_mapping
 
 
 def load_courier_routes(db: Session, data_file: Path, user_id_mapping: dict):
@@ -97,9 +104,43 @@ def load_courier_routes(db: Session, data_file: Path, user_id_mapping: dict):
     return created_routes
 
 
+def load_notifications(
+    db: Session, data_file: Path, user_id_mapping: dict, package_id_mapping: dict
+):
+    """Load notifications from JSON file with updated user and package IDs"""
+    with open(data_file) as f:
+        notifications_data = json.load(f)
+
+    created_notifications = []
+    for notification_data in notifications_data:
+        # Update user_id to use actual ID
+        if notification_data.get("user_id"):
+            notification_data["user_id"] = user_id_mapping.get(
+                notification_data["user_id"]
+            )
+
+        # Update package_id to use actual ID when present
+        if notification_data.get("package_id"):
+            notification_data["package_id"] = package_id_mapping.get(
+                notification_data["package_id"]
+            )
+
+        # Convert type string to NotificationType enum
+        notification_data["type"] = NotificationType(notification_data["type"])
+
+        notification = Notification(**notification_data)
+        db.add(notification)
+        created_notifications.append(notification)
+
+    db.commit()
+    print(f"Created {len(created_notifications)} notifications")
+    return created_notifications
+
+
 def clear_all_data(db: Session):
     """Clear all existing data from tables"""
     try:
+        db.query(Notification).delete()
         db.query(CourierRoute).delete()
         db.query(Package).delete()
         db.query(User).delete()
@@ -132,8 +173,18 @@ def main():
         print("-" * 50)
 
         users, user_id_mapping = load_users(db, test_data_dir / "users.json")
-        packages = load_packages(db, test_data_dir / "packages.json", user_id_mapping)
-        routes = load_courier_routes(db, test_data_dir / "courier_routes.json", user_id_mapping)
+        packages, package_id_mapping = load_packages(
+            db, test_data_dir / "packages.json", user_id_mapping
+        )
+        routes = load_courier_routes(
+            db, test_data_dir / "courier_routes.json", user_id_mapping
+        )
+        notifications = load_notifications(
+            db,
+            test_data_dir / "notifications.json",
+            user_id_mapping,
+            package_id_mapping,
+        )
 
         print("-" * 50)
         print("Test data loaded successfully!")
@@ -141,6 +192,7 @@ def main():
         print(f"  Users: {len(users)}")
         print(f"  Packages: {len(packages)}")
         print(f"  Courier Routes: {len(routes)}")
+        print(f"  Notifications: {len(notifications)}")
 
         print("\nTest credentials:")
         print("  Admin: admin@chaski.com / admin123")

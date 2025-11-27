@@ -1,0 +1,84 @@
+[
+  {
+    "user_id": 2,
+    "package_id": 1,
+    "type": "route_match_found",
+    "message": "We found nearby couriers interested in 'Small envelope with documents'.",
+    "read": false
+  },
+  {
+    "user_id": 3,
+    "package_id": 2,
+    "type": "package_matched",
+    "message": "Courier Mike Courier is matched to 'Medium box with books'.",
+    "read": false
+  },
+  {
+    "user_id": 4,
+    "package_id": 2,
+    "type": "package_accepted",
+    "message": "You accepted pickup for 'Medium box with books' from Jane Sender.",
+    "read": true
+  },
+  {
+    "user_id": 8,
+    "package_id": 3,
+    "type": "package_picked_up",
+    "message": "Sarah Courier picked up 'Large package with electronics' and is en route.",
+    "read": false
+  },
+  {
+    "user_id": 5,
+    "package_id": 3,
+    "type": "package_picked_up",
+    "message": "You confirmed pickup for 'Large package with electronics'.",
+    "read": true
+  },
+  {
+    "user_id": 2,
+    "package_id": 4,
+    "type": "package_in_transit",
+    "message": "Your delivery 'Small gift package' is in transit with Lisa Courier.",
+    "read": false
+  },
+  {
+    "user_id": 3,
+    "package_id": 5,
+    "type": "package_delivered",
+    "message": "'Medium box with clothes' was delivered. Rate your courier when ready.",
+    "read": false
+  },
+  {
+    "user_id": 4,
+    "type": "system",
+    "message": "Reminder: update your availability to get more matches this afternoon.",
+    "read": true
+  },
+  {
+    "user_id": 5,
+    "package_id": 9,
+    "type": "route_match_found",
+    "message": "New package request 'Large box with sports equipment' matches your route.",
+    "read": false
+  },
+  {
+    "user_id": 2,
+    "package_id": 8,
+    "type": "package_cancelled",
+    "message": "'Medium box with medical supplies' was cancelled at sender's request.",
+    "read": true
+  },
+  {
+    "user_id": 5,
+    "package_id": 8,
+    "type": "package_cancelled",
+    "message": "Delivery for 'Medium box with medical supplies' was cancelled before pickup.",
+    "read": false
+  },
+  {
+    "user_id": 1,
+    "type": "system",
+    "message": "System maintenance scheduled tonight at 11 PM UTC.",
+    "read": false
+  }
+]
