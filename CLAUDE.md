@@ -27,6 +27,9 @@ pytest tests/test_packages.py::test_create_package_success -v
 
 # Run with coverage
 pytest --cov=app tests/
+
+# Load test data (users, packages, routes, notifications)
+python -m test_data.load_test_data
 ```
 
 ### Frontend (Next.js)
@@ -61,7 +64,7 @@ npm run lint
 - `main.py` - FastAPI app entry point with middleware (CORS, security headers, rate limiting, sessions)
 - `app/config.py` - Environment settings via pydantic-settings
 - `app/database.py` - SQLAlchemy database connection and session management
-- `app/models/` - SQLAlchemy models (User, Package, Notification, CourierRoute, Rating)
+- `app/models/` - SQLAlchemy models (User, Package, Notification, CourierRoute, Rating, Message)
 - `app/routes/` - API endpoints organized by domain:
   - `auth.py` - Registration, login, email verification, OAuth
   - `packages.py` - Package CRUD for senders
@@ -70,6 +73,7 @@ npm run lint
   - `admin.py` - Admin-only user/package management
   - `notifications.py` - User notification management
   - `ratings.py` - Rating and review system
+  - `messages.py` - In-app messaging between sender and courier
   - `ws.py` - WebSocket endpoint for real-time updates
 - `app/utils/` - Shared utilities:
   - `dependencies.py` - FastAPI dependencies (`get_current_user`, `get_current_admin_user`)
@@ -79,6 +83,7 @@ npm run lint
   - `oauth.py` - Google OAuth configuration
 - `app/services/` - Business logic services:
   - `websocket_manager.py` - WebSocket connection manager and broadcast functions
+- `test_data/` - JSON fixtures and loader script for seeding the database
 
 ### Frontend Structure
 - `app/` - Next.js 14 App Router pages
@@ -128,7 +133,7 @@ Users have one role: `sender`, `courier`, `both`, or `admin`
 - **Courier Routes**: Create/update/delete routes, one active route per courier
 - **Matching Algorithm**: Geospatial matching using haversine/cross-track distance
 - **Admin Dashboard**: User management, package management, platform statistics
-- **Notification System**: Full backend API, email notifications, frontend dropdown with unread badge
+- **Notification System**: Full backend API, email notifications, frontend dropdown with unread badge, full notifications page at /notifications
 - **Rating & Review System**:
   - Backend: Rating model, API endpoints (create rating, get user ratings, get pending ratings)
   - Frontend: StarRating component, RatingModal for post-delivery ratings, reviews page at /profile/reviews
@@ -138,12 +143,32 @@ Users have one role: `sender`, `courier`, `both`, or `admin`
   - Backend: WebSocket endpoint at `/api/ws` with JWT authentication
   - Connection manager supporting multiple connections per user
   - Real-time notification broadcast on all package events (status changes, matching, cancellation)
-  - Events: `notification_created`, `unread_count_updated`, `ping/pong`
+  - Events: `notification_created`, `unread_count_updated`, `message_received`, `ping/pong`
   - Frontend: `useWebSocket` hook with auto-reconnect and fallback polling
   - NotificationDropdown integrates WebSocket for instant updates with visual connection indicator
   - Comprehensive test suite (12 tests)
+- **In-App Messaging**:
+  - Backend: Message model, API endpoints at `/api/messages`
+  - Package-based conversations: sender and courier can chat about a specific package
+  - Available at any package status (pending through delivered)
+  - Private: only sender and courier can view/send messages (admins excluded)
+  - Real-time delivery via WebSocket `message_received` event
+  - Frontend: ChatWindow component, dedicated /messages page, chat in package detail page
+  - Messages icon in navbar with unread badge
+  - Comprehensive test suite (11 tests)
 
 ## Pending Features
 
-- Payment integration (Stripe)
-- Mobile app (React Native)
+### High Priority
+- **Payment & Earnings System (Stripe)**: Payment processing, courier earnings dashboard, commission handling, payouts
+- **Verification & Trust System**: ID verification, trust scores, verification badges, fraud detection
+- **Dispute Resolution**: Claim creation, evidence upload, mediation workflow, resolution tracking
+
+### Medium Priority
+- **Scheduling & Time Windows**: Pickup/delivery time preferences, courier availability, SLA tracking
+- **Advanced Courier Search/Filtering**: Filter packages by price, size, time window, sender rating
+
+### Lower Priority
+- **Insurance Options**: Optional coverage for high-value packages, claims process
+- **Analytics Dashboards**: Courier earnings trends, sender cost analysis, admin demand heatmaps
+- **Mobile App (React Native)**: Push notifications, real-time tracking

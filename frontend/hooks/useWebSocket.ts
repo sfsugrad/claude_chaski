@@ -8,7 +8,18 @@ export type WebSocketEventType =
   | 'notification_created'
   | 'unread_count_updated'
   | 'package_updated'
+  | 'message_received'
   | 'pong'
+
+export interface ChatMessage {
+  id: number
+  package_id: number
+  sender_id: number
+  sender_name: string
+  content: string
+  is_read: boolean
+  created_at: string
+}
 
 export interface WebSocketMessage {
   event_type: WebSocketEventType
@@ -23,6 +34,7 @@ export interface WebSocketMessage {
   }
   count?: number
   package?: any
+  message?: ChatMessage
 }
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
@@ -31,6 +43,7 @@ interface UseWebSocketOptions {
   onNotification?: (notification: WebSocketMessage['notification']) => void
   onUnreadCountUpdate?: (count: number) => void
   onPackageUpdate?: (pkg: any) => void
+  onMessageReceived?: (message: ChatMessage) => void
   onConnectionChange?: (status: ConnectionStatus) => void
   reconnectAttempts?: number
   reconnectInterval?: number
@@ -41,6 +54,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     onNotification,
     onUnreadCountUpdate,
     onPackageUpdate,
+    onMessageReceived,
     onConnectionChange,
     reconnectAttempts = 5,
     reconnectInterval = 3000,
@@ -112,6 +126,11 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
                 onPackageUpdate?.(message.package)
               }
               break
+            case 'message_received':
+              if (message.message) {
+                onMessageReceived?.(message.message)
+              }
+              break
             case 'pong':
               // Connection is alive, nothing to do
               break
@@ -146,7 +165,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       console.error('WebSocket connection error:', err)
       updateStatus('error')
     }
-  }, [onNotification, onUnreadCountUpdate, onPackageUpdate, updateStatus, reconnectAttempts, reconnectInterval])
+  }, [onNotification, onUnreadCountUpdate, onPackageUpdate, onMessageReceived, updateStatus, reconnectAttempts, reconnectInterval])
 
   const disconnect = useCallback(() => {
     // Clear reconnect timeout

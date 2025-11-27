@@ -123,3 +123,18 @@ async def broadcast_package_update(user_id: int, package_data: dict):
         "package": package_data
     }
     await manager.send_personal_message(message, user_id)
+
+
+async def broadcast_message(user_id: int, message_data: dict):
+    """
+    Broadcast a chat message to a user via WebSocket.
+
+    Args:
+        user_id: The ID of the user to notify
+        message_data: Dict containing message details
+    """
+    message = {
+        "event_type": "message_received",
+        "message": message_data
+    }
+    await manager.send_personal_message(message, user_id)

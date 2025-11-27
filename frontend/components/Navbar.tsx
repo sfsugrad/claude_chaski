@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { UserResponse } from '@/lib/api'
+import { UserResponse, messagesAPI } from '@/lib/api'
 import NotificationDropdown from './NotificationDropdown'
 import StarRating from './StarRating'
 
@@ -14,6 +14,27 @@ interface NavbarProps {
 export default function Navbar({ user }: NavbarProps) {
   const router = useRouter()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0)
+
+  // Fetch unread message count
+  useEffect(() => {
+    if (!user) return
+
+    const fetchUnreadCount = async () => {
+      try {
+        const response = await messagesAPI.getUnreadCount()
+        setUnreadMessageCount(response.data.unread_count)
+      } catch (err) {
+        // Silently fail - not critical
+        console.error('Failed to fetch message count:', err)
+      }
+    }
+
+    fetchUnreadCount()
+    // Poll every 30 seconds
+    const interval = setInterval(fetchUnreadCount, 30000)
+    return () => clearInterval(interval)
+  }, [user])
 
   const handleLogout = () => {
     localStorage.removeItem('token')
@@ -83,6 +104,32 @@ export default function Navbar({ user }: NavbarProps) {
           <div className="flex items-center space-x-4">
             {user && (
               <>
+                {/* Messages Link */}
+                <Link
+                  href="/messages"
+                  className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors"
+                  aria-label={`Messages${unreadMessageCount > 0 ? ` (${unreadMessageCount} unread)` : ''}`}
+                >
+                  <svg
+                    className="h-6 w-6"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                    />
+                  </svg>
+                  {unreadMessageCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[20px] h-5 px-1 text-xs font-bold text-white bg-blue-600 rounded-full">
+                      {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
+                    </span>
+                  )}
+                </Link>
+
                 {/* Notification Dropdown */}
                 <NotificationDropdown />
 
@@ -164,6 +211,18 @@ export default function Navbar({ user }: NavbarProps) {
               onClick={() => setMobileMenuOpen(false)}
             >
               Dashboard
+            </Link>
+            <Link
+              href="/messages"
+              className="flex items-center gap-2 px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Messages
+              {unreadMessageCount > 0 && (
+                <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold text-white bg-blue-600 rounded-full">
+                  {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
+                </span>
+              )}
             </Link>
             {isSender && (
               <>

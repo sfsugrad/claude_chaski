@@ -1,11 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
-import axios, { ratingsAPI, RatingResponse } from '@/lib/api'
+import axios, { ratingsAPI, RatingResponse, messagesAPI, MessageResponse } from '@/lib/api'
 import StarRating from '@/components/StarRating'
 import RatingModal from '@/components/RatingModal'
+import ChatWindow from '@/components/ChatWindow'
+import { useWebSocket } from '@/hooks/useWebSocket'
 
 interface Package {
   id: number
@@ -63,6 +65,23 @@ export default function PackageDetailPage() {
   const [packageRatings, setPackageRatings] = useState<RatingResponse[]>([])
   const [pendingRating, setPendingRating] = useState<PendingRatingInfo | null>(null)
   const [showRatingModal, setShowRatingModal] = useState(false)
+  const [showChat, setShowChat] = useState(false)
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0)
+  const [otherUserName, setOtherUserName] = useState<string>('')
+
+  // Handle incoming WebSocket messages
+  const handleMessageReceived = useCallback((message: MessageResponse) => {
+    if (message.package_id === parseInt(packageId)) {
+      if (!showChat) {
+        setUnreadMessageCount(prev => prev + 1)
+      }
+    }
+  }, [packageId, showChat])
+
+  // Initialize WebSocket
+  useWebSocket({
+    onMessageReceived: handleMessageReceived,
+  })
 
   useEffect(() => {
     loadPackageData()
@@ -103,6 +122,23 @@ export default function PackageDetailPage() {
             console.error('Error loading courier:', err)
           }
         }
+      }
+
+      // Load unread message count for this package
+      try {
+        const messagesResponse = await messagesAPI.getPackageMessages(parseInt(packageId), 0, 1)
+        // Get unread count from conversations API
+        const conversationsResponse = await messagesAPI.getConversations()
+        const thisConversation = conversationsResponse.data.conversations.find(
+          c => c.package_id === parseInt(packageId)
+        )
+        if (thisConversation) {
+          setUnreadMessageCount(thisConversation.unread_count)
+          setOtherUserName(thisConversation.other_user_name)
+        }
+      } catch (err) {
+        // Not critical, messages might not be accessible
+        console.error('Error loading messages:', err)
       }
 
       // Load package ratings if delivered
@@ -603,6 +639,54 @@ export default function PackageDetailPage() {
             </p>
           </div>
         </div>
+
+        {/* Chat Section - Show for sender/courier (not admin) */}
+        {currentUser && pkg && (currentUser.id === pkg.sender_id || currentUser.id === pkg.courier_id) && (
+          <div className="mt-6 bg-white rounded-lg shadow-md overflow-hidden">
+            <button
+              onClick={() => {
+                setShowChat(!showChat)
+                if (!showChat) {
+                  setUnreadMessageCount(0)
+                }
+              }}
+              className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                <span className="text-lg font-bold text-gray-900">
+                  Messages {otherUserName && `with ${otherUserName}`}
+                </span>
+                {unreadMessageCount > 0 && (
+                  <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold text-white bg-blue-600 rounded-full">
+                    {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
+                  </span>
+                )}
+              </div>
+              <svg
+                className={`w-5 h-5 text-gray-400 transition-transform ${showChat ? 'rotate-180' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {showChat && (
+              <div className="border-t border-gray-200">
+                <ChatWindow
+                  packageId={pkg.id}
+                  currentUserId={currentUser.id}
+                  otherUserName={otherUserName || (currentUser.id === pkg.sender_id ? 'Courier' : 'Sender')}
+                  className="rounded-none border-0"
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Ratings Section - Only show for delivered packages */}
         {pkg.status.toLowerCase() === 'delivered' && (

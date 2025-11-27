@@ -280,3 +280,54 @@ export const ratingsAPI = {
   getMyPendingRatings: () =>
     api.get<PendingRating[]>('/ratings/my-pending'),
 }
+
+// Message Types
+export interface MessageResponse {
+  id: number
+  package_id: number
+  sender_id: number
+  sender_name: string
+  content: string
+  is_read: boolean
+  created_at: string
+}
+
+export interface MessageListResponse {
+  messages: MessageResponse[]
+  total: number
+}
+
+export interface ConversationSummary {
+  package_id: number
+  package_description: string
+  other_user_id: number
+  other_user_name: string
+  last_message: string
+  last_message_at: string
+  unread_count: number
+}
+
+export interface ConversationListResponse {
+  conversations: ConversationSummary[]
+  total: number
+}
+
+export interface MessageUnreadCountResponse {
+  unread_count: number
+}
+
+// Messages API
+export const messagesAPI = {
+  getConversations: (skip: number = 0, limit: number = 20) =>
+    api.get<ConversationListResponse>(`/messages/conversations?skip=${skip}&limit=${limit}`),
+  getPackageMessages: (packageId: number, skip: number = 0, limit: number = 50) =>
+    api.get<MessageListResponse>(`/messages/package/${packageId}?skip=${skip}&limit=${limit}`),
+  sendMessage: (packageId: number, content: string) =>
+    api.post<MessageResponse>(`/messages/package/${packageId}`, { content }),
+  markAsRead: (messageId: number) =>
+    api.put<MessageResponse>(`/messages/${messageId}/read`),
+  markAllAsRead: (packageId: number) =>
+    api.put(`/messages/package/${packageId}/read-all`),
+  getUnreadCount: () =>
+    api.get<MessageUnreadCountResponse>('/messages/unread-count'),
+}
