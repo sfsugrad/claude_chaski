@@ -91,14 +91,16 @@ export default function Navbar({ user }: NavbarProps) {
                   <span className="text-sm text-gray-700">
                     {user.full_name}
                   </span>
-                  {user.average_rating !== null && user.average_rating !== undefined && (
-                    <div className="flex items-center gap-1">
-                      <StarRating rating={user.average_rating} size="sm" />
-                      <span className="text-xs text-gray-500">
-                        ({user.total_ratings})
-                      </span>
-                    </div>
-                  )}
+                  <Link
+                    href="/profile/reviews"
+                    className="flex items-center gap-1 hover:opacity-80 transition-opacity"
+                    title="View my reviews"
+                  >
+                    <StarRating rating={user.average_rating || 0} size="sm" />
+                    <span className="text-xs text-gray-500">
+                      ({user.total_ratings || 0})
+                    </span>
+                  </Link>
                 </div>
 
                 {/* Logout Button */}
@@ -204,12 +206,14 @@ export default function Navbar({ user }: NavbarProps) {
             <div className="px-4 py-2">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-medium text-gray-900">{user.full_name}</p>
-                {user.average_rating !== null && user.average_rating !== undefined && (
-                  <div className="flex items-center gap-1">
-                    <StarRating rating={user.average_rating} size="sm" />
-                    <span className="text-xs text-gray-500">({user.total_ratings})</span>
-                  </div>
-                )}
+                <Link
+                  href="/profile/reviews"
+                  className="flex items-center gap-1 hover:opacity-80 transition-opacity"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <StarRating rating={user.average_rating || 0} size="sm" />
+                  <span className="text-xs text-gray-500">({user.total_ratings || 0})</span>
+                </Link>
               </div>
               <p className="text-sm text-gray-500">{user.email}</p>
             </div>
