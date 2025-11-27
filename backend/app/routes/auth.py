@@ -38,12 +38,12 @@ COOKIE_NAME = "access_token"
 COOKIE_MAX_AGE = settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60  # Convert to seconds
 
 
-def set_auth_cookie(response: Response, token: str) -> None:
+def set_auth_cookie(response: Response, token: str, max_age: int = COOKIE_MAX_AGE) -> None:
     """Set the JWT token in an httpOnly cookie."""
     response.set_cookie(
         key=COOKIE_NAME,
         value=token,
-        max_age=COOKIE_MAX_AGE,
+        max_age=max_age,
         httponly=True,
         secure=settings.ENVIRONMENT == "production",
         samesite="lax",
@@ -69,10 +69,14 @@ class UserRegister(BaseModel):
     role: str = Field(..., pattern="^(sender|courier|both)$")
     phone_number: str | None = None
     max_deviation_km: int | None = Field(default=5, ge=1, le=50)
+    default_address: str | None = None
+    default_address_lat: float | None = None
+    default_address_lng: float | None = None
 
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+    remember_me: bool = False
 
 class Token(BaseModel):
     access_token: str
@@ -91,12 +95,24 @@ class UserResponse(BaseModel):
     is_active: bool
     is_verified: bool
     max_deviation_km: int
+    default_address: str | None = None
+    default_address_lat: float | None = None
+    default_address_lng: float | None = None
     created_at: datetime
     average_rating: float | None = None
     total_ratings: int = 0
 
     class Config:
         from_attributes = True
+
+
+class UserUpdate(BaseModel):
+    full_name: str | None = None
+    phone_number: str | None = None
+    max_deviation_km: int | None = Field(default=None, ge=1, le=50)
+    default_address: str | None = None
+    default_address_lat: float | None = None
+    default_address_lng: float | None = None
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -153,6 +169,9 @@ async def register(request: Request, user_data: UserRegister, db: Session = Depe
         role=user_role,
         phone_number=user_data.phone_number,
         max_deviation_km=user_data.max_deviation_km or 5,
+        default_address=user_data.default_address,
+        default_address_lat=user_data.default_address_lat,
+        default_address_lng=user_data.default_address_lng,
         verification_token=verification_token,
         verification_token_expires_at=verification_token_expires_at
     )
@@ -178,8 +197,9 @@ async def login(request: Request, response: Response, credentials: UserLogin, db
 
     - **email**: Registered email address
     - **password**: User's password
+    - **remember_me**: If true, extends session to 7 days (default: false)
 
-    Sets JWT token in httpOnly cookie valid for 30 minutes (default).
+    Sets JWT token in httpOnly cookie valid for 24 hours (default) or 7 days (remember me).
     """
     # Find user by email
     user = db.query(User).filter(User.email == credentials.email).first()
@@ -208,15 +228,22 @@ async def login(request: Request, response: Response, credentials: UserLogin, db
             detail="User account is inactive"
         )
 
+    # Determine token expiration based on remember_me
+    if credentials.remember_me:
+        expire_minutes = settings.REMEMBER_ME_EXPIRE_MINUTES
+    else:
+        expire_minutes = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+
     # Create access token
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token_expires = timedelta(minutes=expire_minutes)
     access_token = create_access_token(
         data={"sub": user.email, "role": user.role.value},
         expires_delta=access_token_expires
     )
 
-    # Set JWT in httpOnly cookie
-    set_auth_cookie(response, access_token)
+    # Set JWT in httpOnly cookie with appropriate max_age
+    cookie_max_age = expire_minutes * 60  # Convert to seconds
+    set_auth_cookie(response, access_token, cookie_max_age)
 
     # Audit log successful login
     log_login_success(db, user, request, "password")
@@ -251,6 +278,69 @@ async def get_current_user_info(
         is_active=current_user.is_active,
         is_verified=current_user.is_verified,
         max_deviation_km=current_user.max_deviation_km,
+        default_address=current_user.default_address,
+        default_address_lat=current_user.default_address_lat,
+        default_address_lng=current_user.default_address_lng,
+        created_at=current_user.created_at,
+        average_rating=round(float(avg_result), 2) if avg_result else None,
+        total_ratings=total_ratings
+    )
+
+
+@router.put("/me", response_model=UserResponse)
+async def update_current_user(
+    user_data: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update current authenticated user's profile.
+
+    All fields are optional. Only provided fields will be updated.
+    - **full_name**: User's full name
+    - **phone_number**: Phone number
+    - **max_deviation_km**: Maximum deviation distance for couriers (1-50 km)
+    - **default_address**: Default address for package pickup
+    - **default_address_lat**: Latitude of default address
+    - **default_address_lng**: Longitude of default address
+    """
+    # Update only provided fields
+    if user_data.full_name is not None:
+        current_user.full_name = user_data.full_name
+    if user_data.phone_number is not None:
+        current_user.phone_number = user_data.phone_number
+    if user_data.max_deviation_km is not None:
+        current_user.max_deviation_km = user_data.max_deviation_km
+    if user_data.default_address is not None:
+        current_user.default_address = user_data.default_address
+    if user_data.default_address_lat is not None:
+        current_user.default_address_lat = user_data.default_address_lat
+    if user_data.default_address_lng is not None:
+        current_user.default_address_lng = user_data.default_address_lng
+
+    db.commit()
+    db.refresh(current_user)
+
+    # Calculate average rating for the user
+    avg_result = db.query(func.avg(Rating.score)).filter(
+        Rating.rated_user_id == current_user.id
+    ).scalar()
+    total_ratings = db.query(Rating).filter(
+        Rating.rated_user_id == current_user.id
+    ).count()
+
+    return UserResponse(
+        id=current_user.id,
+        email=current_user.email,
+        full_name=current_user.full_name,
+        role=current_user.role.value,
+        phone_number=current_user.phone_number,
+        is_active=current_user.is_active,
+        is_verified=current_user.is_verified,
+        max_deviation_km=current_user.max_deviation_km,
+        default_address=current_user.default_address,
+        default_address_lat=current_user.default_address_lat,
+        default_address_lng=current_user.default_address_lng,
         created_at=current_user.created_at,
         average_rating=round(float(avg_result), 2) if avg_result else None,
         total_ratings=total_ratings

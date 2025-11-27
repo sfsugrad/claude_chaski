@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum as SQLEnum, Float
 from sqlalchemy.sql import func
 from app.models.base import Base
 import enum
@@ -26,6 +26,11 @@ class User(Base):
     # Password reset fields
     password_reset_token = Column(String, nullable=True)
     password_reset_token_expires_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Default address fields (optional)
+    default_address = Column(String, nullable=True)
+    default_address_lat = Column(Float, nullable=True)
+    default_address_lng = Column(Float, nullable=True)
 
     # Courier-specific fields
     max_deviation_km = Column(Integer, default=5)  # Default 5km deviation

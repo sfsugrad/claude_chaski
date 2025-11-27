@@ -16,7 +16,7 @@ const mockGetCurrentUser = jest.fn()
 
 jest.mock('@/lib/api', () => ({
   authAPI: {
-    login: () => mockLogin(),
+    login: (data: any) => mockLogin(data),
     getCurrentUser: () => mockGetCurrentUser(),
   },
 }))
@@ -80,6 +80,17 @@ describe('LoginPage', () => {
     it('renders forgot password link', () => {
       render(<LoginPage />)
       expect(screen.getByText(/forgot password/i)).toBeInTheDocument()
+    })
+
+    it('renders remember me checkbox', () => {
+      render(<LoginPage />)
+      expect(screen.getByLabelText(/remember me/i)).toBeInTheDocument()
+    })
+
+    it('remember me checkbox is unchecked by default', () => {
+      render(<LoginPage />)
+      const checkbox = screen.getByLabelText(/remember me/i) as HTMLInputElement
+      expect(checkbox.checked).toBe(false)
     })
   })
 
@@ -262,6 +273,69 @@ describe('LoginPage', () => {
       await waitFor(() => {
         expect(screen.getByText(/signing in/i)).toBeInTheDocument()
       })
+    })
+
+    it('sends remember_me=false when checkbox is unchecked', async () => {
+      mockLogin.mockResolvedValue({ data: { access_token: 'test-token' } })
+      mockGetCurrentUser.mockResolvedValue({ data: { role: 'sender' } })
+
+      render(<LoginPage />)
+
+      const emailInput = screen.getByLabelText(/email/i)
+      const passwordInput = screen.getByLabelText(/password/i)
+      await userEvent.type(emailInput, 'test@example.com')
+      await userEvent.type(passwordInput, 'password123')
+
+      const submitButton = screen.getByRole('button', { name: /sign in/i })
+      fireEvent.click(submitButton)
+
+      await waitFor(() => {
+        expect(mockLogin).toHaveBeenCalledWith({
+          email: 'test@example.com',
+          password: 'password123',
+          remember_me: false,
+        })
+      })
+    })
+
+    it('sends remember_me=true when checkbox is checked', async () => {
+      mockLogin.mockResolvedValue({ data: { access_token: 'test-token' } })
+      mockGetCurrentUser.mockResolvedValue({ data: { role: 'sender' } })
+
+      render(<LoginPage />)
+
+      const emailInput = screen.getByLabelText(/email/i)
+      const passwordInput = screen.getByLabelText(/password/i)
+      const rememberMeCheckbox = screen.getByLabelText(/remember me/i)
+
+      await userEvent.type(emailInput, 'test@example.com')
+      await userEvent.type(passwordInput, 'password123')
+      await userEvent.click(rememberMeCheckbox)
+
+      const submitButton = screen.getByRole('button', { name: /sign in/i })
+      fireEvent.click(submitButton)
+
+      await waitFor(() => {
+        expect(mockLogin).toHaveBeenCalledWith({
+          email: 'test@example.com',
+          password: 'password123',
+          remember_me: true,
+        })
+      })
+    })
+
+    it('checkbox can be toggled', async () => {
+      render(<LoginPage />)
+
+      const rememberMeCheckbox = screen.getByLabelText(/remember me/i) as HTMLInputElement
+
+      expect(rememberMeCheckbox.checked).toBe(false)
+
+      await userEvent.click(rememberMeCheckbox)
+      expect(rememberMeCheckbox.checked).toBe(true)
+
+      await userEvent.click(rememberMeCheckbox)
+      expect(rememberMeCheckbox.checked).toBe(false)
     })
   })
 

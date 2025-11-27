@@ -9,7 +9,8 @@ class Settings(BaseSettings):
     # JWT
     SECRET_KEY: str = "your-secret-key-change-in-production"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours default
+    REMEMBER_ME_EXPIRE_MINUTES: int = 10080  # 7 days for "Remember Me"
 
     def validate_secret_key(self) -> None:
         """Validate that SECRET_KEY has been changed from default"""

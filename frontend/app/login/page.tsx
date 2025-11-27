@@ -12,6 +12,7 @@ function LoginForm() {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
+    rememberMe: false,
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -30,10 +31,10 @@ function LoginForm() {
   }, [searchParams])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
+    const { name, value, type, checked } = e.target
     setFormData((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: type === 'checkbox' ? checked : value,
     }))
   }
 
@@ -50,7 +51,11 @@ function LoginForm() {
     setLoading(true)
 
     try {
-      await authAPI.login(formData)
+      await authAPI.login({
+        email: formData.email,
+        password: formData.password,
+        remember_me: formData.rememberMe,
+      })
 
       // Cookie is set by the server, now get user info to check role
       try {
@@ -163,6 +168,24 @@ function LoginForm() {
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 placeholder="Enter your password"
               />
+            </div>
+
+            {/* Remember Me */}
+            <div className="flex items-center">
+              <input
+                id="rememberMe"
+                name="rememberMe"
+                type="checkbox"
+                checked={formData.rememberMe}
+                onChange={handleChange}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label
+                htmlFor="rememberMe"
+                className="ml-2 block text-sm text-gray-700"
+              >
+                Remember me for 7 days
+              </label>
             </div>
 
             {/* Submit Button */}

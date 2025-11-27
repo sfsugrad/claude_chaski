@@ -555,6 +555,125 @@ class TestEmailVerification:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
+class TestRememberMe:
+    """Tests for Remember Me functionality"""
+
+    def test_login_without_remember_me_uses_default_expiration(self, client, test_user_data):
+        """Test that login without remember_me uses default 24-hour expiration"""
+        # Register user
+        client.post("/api/auth/register", json=test_user_data)
+
+        # Login without remember_me
+        login_data = {
+            "email": test_user_data["email"],
+            "password": test_user_data["password"],
+            "remember_me": False
+        }
+        response = client.post("/api/auth/login", json=login_data)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert "access_token" in response.cookies
+
+        # Check cookie max_age is set to default (24 hours = 86400 seconds)
+        cookie = response.cookies.get("access_token")
+        assert cookie is not None
+
+    def test_login_with_remember_me_uses_extended_expiration(self, client, test_user_data):
+        """Test that login with remember_me uses 7-day expiration"""
+        # Register user
+        client.post("/api/auth/register", json=test_user_data)
+
+        # Login with remember_me
+        login_data = {
+            "email": test_user_data["email"],
+            "password": test_user_data["password"],
+            "remember_me": True
+        }
+        response = client.post("/api/auth/login", json=login_data)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert "access_token" in response.cookies
+
+    def test_login_remember_me_defaults_to_false(self, client, test_user_data):
+        """Test that remember_me defaults to False when not provided"""
+        # Register user
+        client.post("/api/auth/register", json=test_user_data)
+
+        # Login without specifying remember_me
+        login_data = {
+            "email": test_user_data["email"],
+            "password": test_user_data["password"]
+        }
+        response = client.post("/api/auth/login", json=login_data)
+
+        assert response.status_code == status.HTTP_200_OK
+        # Default behavior should work normally
+        assert "access_token" in response.cookies
+
+    def test_remember_me_token_contains_extended_expiration(self, client, test_user_data):
+        """Test that remember_me token has extended expiration in JWT payload"""
+        import base64
+        import json
+
+        # Register user
+        client.post("/api/auth/register", json=test_user_data)
+
+        # Login with remember_me
+        login_data = {
+            "email": test_user_data["email"],
+            "password": test_user_data["password"],
+            "remember_me": True
+        }
+        response = client.post("/api/auth/login", json=login_data)
+        token = response.cookies["access_token"]
+
+        # Decode token to check expiration
+        payload = token.split('.')[1]
+        payload += '=' * (4 - len(payload) % 4)
+        decoded = json.loads(base64.urlsafe_b64decode(payload))
+
+        # Token should have exp claim
+        assert "exp" in decoded
+
+    def test_regular_login_token_expiration_vs_remember_me(self, client, test_user_data):
+        """Test that remember_me token has longer expiration than regular login"""
+        import base64
+        import json
+
+        # Register user
+        client.post("/api/auth/register", json=test_user_data)
+
+        # Login without remember_me
+        regular_login_data = {
+            "email": test_user_data["email"],
+            "password": test_user_data["password"],
+            "remember_me": False
+        }
+        regular_response = client.post("/api/auth/login", json=regular_login_data)
+        regular_token = regular_response.cookies["access_token"]
+
+        # Login with remember_me
+        remember_me_data = {
+            "email": test_user_data["email"],
+            "password": test_user_data["password"],
+            "remember_me": True
+        }
+        remember_response = client.post("/api/auth/login", json=remember_me_data)
+        remember_token = remember_response.cookies["access_token"]
+
+        # Decode both tokens
+        def decode_token(token):
+            payload = token.split('.')[1]
+            payload += '=' * (4 - len(payload) % 4)
+            return json.loads(base64.urlsafe_b64decode(payload))
+
+        regular_decoded = decode_token(regular_token)
+        remember_decoded = decode_token(remember_token)
+
+        # Remember me token should have longer expiration
+        assert remember_decoded["exp"] > regular_decoded["exp"]
+
+
 class TestAuthenticationWorkflow:
     """Integration tests for complete authentication workflow"""
 
@@ -888,3 +1007,196 @@ class TestPasswordReset:
             "new_password": "anotherpassword456"
         })
         assert response2.status_code == status.HTTP_400_BAD_REQUEST
+
+
+class TestUserProfileUpdate:
+    """Tests for user profile update endpoint"""
+
+    def test_update_profile_full_name(self, client, authenticated_sender):
+        """Test updating user's full name"""
+        response = client.put(
+            "/api/auth/me",
+            json={"full_name": "Updated Name"},
+            cookies={"access_token": authenticated_sender}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["full_name"] == "Updated Name"
+
+    def test_update_profile_phone_number(self, client, authenticated_sender):
+        """Test updating user's phone number"""
+        response = client.put(
+            "/api/auth/me",
+            json={"phone_number": "+1234567890"},
+            cookies={"access_token": authenticated_sender}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["phone_number"] == "+1234567890"
+
+    def test_update_profile_max_deviation_km(self, client, authenticated_courier):
+        """Test updating user's max deviation km"""
+        response = client.put(
+            "/api/auth/me",
+            json={"max_deviation_km": 15},
+            cookies={"access_token": authenticated_courier}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["max_deviation_km"] == 15
+
+    def test_update_profile_default_address(self, client, authenticated_sender):
+        """Test updating user's default address"""
+        response = client.put(
+            "/api/auth/me",
+            json={
+                "default_address": "123 Main St, New York, NY",
+                "default_address_lat": 40.7128,
+                "default_address_lng": -74.0060
+            },
+            cookies={"access_token": authenticated_sender}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["default_address"] == "123 Main St, New York, NY"
+        assert response.json()["default_address_lat"] == 40.7128
+        assert response.json()["default_address_lng"] == -74.0060
+
+    def test_update_profile_multiple_fields(self, client, authenticated_sender):
+        """Test updating multiple profile fields at once"""
+        response = client.put(
+            "/api/auth/me",
+            json={
+                "full_name": "Multi Update User",
+                "phone_number": "+9876543210",
+                "default_address": "456 Oak Ave, Los Angeles, CA",
+                "default_address_lat": 34.0522,
+                "default_address_lng": -118.2437
+            },
+            cookies={"access_token": authenticated_sender}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["full_name"] == "Multi Update User"
+        assert data["phone_number"] == "+9876543210"
+        assert data["default_address"] == "456 Oak Ave, Los Angeles, CA"
+        assert data["default_address_lat"] == 34.0522
+        assert data["default_address_lng"] == -118.2437
+
+    def test_update_profile_empty_request(self, client, authenticated_sender):
+        """Test updating with empty request body (no changes)"""
+        # First get current profile
+        me_response = client.get("/api/auth/me", cookies={"access_token": authenticated_sender})
+        original_data = me_response.json()
+
+        # Update with empty body
+        response = client.put(
+            "/api/auth/me",
+            json={},
+            cookies={"access_token": authenticated_sender}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        # Should return same data
+        assert response.json()["full_name"] == original_data["full_name"]
+
+    def test_update_profile_unauthenticated(self, client):
+        """Test updating profile without authentication"""
+        response = client.put(
+            "/api/auth/me",
+            json={"full_name": "Hacker"}
+        )
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_update_profile_invalid_max_deviation(self, client, authenticated_sender):
+        """Test updating max_deviation_km with invalid value"""
+        # Too high
+        response = client.put(
+            "/api/auth/me",
+            json={"max_deviation_km": 100},
+            cookies={"access_token": authenticated_sender}
+        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+        # Too low
+        response = client.put(
+            "/api/auth/me",
+            json={"max_deviation_km": 0},
+            cookies={"access_token": authenticated_sender}
+        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+
+class TestUserRegistrationWithAddress:
+    """Tests for user registration with default address fields"""
+
+    def test_register_with_default_address(self, client):
+        """Test registration with default address"""
+        user_data = {
+            "email": "address.user@example.com",
+            "password": "password123",
+            "full_name": "Address User",
+            "role": "sender",
+            "default_address": "789 Pine St, Chicago, IL",
+            "default_address_lat": 41.8781,
+            "default_address_lng": -87.6298
+        }
+        response = client.post("/api/auth/register", json=user_data)
+
+        assert response.status_code == status.HTTP_201_CREATED
+        data = response.json()
+        assert data["default_address"] == "789 Pine St, Chicago, IL"
+        assert data["default_address_lat"] == 41.8781
+        assert data["default_address_lng"] == -87.6298
+
+    def test_register_without_default_address(self, client):
+        """Test registration without default address (should be null)"""
+        user_data = {
+            "email": "no.address@example.com",
+            "password": "password123",
+            "full_name": "No Address User",
+            "role": "sender"
+        }
+        response = client.post("/api/auth/register", json=user_data)
+
+        assert response.status_code == status.HTTP_201_CREATED
+        data = response.json()
+        assert data["default_address"] is None
+        assert data["default_address_lat"] is None
+        assert data["default_address_lng"] is None
+
+    def test_get_current_user_includes_address(self, client, db_session):
+        """Test that GET /auth/me returns address fields"""
+        from app.models.user import User, UserRole
+        from app.utils.auth import get_password_hash, create_access_token
+        from datetime import timedelta
+
+        # Create user with address
+        user = User(
+            email="me.address@example.com",
+            hashed_password=get_password_hash("password123"),
+            full_name="Me Address User",
+            role=UserRole.SENDER,
+            is_verified=True,
+            default_address="100 Test Blvd, Boston, MA",
+            default_address_lat=42.3601,
+            default_address_lng=-71.0589
+        )
+        db_session.add(user)
+        db_session.commit()
+
+        # Create token and get user info
+        token = create_access_token(
+            data={"sub": user.email, "role": user.role.value},
+            expires_delta=timedelta(hours=1)
+        )
+
+        response = client.get("/api/auth/me", cookies={"access_token": token})
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["default_address"] == "100 Test Blvd, Boston, MA"
+        assert data["default_address_lat"] == 42.3601
+        assert data["default_address_lng"] == -71.0589

@@ -55,6 +55,9 @@ const mockUser = {
   is_active: true,
   is_verified: true,
   max_deviation_km: 5,
+  default_address: null,
+  default_address_lat: null,
+  default_address_lng: null,
   created_at: '2024-01-01T00:00:00Z',
   average_rating: 4.5,
   total_ratings: 10,
@@ -98,10 +101,14 @@ describe('Navbar', () => {
       expect(screen.getByText('(0)')).toBeInTheDocument()
     })
 
-    it('rating links to reviews page', () => {
+    it('rating links to reviews page when mobile menu is open', () => {
       render(<Navbar user={mockUser} />)
 
-      // Find links that go to /profile/reviews
+      // Open mobile menu to access the reviews link
+      const menuButton = screen.getByLabelText('Toggle menu')
+      fireEvent.click(menuButton)
+
+      // Find links that go to /profile/reviews in mobile menu
       const allLinks = screen.getAllByRole('link')
       const reviewLinks = allLinks.filter(link => link.getAttribute('href') === '/profile/reviews')
 
@@ -163,6 +170,10 @@ describe('Navbar', () => {
     it('calls logout API and redirects on logout', async () => {
       const { authAPI } = require('@/lib/api')
       render(<Navbar user={mockUser} />)
+
+      // Open mobile menu to access the logout button
+      const menuButton = screen.getByLabelText('Toggle menu')
+      fireEvent.click(menuButton)
 
       const logoutButton = screen.getByText('Logout')
       fireEvent.click(logoutButton)

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { packagesAPI, PackageCreate, authAPI, adminAPI, AdminUser } from '@/lib/api'
+import { packagesAPI, PackageCreate, authAPI, adminAPI, AdminUser, UserResponse } from '@/lib/api'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
 
 type User = AdminUser
@@ -32,6 +32,7 @@ export default function CreatePackagePage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [users, setUsers] = useState<User[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
+  const [currentUser, setCurrentUser] = useState<UserResponse | null>(null)
 
   useEffect(() => {
     checkAdminAndLoadUsers()
@@ -40,9 +41,20 @@ export default function CreatePackagePage() {
   const checkAdminAndLoadUsers = async () => {
     try {
       const response = await authAPI.getCurrentUser()
-      const currentUser = response.data
+      const user = response.data
+      setCurrentUser(user)
 
-      if (currentUser.role === 'admin' || currentUser.role === 'ADMIN') {
+      // Pre-fill pickup address with user's default address if available
+      if (user.default_address && user.default_address_lat && user.default_address_lng) {
+        setFormData((prev) => ({
+          ...prev,
+          pickup_address: user.default_address || '',
+          pickup_lat: user.default_address_lat || 0,
+          pickup_lng: user.default_address_lng || 0,
+        }))
+      }
+
+      if (user.role === 'admin' || user.role === 'ADMIN') {
         setIsAdmin(true)
         await loadUsers()
       }
@@ -365,10 +377,17 @@ export default function CreatePackagePage() {
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   />
                   <p className="mt-1 text-xs text-gray-500">
-                    {process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY
+                    {currentUser?.default_address
+                      ? 'Pre-filled with your default address. You can change it if needed.'
+                      : process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY
                       ? 'Select an address from the autocomplete suggestions. Coordinates will be set automatically.'
                       : 'Google Places API key not configured. Please enter a valid address.'}
                   </p>
+                  {!currentUser?.default_address && (
+                    <p className="mt-1 text-xs text-blue-600">
+                      Tip: Set a default address in your profile to auto-fill this field.
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

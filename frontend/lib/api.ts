@@ -20,11 +20,15 @@ export interface RegisterData {
   role: 'sender' | 'courier' | 'both'
   phone_number?: string
   max_deviation_km?: number
+  default_address?: string
+  default_address_lat?: number
+  default_address_lng?: number
 }
 
 export interface LoginData {
   email: string
   password: string
+  remember_me?: boolean
 }
 
 export interface UserResponse {
@@ -36,6 +40,9 @@ export interface UserResponse {
   is_active: boolean
   is_verified: boolean
   max_deviation_km: number
+  default_address: string | null
+  default_address_lat: number | null
+  default_address_lng: number | null
   created_at: string
   average_rating: number | null
   total_ratings: number
@@ -106,12 +113,22 @@ export interface MessageResponse {
   message: string
 }
 
+export interface UserUpdate {
+  full_name?: string
+  phone_number?: string
+  max_deviation_km?: number
+  default_address?: string
+  default_address_lat?: number
+  default_address_lng?: number
+}
+
 // Auth API
 export const authAPI = {
   register: (data: RegisterData) => api.post<UserResponse>('/auth/register', data),
   login: (data: LoginData) => api.post<AuthResponse>('/auth/login', data),
   logout: () => api.post<AuthResponse>('/auth/logout'),
   getCurrentUser: () => api.get<UserResponse>('/auth/me'),
+  updateProfile: (data: UserUpdate) => api.put<UserResponse>('/auth/me', data),
   forgotPassword: (data: ForgotPasswordData) => api.post<MessageResponse>('/auth/forgot-password', data),
   resetPassword: (data: ResetPasswordData) => api.post<MessageResponse>('/auth/reset-password', data),
 }

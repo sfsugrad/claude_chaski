@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { couriersAPI, authAPI, ratingsAPI, RouteResponse, UserResponse, PendingRating } from '@/lib/api'
+import { couriersAPI, authAPI, ratingsAPI, packagesAPI, RouteResponse, UserResponse, PendingRating, PackageResponse } from '@/lib/api'
 import Navbar from '@/components/Navbar'
 import RatingModal from '@/components/RatingModal'
 
@@ -16,6 +16,7 @@ export default function CourierDashboard() {
   const [pendingRatings, setPendingRatings] = useState<PendingRating[]>([])
   const [showRatingModal, setShowRatingModal] = useState(false)
   const [currentRatingIndex, setCurrentRatingIndex] = useState(0)
+  const [assignedPackages, setAssignedPackages] = useState<PackageResponse[]>([])
   const router = useRouter()
 
   useEffect(() => {
@@ -36,11 +37,28 @@ export default function CourierDashboard() {
 
       await loadRoutes()
       await loadPendingRatings()
+      await loadAssignedPackages()
     } catch (err) {
       setError('Failed to load data. Please log in.')
       router.push('/login')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadAssignedPackages = async () => {
+    try {
+      const response = await packagesAPI.getAll()
+      // Filter to only show packages where user is the courier (not sender)
+      // and exclude delivered/cancelled packages
+      const courierPackages = response.data.filter(
+        (pkg: PackageResponse) =>
+          pkg.courier_id !== null &&
+          !['delivered', 'cancelled'].includes(pkg.status)
+      )
+      setAssignedPackages(courierPackages)
+    } catch (err) {
+      console.error('Failed to load assigned packages:', err)
     }
   }
 
@@ -210,6 +228,77 @@ export default function CourierDashboard() {
                   Deactivate
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Assigned Packages Section */}
+        {assignedPackages.length > 0 && (
+          <div className="bg-white rounded-lg shadow p-6 mb-8">
+            <h2 className="text-xl font-bold mb-4">
+              Assigned Packages ({assignedPackages.length})
+            </h2>
+            <p className="text-gray-600 text-sm mb-4">
+              Packages you've accepted and need to deliver
+            </p>
+            <div className="space-y-4">
+              {assignedPackages.map((pkg) => (
+                <div
+                  key={pkg.id}
+                  className="border rounded-lg p-4 hover:border-green-300 transition-colors"
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="font-semibold">{pkg.description}</h3>
+                        <span className={`px-2 py-0.5 text-xs rounded-full ${
+                          pkg.status === 'matched' ? 'bg-blue-100 text-blue-800' :
+                          pkg.status === 'picked_up' ? 'bg-yellow-100 text-yellow-800' :
+                          pkg.status === 'in_transit' ? 'bg-purple-100 text-purple-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {pkg.status.replace('_', ' ')}
+                        </span>
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-gray-500">Pickup</p>
+                          <p className="text-gray-700">{pkg.pickup_address}</p>
+                          {pkg.pickup_contact_name && (
+                            <p className="text-gray-500 text-xs">Contact: {pkg.pickup_contact_name}</p>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-gray-500">Dropoff</p>
+                          <p className="text-gray-700">{pkg.dropoff_address}</p>
+                          {pkg.dropoff_contact_name && (
+                            <p className="text-gray-500 text-xs">Contact: {pkg.dropoff_contact_name}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="mt-2 flex items-center gap-4 text-sm text-gray-600">
+                        <span>📦 {pkg.size}</span>
+                        <span>⚖️ {pkg.weight_kg} kg</span>
+                        {pkg.price && <span className="text-green-600 font-medium">${pkg.price.toFixed(2)}</span>}
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2 ml-4">
+                      <Link
+                        href={`/packages/${pkg.id}`}
+                        className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors text-sm text-center"
+                      >
+                        View Details
+                      </Link>
+                      <Link
+                        href={`/messages?package=${pkg.id}`}
+                        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors text-sm text-center"
+                      >
+                        Message Sender
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
