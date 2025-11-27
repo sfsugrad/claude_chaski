@@ -1,21 +1,26 @@
-from datetime import timedelta, datetime, timezone
+import logging
+import secrets
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+
+from app.config import settings
 from app.database import get_db
 from app.models.user import User, UserRole
 from app.utils.auth import get_password_hash, verify_password, create_access_token
 from app.utils.dependencies import get_current_user
 from app.utils.email import send_verification_email, send_welcome_email, generate_verification_token
 from app.utils.oauth import oauth
-from app.config import settings
 from pydantic import BaseModel, EmailStr, Field
-import secrets
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=get_remote_address, enabled=settings.ENVIRONMENT != "test")
 
 # Request/Response Models
 class UserRegister(BaseModel):
@@ -222,16 +227,17 @@ async def resend_verification_email(request: Request, email: EmailStr, db: Sessi
     """
     user = db.query(User).filter(User.email == email).first()
 
-    # Always return success to prevent user enumeration
     if not user:
-        return {
-            "message": "If the email is registered and not verified, a verification email has been sent."
-        }
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
 
     if user.is_verified:
-        return {
-            "message": "If the email is registered and not verified, a verification email has been sent."
-        }
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email is already verified"
+        )
 
     # Generate new verification token (expires in 24 hours)
     verification_token = generate_verification_token()
@@ -239,11 +245,14 @@ async def resend_verification_email(request: Request, email: EmailStr, db: Sessi
     user.verification_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
     db.commit()
 
-    # Send verification email
-    await send_verification_email(user.email, verification_token, user.full_name)
+    # Send verification email but don't fail the endpoint if email delivery fails
+    try:
+        await send_verification_email(user.email, verification_token, user.full_name)
+    except Exception as exc:  # pragma: no cover - network/email provider issues
+        logger.warning("Failed to send verification email for %s: %s", user.email, exc)
 
     return {
-        "message": "If the email is registered and not verified, a verification email has been sent."
+        "message": "Verification email sent successfully"
     }
 
 
