@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { couriersAPI, authAPI, RouteResponse, UserResponse } from '@/lib/api'
+import { couriersAPI, authAPI, ratingsAPI, RouteResponse, UserResponse, PendingRating } from '@/lib/api'
 import Navbar from '@/components/Navbar'
+import RatingModal from '@/components/RatingModal'
 
 export default function CourierDashboard() {
   const [routes, setRoutes] = useState<RouteResponse[]>([])
@@ -12,6 +13,9 @@ export default function CourierDashboard() {
   const [user, setUser] = useState<UserResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [pendingRatings, setPendingRatings] = useState<PendingRating[]>([])
+  const [showRatingModal, setShowRatingModal] = useState(false)
+  const [currentRatingIndex, setCurrentRatingIndex] = useState(0)
   const router = useRouter()
 
   useEffect(() => {
@@ -31,11 +35,42 @@ export default function CourierDashboard() {
       }
 
       await loadRoutes()
+      await loadPendingRatings()
     } catch (err) {
       setError('Failed to load data. Please log in.')
       router.push('/login')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadPendingRatings = async () => {
+    try {
+      const response = await ratingsAPI.getMyPendingRatings()
+      setPendingRatings(response.data)
+      if (response.data.length > 0) {
+        setShowRatingModal(true)
+      }
+    } catch (err) {
+      console.error('Failed to load pending ratings:', err)
+    }
+  }
+
+  const handleRatingSubmitted = () => {
+    if (currentRatingIndex < pendingRatings.length - 1) {
+      setCurrentRatingIndex(currentRatingIndex + 1)
+    } else {
+      setShowRatingModal(false)
+      setCurrentRatingIndex(0)
+      loadPendingRatings()
+    }
+  }
+
+  const handleRatingModalClose = () => {
+    if (currentRatingIndex < pendingRatings.length - 1) {
+      setCurrentRatingIndex(currentRatingIndex + 1)
+    } else {
+      setShowRatingModal(false)
     }
   }
 
@@ -92,6 +127,16 @@ export default function CourierDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar user={user} />
+
+      {/* Rating Modal */}
+      {pendingRatings.length > 0 && (
+        <RatingModal
+          isOpen={showRatingModal}
+          onClose={handleRatingModalClose}
+          pendingRating={pendingRatings[currentRatingIndex]}
+          onRatingSubmitted={handleRatingSubmitted}
+        />
+      )}
 
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">

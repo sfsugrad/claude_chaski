@@ -45,6 +45,8 @@ export interface UserResponse {
   is_verified: boolean
   max_deviation_km: number
   created_at: string
+  average_rating: number | null
+  total_ratings: number
 }
 
 export interface TokenResponse {
@@ -223,4 +225,58 @@ export const notificationsAPI = {
     api.put('/notifications/mark-read', {}),
   delete: (id: number) =>
     api.delete(`/notifications/${id}`),
+}
+
+// Rating Types
+export interface RatingCreate {
+  package_id: number
+  score: number
+  comment?: string
+}
+
+export interface RatingResponse {
+  id: number
+  rater_id: number
+  rated_user_id: number
+  package_id: number
+  score: number
+  comment: string | null
+  created_at: string
+  rater_name: string | null
+}
+
+export interface RatingListResponse {
+  ratings: RatingResponse[]
+  total: number
+  average_rating: number | null
+}
+
+export interface UserRatingSummary {
+  user_id: number
+  average_rating: number | null
+  total_ratings: number
+  rating_breakdown: Record<number, number>
+}
+
+export interface PendingRating {
+  package_id: number
+  package_description: string
+  delivery_time: string | null
+  user_to_rate_id: number
+  user_to_rate_name: string
+  user_to_rate_role: 'sender' | 'courier'
+}
+
+// Ratings API
+export const ratingsAPI = {
+  create: (data: RatingCreate) =>
+    api.post<RatingResponse>('/ratings', data),
+  getUserRatings: (userId: number, skip: number = 0, limit: number = 20) =>
+    api.get<RatingListResponse>(`/ratings/user/${userId}?skip=${skip}&limit=${limit}`),
+  getUserRatingSummary: (userId: number) =>
+    api.get<UserRatingSummary>(`/ratings/user/${userId}/summary`),
+  getPackageRatings: (packageId: number) =>
+    api.get<RatingResponse[]>(`/ratings/package/${packageId}`),
+  getMyPendingRatings: () =>
+    api.get<PendingRating[]>('/ratings/my-pending'),
 }

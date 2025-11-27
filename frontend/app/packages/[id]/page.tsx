@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
-import axios from '@/lib/api'
+import axios, { ratingsAPI, RatingResponse } from '@/lib/api'
+import StarRating from '@/components/StarRating'
+import RatingModal from '@/components/RatingModal'
 
 interface Package {
   id: number
@@ -32,6 +34,17 @@ interface User {
   email: string
   full_name: string
   role: string
+  average_rating?: number | null
+  total_ratings?: number
+}
+
+interface PendingRatingInfo {
+  package_id: number
+  package_description: string
+  delivery_time: string | null
+  user_to_rate_id: number
+  user_to_rate_name: string
+  user_to_rate_role: 'sender' | 'courier'
 }
 
 export default function PackageDetailPage() {
@@ -47,6 +60,9 @@ export default function PackageDetailPage() {
   const [error, setError] = useState('')
   const [isEditing, setIsEditing] = useState(false)
   const [editedPackage, setEditedPackage] = useState<Partial<Package>>({})
+  const [packageRatings, setPackageRatings] = useState<RatingResponse[]>([])
+  const [pendingRating, setPendingRating] = useState<PendingRatingInfo | null>(null)
+  const [showRatingModal, setShowRatingModal] = useState(false)
 
   useEffect(() => {
     loadPackageData()
@@ -86,6 +102,47 @@ export default function PackageDetailPage() {
           } catch (err) {
             console.error('Error loading courier:', err)
           }
+        }
+      }
+
+      // Load package ratings if delivered
+      if (packageData.status.toLowerCase() === 'delivered') {
+        try {
+          const ratingsResponse = await ratingsAPI.getPackageRatings(parseInt(packageId))
+          setPackageRatings(ratingsResponse.data)
+
+          // Check if current user can rate
+          const userHasRated = ratingsResponse.data.some(
+            (r: RatingResponse) => r.rater_id === userResponse.data.id
+          )
+
+          if (!userHasRated) {
+            // Determine who to rate
+            const isSender = userResponse.data.id === packageData.sender_id
+            const isCourier = userResponse.data.id === packageData.courier_id
+
+            if (isSender && packageData.courier_id) {
+              setPendingRating({
+                package_id: packageData.id,
+                package_description: packageData.description,
+                delivery_time: null,
+                user_to_rate_id: packageData.courier_id,
+                user_to_rate_name: 'the courier',
+                user_to_rate_role: 'courier'
+              })
+            } else if (isCourier) {
+              setPendingRating({
+                package_id: packageData.id,
+                package_description: packageData.description,
+                delivery_time: null,
+                user_to_rate_id: packageData.sender_id,
+                user_to_rate_name: 'the sender',
+                user_to_rate_role: 'sender'
+              })
+            }
+          }
+        } catch (err) {
+          console.error('Error loading ratings:', err)
         }
       }
     } catch (err: any) {
@@ -171,6 +228,18 @@ export default function PackageDetailPage() {
       console.error('Error updating package:', err)
       const errorMessage = err.response?.data?.detail || 'Failed to update package'
       alert(errorMessage)
+    }
+  }
+
+  const handleRatingSubmitted = async () => {
+    setShowRatingModal(false)
+    setPendingRating(null)
+    // Reload ratings
+    try {
+      const ratingsResponse = await ratingsAPI.getPackageRatings(parseInt(packageId))
+      setPackageRatings(ratingsResponse.data)
+    } catch (err) {
+      console.error('Error reloading ratings:', err)
     }
   }
 
@@ -534,7 +603,68 @@ export default function PackageDetailPage() {
             </p>
           </div>
         </div>
+
+        {/* Ratings Section - Only show for delivered packages */}
+        {pkg.status.toLowerCase() === 'delivered' && (
+          <div className="mt-6 bg-white rounded-lg shadow-md p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <svg className="w-6 h-6 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                </svg>
+                Ratings & Reviews
+              </h2>
+              {pendingRating && (
+                <button
+                  onClick={() => setShowRatingModal(true)}
+                  className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 font-medium"
+                >
+                  Rate {pendingRating.user_to_rate_role === 'courier' ? 'Courier' : 'Sender'}
+                </button>
+              )}
+            </div>
+
+            {packageRatings.length === 0 ? (
+              <p className="text-gray-500">No ratings yet for this delivery.</p>
+            ) : (
+              <div className="space-y-4">
+                {packageRatings.map((rating) => (
+                  <div key={rating.id} className="border-b border-gray-200 pb-4 last:border-b-0">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-900">
+                          {rating.rater_name || `User #${rating.rater_id}`}
+                        </span>
+                        <span className="text-gray-400">→</span>
+                        <span className="text-gray-600">
+                          {rating.rated_user_id === pkg.sender_id ? 'Sender' : 'Courier'}
+                        </span>
+                      </div>
+                      <span className="text-sm text-gray-400">
+                        {new Date(rating.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <StarRating rating={rating.score} size="sm" />
+                    {rating.comment && (
+                      <p className="mt-2 text-gray-600">{rating.comment}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Rating Modal */}
+      {pendingRating && (
+        <RatingModal
+          isOpen={showRatingModal}
+          onClose={() => setShowRatingModal(false)}
+          pendingRating={pendingRating}
+          onRatingSubmitted={handleRatingSubmitted}
+        />
+      )}
     </div>
   )
 }

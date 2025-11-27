@@ -2,10 +2,12 @@ from datetime import timedelta, datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from app.database import get_db
 from app.models.user import User, UserRole
+from app.models.rating import Rating
 from app.utils.auth import get_password_hash, verify_password, create_access_token
 from app.utils.dependencies import get_current_user
 from app.utils.email import send_verification_email, send_welcome_email, generate_verification_token
@@ -44,6 +46,8 @@ class UserResponse(BaseModel):
     is_verified: bool
     max_deviation_km: int
     created_at: datetime
+    average_rating: float | None = None
+    total_ratings: int = 0
 
     class Config:
         from_attributes = True
@@ -157,13 +161,36 @@ async def login(request: Request, credentials: UserLogin, db: Session = Depends(
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_current_user_info(current_user: User = Depends(get_current_user)):
+async def get_current_user_info(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """
     Get current authenticated user information.
 
     Requires: Valid JWT token in Authorization header (Bearer token)
     """
-    return current_user
+    # Calculate average rating for the user
+    avg_result = db.query(func.avg(Rating.score)).filter(
+        Rating.rated_user_id == current_user.id
+    ).scalar()
+    total_ratings = db.query(Rating).filter(
+        Rating.rated_user_id == current_user.id
+    ).count()
+
+    return UserResponse(
+        id=current_user.id,
+        email=current_user.email,
+        full_name=current_user.full_name,
+        role=current_user.role.value,
+        phone_number=current_user.phone_number,
+        is_active=current_user.is_active,
+        is_verified=current_user.is_verified,
+        max_deviation_km=current_user.max_deviation_km,
+        created_at=current_user.created_at,
+        average_rating=round(float(avg_result), 2) if avg_result else None,
+        total_ratings=total_ratings
+    )
 
 
 @router.get("/verify-email/{token}")

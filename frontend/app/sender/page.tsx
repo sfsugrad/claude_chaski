@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { packagesAPI, authAPI, PackageResponse, UserResponse } from '@/lib/api'
+import { packagesAPI, authAPI, ratingsAPI, PackageResponse, UserResponse, PendingRating } from '@/lib/api'
 import Navbar from '@/components/Navbar'
+import RatingModal from '@/components/RatingModal'
 
 type StatusFilter = 'all' | 'pending' | 'matched' | 'picked_up' | 'in_transit' | 'delivered' | 'cancelled'
 
@@ -26,6 +27,9 @@ export default function SenderDashboard() {
   const [error, setError] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [cancellingId, setCancellingId] = useState<number | null>(null)
+  const [pendingRatings, setPendingRatings] = useState<PendingRating[]>([])
+  const [showRatingModal, setShowRatingModal] = useState(false)
+  const [currentRatingIndex, setCurrentRatingIndex] = useState(0)
   const router = useRouter()
 
   useEffect(() => {
@@ -44,11 +48,42 @@ export default function SenderDashboard() {
       }
 
       await loadPackages()
+      await loadPendingRatings()
     } catch (err) {
       setError('Please log in to view your packages.')
       router.push('/login')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadPendingRatings = async () => {
+    try {
+      const response = await ratingsAPI.getMyPendingRatings()
+      setPendingRatings(response.data)
+      if (response.data.length > 0) {
+        setShowRatingModal(true)
+      }
+    } catch (err) {
+      console.error('Failed to load pending ratings:', err)
+    }
+  }
+
+  const handleRatingSubmitted = () => {
+    if (currentRatingIndex < pendingRatings.length - 1) {
+      setCurrentRatingIndex(currentRatingIndex + 1)
+    } else {
+      setShowRatingModal(false)
+      setCurrentRatingIndex(0)
+      loadPendingRatings()
+    }
+  }
+
+  const handleRatingModalClose = () => {
+    if (currentRatingIndex < pendingRatings.length - 1) {
+      setCurrentRatingIndex(currentRatingIndex + 1)
+    } else {
+      setShowRatingModal(false)
     }
   }
 
@@ -121,6 +156,16 @@ export default function SenderDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar user={user} />
+
+      {/* Rating Modal */}
+      {pendingRatings.length > 0 && (
+        <RatingModal
+          isOpen={showRatingModal}
+          onClose={handleRatingModalClose}
+          pendingRating={pendingRatings[currentRatingIndex]}
+          onRatingSubmitted={handleRatingSubmitted}
+        />
+      )}
 
       {/* Page Header */}
       <div className="bg-white shadow-sm border-b">

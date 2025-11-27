@@ -8,7 +8,7 @@ from slowapi.errors import RateLimitExceeded
 from app.config import settings
 from app.database import engine
 from app.models import base
-from app.routes import auth, packages, couriers, matching, admin, notifications
+from app.routes import auth, packages, couriers, matching, admin, notifications, ratings
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -121,6 +121,7 @@ app.include_router(couriers.router, prefix="/api/couriers", tags=["Couriers"])
 app.include_router(matching.router, prefix="/api/matching", tags=["Matching"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
+app.include_router(ratings.router, prefix="/api/ratings", tags=["Ratings"])
 
 @app.get("/")
 async def root():
