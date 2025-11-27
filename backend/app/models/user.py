@@ -23,6 +23,10 @@ class User(Base):
     verification_token = Column(String, nullable=True)
     verification_token_expires_at = Column(DateTime(timezone=True), nullable=True)
 
+    # Password reset fields
+    password_reset_token = Column(String, nullable=True)
+    password_reset_token_expires_at = Column(DateTime(timezone=True), nullable=True)
+
     # Courier-specific fields
     max_deviation_km = Column(Integer, default=5)  # Default 5km deviation
 

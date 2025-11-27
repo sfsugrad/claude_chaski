@@ -3,20 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
-import axios from '@/lib/api'
+import { authAPI, adminAPI, AdminUser, AdminPackage } from '@/lib/api'
 
-interface User {
-  id: number
-  email: string
-  full_name: string
-  role: string
-  phone_number: string | null
-  is_active: boolean
-  is_verified: boolean
-  max_deviation_km: number
-  created_at: string
-  updated_at: string | null
-}
+type User = AdminUser
 
 interface Package {
   id: number
@@ -41,14 +30,8 @@ export default function UserDetailPage() {
 
   const loadUserData = async () => {
     try {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        router.push('/login')
-        return
-      }
-
       // Get current user to verify admin
-      const currentUserResponse = await axios.get('/auth/me')
+      const currentUserResponse = await authAPI.getCurrentUser()
       if (currentUserResponse.data.role !== 'admin' && currentUserResponse.data.role !== 'ADMIN') {
         setError('Access denied. Admin privileges required.')
         setLoading(false)
@@ -56,14 +39,14 @@ export default function UserDetailPage() {
       }
 
       // Get user details
-      const userResponse = await axios.get(`/admin/users/${userId}`)
+      const userResponse = await adminAPI.getUser(parseInt(userId))
       setUser(userResponse.data)
 
       // Get user's packages
       try {
-        const packagesResponse = await axios.get('/admin/packages')
+        const packagesResponse = await adminAPI.getPackages()
         const userPackages = packagesResponse.data.filter(
-          (pkg: any) => pkg.sender_id === parseInt(userId)
+          (pkg: AdminPackage) => pkg.sender_id === parseInt(userId)
         )
         setPackages(userPackages)
       } catch (err) {

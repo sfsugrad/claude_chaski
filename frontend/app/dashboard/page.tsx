@@ -18,19 +18,13 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const token = localStorage.getItem('token')
-        if (!token) {
-          router.push('/login')
-          return
-        }
-
         const response = await authAPI.getCurrentUser()
         setUser(response.data)
 
         // Load pending ratings
         await loadPendingRatings()
       } catch (error) {
-        localStorage.removeItem('token')
+        // Not authenticated, redirect to login
         router.push('/login')
       } finally {
         setLoading(false)

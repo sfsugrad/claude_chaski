@@ -12,22 +12,26 @@ from app.models.user import User, UserRole
 from app.utils.auth import create_access_token
 
 
+def create_mock_request(cookies=None):
+    """Create a mock request object with cookies"""
+    mock_request = MagicMock()
+    mock_request.cookies = cookies or {}
+    return mock_request
+
+
 class TestGetCurrentUser:
     """Tests for get_current_user dependency"""
 
     def test_get_current_user_success(self, db_session, test_verified_user):
-        """Test successful user authentication"""
+        """Test successful user authentication via cookie"""
         # Create a valid token
         token = create_access_token(data={"sub": test_verified_user.email})
 
-        # Mock credentials
-        credentials = HTTPAuthorizationCredentials(
-            scheme="Bearer",
-            credentials=token
-        )
+        # Mock request with cookie
+        mock_request = create_mock_request(cookies={"access_token": token})
 
         # Get current user
-        user = get_current_user(credentials=credentials, db=db_session)
+        user = get_current_user(request=mock_request, credentials=None, db=db_session)
 
         assert user is not None
         assert user.email == test_verified_user.email
@@ -35,13 +39,10 @@ class TestGetCurrentUser:
 
     def test_get_current_user_invalid_token(self, db_session):
         """Test authentication with invalid token"""
-        credentials = HTTPAuthorizationCredentials(
-            scheme="Bearer",
-            credentials="invalid-token"
-        )
+        mock_request = create_mock_request(cookies={"access_token": "invalid-token"})
 
         with pytest.raises(HTTPException) as exc_info:
-            get_current_user(credentials=credentials, db=db_session)
+            get_current_user(request=mock_request, credentials=None, db=db_session)
 
         assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
         assert "Could not validate credentials" in exc_info.value.detail
@@ -56,13 +57,10 @@ class TestGetCurrentUser:
             expires_delta=timedelta(minutes=-30)  # Expired 30 minutes ago
         )
 
-        credentials = HTTPAuthorizationCredentials(
-            scheme="Bearer",
-            credentials=token
-        )
+        mock_request = create_mock_request(cookies={"access_token": token})
 
         with pytest.raises(HTTPException) as exc_info:
-            get_current_user(credentials=credentials, db=db_session)
+            get_current_user(request=mock_request, credentials=None, db=db_session)
 
         assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
 
@@ -71,13 +69,10 @@ class TestGetCurrentUser:
         # Create token for user that doesn't exist
         token = create_access_token(data={"sub": "nonexistent@example.com"})
 
-        credentials = HTTPAuthorizationCredentials(
-            scheme="Bearer",
-            credentials=token
-        )
+        mock_request = create_mock_request(cookies={"access_token": token})
 
         with pytest.raises(HTTPException) as exc_info:
-            get_current_user(credentials=credentials, db=db_session)
+            get_current_user(request=mock_request, credentials=None, db=db_session)
 
         assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
         assert "Could not validate credentials" in exc_info.value.detail
@@ -90,13 +85,10 @@ class TestGetCurrentUser:
 
         token = create_access_token(data={"sub": test_verified_user.email})
 
-        credentials = HTTPAuthorizationCredentials(
-            scheme="Bearer",
-            credentials=token
-        )
+        mock_request = create_mock_request(cookies={"access_token": token})
 
         with pytest.raises(HTTPException) as exc_info:
-            get_current_user(credentials=credentials, db=db_session)
+            get_current_user(request=mock_request, credentials=None, db=db_session)
 
         assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
         assert "Inactive user" in exc_info.value.detail
@@ -114,13 +106,10 @@ class TestGetCurrentUser:
         token_data = {"user_id": 123}  # Wrong claim
         token = jwt.encode(token_data, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
-        credentials = HTTPAuthorizationCredentials(
-            scheme="Bearer",
-            credentials=token
-        )
+        mock_request = create_mock_request(cookies={"access_token": token})
 
         with pytest.raises(HTTPException) as exc_info:
-            get_current_user(credentials=credentials, db=db_session)
+            get_current_user(request=mock_request, credentials=None, db=db_session)
 
         assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
 
@@ -226,11 +215,11 @@ class TestDependenciesIntegration:
         token1 = create_access_token(data={"sub": test_verified_user.email})
         token2 = create_access_token(data={"sub": test_verified_user.email})
 
-        credentials1 = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token1)
-        credentials2 = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token2)
+        mock_request1 = create_mock_request(cookies={"access_token": token1})
+        mock_request2 = create_mock_request(cookies={"access_token": token2})
 
-        user1 = get_current_user(credentials=credentials1, db=db_session)
-        user2 = get_current_user(credentials=credentials2, db=db_session)
+        user1 = get_current_user(request=mock_request1, credentials=None, db=db_session)
+        user2 = get_current_user(request=mock_request2, credentials=None, db=db_session)
 
         assert user1.email == user2.email
         assert user1.id == user2.id

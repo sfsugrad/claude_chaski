@@ -24,6 +24,9 @@ function LoginForm() {
     if (searchParams.get('verified') === 'true') {
       setSuccessMessage('Email verified successfully! You can now log in.')
     }
+    if (searchParams.get('reset') === 'true') {
+      setSuccessMessage('Password reset successful! Please log in with your new password.')
+    }
   }, [searchParams])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -47,26 +50,22 @@ function LoginForm() {
     setLoading(true)
 
     try {
-      const response = await authAPI.login(formData)
+      await authAPI.login(formData)
 
-      if (response.data?.access_token) {
-        localStorage.setItem('token', response.data.access_token)
+      // Cookie is set by the server, now get user info to check role
+      try {
+        const userResponse = await authAPI.getCurrentUser()
+        const userRole = userResponse.data?.role
 
-        // Get user info to check role
-        try {
-          const userResponse = await authAPI.getCurrentUser()
-          const userRole = userResponse.data?.role
-
-          // Redirect based on role
-          if (userRole === 'ADMIN' || userRole === 'admin') {
-            router.push('/admin')
-          } else {
-            router.push('/dashboard')
-          }
-        } catch {
-          // If we can't get user info, default to dashboard
+        // Redirect based on role
+        if (userRole === 'ADMIN' || userRole === 'admin') {
+          router.push('/admin')
+        } else {
           router.push('/dashboard')
         }
+      } catch {
+        // If we can't get user info, default to dashboard
+        router.push('/dashboard')
       }
     } catch (err: any) {
       if (err.response?.data?.detail) {
@@ -140,12 +139,20 @@ function LoginForm() {
 
             {/* Password */}
             <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Password
-              </label>
+              <div className="flex justify-between">
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Password
+                </label>
+                <Link
+                  href="/forgot-password"
+                  className="text-sm text-blue-600 hover:text-blue-500"
+                >
+                  Forgot password?
+                </Link>
+              </div>
               <input
                 id="password"
                 name="password"

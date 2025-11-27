@@ -43,7 +43,7 @@ class TestAdminUserManagement:
         """Test cannot view users without authentication"""
         response = client.get("/api/admin/users")
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_get_all_users_with_pagination(self, client, authenticated_admin):
         """Test user pagination works"""
@@ -416,7 +416,7 @@ class TestAdminUserToggleActive:
             json={"is_active": False}
         )
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_deactivate_user_preserves_data(self, client, db_session, authenticated_admin, authenticated_sender, test_package_data):
         """Test deactivating user preserves their packages and data"""
@@ -480,7 +480,7 @@ class TestAdminUserToggleActive:
             "password": test_user_data["password"]
         })
         assert login_response.status_code == status.HTTP_200_OK
-        assert "access_token" in login_response.json()
+        assert "access_token" in login_response.cookies
 
     def test_toggle_user_updates_timestamp(self, client, db_session, authenticated_admin, test_user_data):
         """Test toggling user active status updates the updated_at timestamp"""
@@ -747,7 +747,7 @@ class TestAdminUserProfileUpdate:
             json={"full_name": "New Name"}
         )
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_update_user_profile_updates_timestamp(self, client, db_session, authenticated_admin, test_user_data):
         """Test updating profile updates the updated_at timestamp"""
@@ -1091,7 +1091,7 @@ class TestAdminPackageToggleActive:
             json={"is_active": False}
         )
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_toggle_package_updates_timestamp(self, client, authenticated_admin, authenticated_sender, test_package_data):
         """Test that updated_at timestamp is updated when toggling active status"""
@@ -1493,7 +1493,7 @@ class TestAdminAuthorization:
             elif method == "DELETE":
                 response = client.delete(endpoint)
 
-            assert response.status_code == status.HTTP_403_FORBIDDEN, f"Failed for {method} {endpoint}"
+            assert response.status_code == status.HTTP_401_UNAUTHORIZED, f"Failed for {method} {endpoint}"
 
     def test_admin_endpoints_reject_invalid_tokens(self, client):
         """Test admin endpoints reject invalid tokens"""
@@ -1528,12 +1528,12 @@ class TestAdminAuthorization:
         })
 
         assert login_response.status_code == status.HTTP_200_OK
-        token = login_response.json()["access_token"]
+        token = login_response.cookies["access_token"]
 
         # Access admin endpoint
         stats_response = client.get(
             "/api/admin/stats",
-            headers={"Authorization": f"Bearer {token}"}
+            cookies={"access_token": token}
         )
 
         assert stats_response.status_code == status.HTTP_200_OK
@@ -1561,7 +1561,7 @@ class TestAdminAuthorization:
             "password": test_admin_data["password"]
         })
 
-        token = login_response.json()["access_token"]
+        token = login_response.cookies["access_token"]
 
         # Decode token
         import base64

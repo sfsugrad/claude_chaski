@@ -2,7 +2,6 @@ import React from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import VerifyEmailPage from '../page'
-import axios from 'axios'
 
 // Mock next/navigation
 jest.mock('next/navigation', () => ({
@@ -10,12 +9,17 @@ jest.mock('next/navigation', () => ({
   useSearchParams: jest.fn(),
 }))
 
-// Mock axios
-jest.mock('axios')
+// Mock the verificationAPI
+const mockVerifyEmail = jest.fn()
+
+jest.mock('@/lib/api', () => ({
+  verificationAPI: {
+    verifyEmail: (token: string) => mockVerifyEmail(token),
+  },
+}))
 
 describe('VerifyEmailPage', () => {
   const mockPush = jest.fn()
-  const mockGet = jest.fn()
   const mockRouterReturn = {
     push: mockPush,
     back: jest.fn(),
@@ -29,7 +33,6 @@ describe('VerifyEmailPage', () => {
     jest.clearAllMocks()
     jest.useFakeTimers()
     ;(useRouter as jest.Mock).mockReturnValue(mockRouterReturn)
-    ;(axios.get as jest.Mock) = mockGet
   })
 
   afterEach(() => {
@@ -52,7 +55,7 @@ describe('VerifyEmailPage', () => {
       ;(useSearchParams as jest.Mock).mockReturnValue({
         get: jest.fn().mockReturnValue('test-token'),
       })
-      mockGet.mockImplementation(
+      mockVerifyEmail.mockImplementation(
         () => new Promise(() => {}) // Never resolves
       )
 
@@ -78,7 +81,7 @@ describe('VerifyEmailPage', () => {
         expect(screen.getByText('Invalid verification link')).toBeInTheDocument()
       })
 
-      expect(mockGet).not.toHaveBeenCalled()
+      expect(mockVerifyEmail).not.toHaveBeenCalled()
     })
 
     it('calls API with correct token', async () => {
@@ -86,14 +89,12 @@ describe('VerifyEmailPage', () => {
       ;(useSearchParams as jest.Mock).mockReturnValue({
         get: jest.fn().mockReturnValue(testToken),
       })
-      mockGet.mockResolvedValue({ data: { message: 'Email verified' } })
+      mockVerifyEmail.mockResolvedValue({ data: { message: 'Email verified' } })
 
       render(<VerifyEmailPage />)
 
       await waitFor(() => {
-        expect(mockGet).toHaveBeenCalledWith(
-          `http://localhost:8000/api/auth/verify-email/${testToken}`
-        )
+        expect(mockVerifyEmail).toHaveBeenCalledWith(testToken)
       })
     })
   })
@@ -106,7 +107,7 @@ describe('VerifyEmailPage', () => {
     })
 
     it('shows success message on successful verification', async () => {
-      mockGet.mockResolvedValue({ data: { message: 'Email verified' } })
+      mockVerifyEmail.mockResolvedValue({ data: { message: 'Email verified' } })
 
       render(<VerifyEmailPage />)
 
@@ -119,7 +120,7 @@ describe('VerifyEmailPage', () => {
     })
 
     it('shows success icon on successful verification', async () => {
-      mockGet.mockResolvedValue({ data: { message: 'Email verified' } })
+      mockVerifyEmail.mockResolvedValue({ data: { message: 'Email verified' } })
 
       const { container } = render(<VerifyEmailPage />)
 
@@ -131,7 +132,7 @@ describe('VerifyEmailPage', () => {
     })
 
     it('redirects to login page after 3 seconds', async () => {
-      mockGet.mockResolvedValue({ data: { message: 'Email verified' } })
+      mockVerifyEmail.mockResolvedValue({ data: { message: 'Email verified' } })
 
       render(<VerifyEmailPage />)
 
@@ -148,7 +149,7 @@ describe('VerifyEmailPage', () => {
     })
 
     it('shows redirect message during countdown', async () => {
-      mockGet.mockResolvedValue({ data: { message: 'Email verified' } })
+      mockVerifyEmail.mockResolvedValue({ data: { message: 'Email verified' } })
 
       render(<VerifyEmailPage />)
 
@@ -169,7 +170,7 @@ describe('VerifyEmailPage', () => {
 
     it('shows error message when API returns error with detail', async () => {
       const errorMessage = 'Invalid or expired verification token'
-      mockGet.mockRejectedValue({
+      mockVerifyEmail.mockRejectedValue({
         response: {
           data: {
             detail: errorMessage,
@@ -186,7 +187,7 @@ describe('VerifyEmailPage', () => {
     })
 
     it('shows generic error message when API returns error without detail', async () => {
-      mockGet.mockRejectedValue(new Error('Network error'))
+      mockVerifyEmail.mockRejectedValue(new Error('Network error'))
 
       render(<VerifyEmailPage />)
 
@@ -201,7 +202,7 @@ describe('VerifyEmailPage', () => {
     })
 
     it('shows error icon on failed verification', async () => {
-      mockGet.mockRejectedValue(new Error('Network error'))
+      mockVerifyEmail.mockRejectedValue(new Error('Network error'))
 
       const { container } = render(<VerifyEmailPage />)
 
@@ -213,7 +214,7 @@ describe('VerifyEmailPage', () => {
     })
 
     it('shows links to login and register on error', async () => {
-      mockGet.mockRejectedValue(new Error('Network error'))
+      mockVerifyEmail.mockRejectedValue(new Error('Network error'))
 
       render(<VerifyEmailPage />)
 
@@ -230,7 +231,7 @@ describe('VerifyEmailPage', () => {
     })
 
     it('does not redirect on error', async () => {
-      mockGet.mockRejectedValue(new Error('Network error'))
+      mockVerifyEmail.mockRejectedValue(new Error('Network error'))
 
       render(<VerifyEmailPage />)
 
@@ -249,7 +250,7 @@ describe('VerifyEmailPage', () => {
       ;(useSearchParams as jest.Mock).mockReturnValue({
         get: jest.fn().mockReturnValue('test-token'),
       })
-      mockGet.mockResolvedValue({ data: { message: 'Email verified' } })
+      mockVerifyEmail.mockResolvedValue({ data: { message: 'Email verified' } })
 
       // Simulate StrictMode by rendering twice
       const { rerender } = render(<VerifyEmailPage />)
@@ -260,7 +261,7 @@ describe('VerifyEmailPage', () => {
       })
 
       // Verify API was called exactly once
-      expect(mockGet).toHaveBeenCalledTimes(1)
+      expect(mockVerifyEmail).toHaveBeenCalledTimes(1)
     })
 
     it('prevents duplicate API calls with useRef guard', async () => {
@@ -270,7 +271,7 @@ describe('VerifyEmailPage', () => {
       })
 
       let callCount = 0
-      mockGet.mockImplementation(() => {
+      mockVerifyEmail.mockImplementation(() => {
         callCount++
         return Promise.resolve({ data: { message: 'Email verified' } })
       })
@@ -283,7 +284,7 @@ describe('VerifyEmailPage', () => {
 
       // Ensure only one API call was made
       expect(callCount).toBe(1)
-      expect(mockGet).toHaveBeenCalledTimes(1)
+      expect(mockVerifyEmail).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -295,7 +296,7 @@ describe('VerifyEmailPage', () => {
     })
 
     it('handles 400 Bad Request error', async () => {
-      mockGet.mockRejectedValue({
+      mockVerifyEmail.mockRejectedValue({
         response: {
           status: 400,
           data: {
@@ -312,7 +313,7 @@ describe('VerifyEmailPage', () => {
     })
 
     it('handles 404 Not Found error', async () => {
-      mockGet.mockRejectedValue({
+      mockVerifyEmail.mockRejectedValue({
         response: {
           status: 404,
           data: {
@@ -331,7 +332,7 @@ describe('VerifyEmailPage', () => {
     })
 
     it('handles network timeout', async () => {
-      mockGet.mockRejectedValue({
+      mockVerifyEmail.mockRejectedValue({
         code: 'ECONNABORTED',
         message: 'timeout of 10000ms exceeded',
       })
@@ -353,7 +354,7 @@ describe('VerifyEmailPage', () => {
       ;(useSearchParams as jest.Mock).mockReturnValue({
         get: jest.fn().mockReturnValue('test-token'),
       })
-      mockGet.mockResolvedValue({ data: { message: 'Email verified' } })
+      mockVerifyEmail.mockResolvedValue({ data: { message: 'Email verified' } })
 
       render(<VerifyEmailPage />)
 
@@ -371,7 +372,7 @@ describe('VerifyEmailPage', () => {
       ;(useSearchParams as jest.Mock).mockReturnValue({
         get: jest.fn().mockReturnValue('test-token'),
       })
-      mockGet.mockRejectedValue(new Error('Network error'))
+      mockVerifyEmail.mockRejectedValue(new Error('Network error'))
 
       render(<VerifyEmailPage />)
 

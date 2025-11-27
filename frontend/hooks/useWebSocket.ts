@@ -90,14 +90,6 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   }, [])
 
   const connect = useCallback(() => {
-    // Get token from localStorage
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
-
-    if (!token) {
-      updateStatus('disconnected')
-      return
-    }
-
     // Close existing connection
     if (wsRef.current) {
       wsRef.current.close()
@@ -106,7 +98,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     updateStatus('connecting')
 
     try {
-      const ws = new WebSocket(`${WS_URL}/api/ws?token=${token}`)
+      // No token in URL - cookies will be sent automatically
+      const ws = new WebSocket(`${WS_URL}/api/ws`)
       wsRef.current = ws
 
       ws.onopen = () => {
@@ -230,21 +223,6 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reconnect when token changes
-  useEffect(() => {
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === 'token') {
-        if (event.newValue) {
-          connect()
-        } else {
-          disconnect()
-        }
-      }
-    }
-
-    window.addEventListener('storage', handleStorageChange)
-    return () => window.removeEventListener('storage', handleStorageChange)
-  }, [connect, disconnect])
 
   return {
     connectionStatus,

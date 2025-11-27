@@ -142,10 +142,10 @@ class TestUserLogin:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
 
-        assert "access_token" in data
-        assert "token_type" in data
-        assert data["token_type"] == "bearer"
-        assert len(data["access_token"]) > 0
+        assert "message" in data
+        assert data["message"] == "Login successful"
+        # JWT is now set in httpOnly cookie
+        assert "access_token" in response.cookies
 
     def test_login_invalid_email(self, client):
         """Test login with non-existent email"""
@@ -212,7 +212,8 @@ class TestUserLogin:
         response = client.post("/api/auth/login", json=login_data)
 
         assert response.status_code == status.HTTP_200_OK
-        token = response.json()["access_token"]
+        # Get token from cookie
+        token = response.cookies["access_token"]
 
         # Decode token (without verification for testing)
         import base64
@@ -238,12 +239,13 @@ class TestGetCurrentUser:
             "email": test_user_data["email"],
             "password": test_user_data["password"]
         })
-        token = login_response.json()["access_token"]
+        # Get token from cookie
+        token = login_response.cookies["access_token"]
 
-        # Get current user
+        # Get current user using cookie (set via headers for TestClient)
         response = client.get(
             "/api/auth/me",
-            headers={"Authorization": f"Bearer {token}"}
+            cookies={"access_token": token}
         )
 
         assert response.status_code == status.HTTP_200_OK
@@ -260,26 +262,26 @@ class TestGetCurrentUser:
         """Test getting current user without token"""
         response = client.get("/api/auth/me")
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
         assert "not authenticated" in response.json()["detail"].lower()
 
     def test_get_current_user_invalid_token(self, client):
         """Test getting current user with invalid token"""
         response = client.get(
             "/api/auth/me",
-            headers={"Authorization": "Bearer invalid_token"}
+            cookies={"access_token": "invalid_token"}
         )
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_get_current_user_malformed_token(self, client):
-        """Test getting current user with malformed authorization header"""
+        """Test getting current user with malformed cookie"""
         response = client.get(
             "/api/auth/me",
-            headers={"Authorization": "InvalidFormat"}
+            cookies={"access_token": "InvalidFormat"}
         )
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_get_current_user_expired_token(self, client, db_session, test_user_data):
         """Test getting current user with expired token"""
@@ -307,7 +309,7 @@ class TestGetCurrentUser:
             "email": test_user_data["email"],
             "password": test_user_data["password"]
         })
-        token = login_response.json()["access_token"]
+        token = login_response.cookies["access_token"]
 
         # Delete user from database
         user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
@@ -317,7 +319,7 @@ class TestGetCurrentUser:
         # Try to get current user
         response = client.get(
             "/api/auth/me",
-            headers={"Authorization": f"Bearer {token}"}
+            cookies={"access_token": token}
         )
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
@@ -330,7 +332,7 @@ class TestGetCurrentUser:
             "email": test_user_data["email"],
             "password": test_user_data["password"]
         })
-        token = login_response.json()["access_token"]
+        token = login_response.cookies["access_token"]
 
         # Deactivate user
         user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
@@ -340,7 +342,7 @@ class TestGetCurrentUser:
         # Try to get current user
         response = client.get(
             "/api/auth/me",
-            headers={"Authorization": f"Bearer {token}"}
+            cookies={"access_token": token}
         )
 
         assert response.status_code == status.HTTP_403_FORBIDDEN
@@ -569,12 +571,12 @@ class TestAuthenticationWorkflow:
             "password": test_user_data["password"]
         })
         assert login_response.status_code == status.HTTP_200_OK
-        token = login_response.json()["access_token"]
+        token = login_response.cookies["access_token"]
 
         # Step 3: Access protected endpoint
         me_response = client.get(
             "/api/auth/me",
-            headers={"Authorization": f"Bearer {token}"}
+            cookies={"access_token": token}
         )
         assert me_response.status_code == status.HTTP_200_OK
         assert me_response.json()["id"] == user_id
@@ -593,20 +595,296 @@ class TestAuthenticationWorkflow:
             "email": test_user_data["email"],
             "password": test_user_data["password"]
         })
-        token1 = login1.json()["access_token"]
+        token1 = login1.cookies["access_token"]
 
         # Login as second user
         login2 = client.post("/api/auth/login", json={
             "email": test_courier_data["email"],
             "password": test_courier_data["password"]
         })
-        token2 = login2.json()["access_token"]
+        token2 = login2.cookies["access_token"]
 
         # Verify each token returns correct user
-        me1 = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token1}"})
-        me2 = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token2}"})
+        me1 = client.get("/api/auth/me", cookies={"access_token": token1})
+        me2 = client.get("/api/auth/me", cookies={"access_token": token2})
 
         assert me1.json()["email"] == test_user_data["email"]
         assert me2.json()["email"] == test_courier_data["email"]
         assert me1.json()["role"] == "sender"
         assert me2.json()["role"] == "courier"
+
+
+class TestPasswordReset:
+    """Tests for password reset endpoints"""
+
+    def test_forgot_password_with_existing_email(self, client, db_session):
+        """Test forgot password request with existing email"""
+        from app.models.user import User, UserRole
+
+        # Create user
+        user = User(
+            email="reset@example.com",
+            hashed_password="hashed_password",
+            full_name="Reset User",
+            role=UserRole.SENDER,
+            is_verified=True
+        )
+        db_session.add(user)
+        db_session.commit()
+
+        # Request password reset
+        response = client.post("/api/auth/forgot-password", json={"email": "reset@example.com"})
+
+        assert response.status_code == status.HTTP_200_OK
+        assert "password reset link" in response.json()["message"].lower()
+
+        # Verify token was set
+        db_session.refresh(user)
+        assert user.password_reset_token is not None
+        assert user.password_reset_token_expires_at is not None
+
+    def test_forgot_password_with_nonexistent_email(self, client):
+        """Test forgot password with non-existent email (should not reveal user existence)"""
+        response = client.post("/api/auth/forgot-password", json={"email": "nonexistent@example.com"})
+
+        # Should return success to prevent user enumeration
+        assert response.status_code == status.HTTP_200_OK
+        assert "password reset link" in response.json()["message"].lower()
+
+    def test_forgot_password_with_inactive_user(self, client, db_session):
+        """Test forgot password for inactive user"""
+        from app.models.user import User, UserRole
+
+        # Create inactive user
+        user = User(
+            email="inactive.reset@example.com",
+            hashed_password="hashed_password",
+            full_name="Inactive User",
+            role=UserRole.SENDER,
+            is_active=False
+        )
+        db_session.add(user)
+        db_session.commit()
+
+        # Request password reset
+        response = client.post("/api/auth/forgot-password", json={"email": "inactive.reset@example.com"})
+
+        # Should return success to prevent user enumeration
+        assert response.status_code == status.HTTP_200_OK
+
+        # But token should not be set
+        db_session.refresh(user)
+        assert user.password_reset_token is None
+
+    def test_reset_password_with_valid_token(self, client, db_session):
+        """Test password reset with valid token"""
+        from app.models.user import User, UserRole
+        from app.utils.email import generate_verification_token
+        from app.utils.auth import verify_password
+        from datetime import datetime, timezone, timedelta
+
+        # Create user with reset token
+        reset_token = generate_verification_token()
+        user = User(
+            email="validreset@example.com",
+            hashed_password="old_hashed_password",
+            full_name="Valid Reset User",
+            role=UserRole.SENDER,
+            password_reset_token=reset_token,
+            password_reset_token_expires_at=datetime.now(timezone.utc) + timedelta(hours=1)
+        )
+        db_session.add(user)
+        db_session.commit()
+
+        # Reset password
+        new_password = "newpassword123"
+        response = client.post("/api/auth/reset-password", json={
+            "token": reset_token,
+            "new_password": new_password
+        })
+
+        assert response.status_code == status.HTTP_200_OK
+        assert "successfully" in response.json()["message"].lower()
+
+        # Verify password was changed
+        db_session.refresh(user)
+        assert verify_password(new_password, user.hashed_password)
+
+        # Verify token was cleared
+        assert user.password_reset_token is None
+        assert user.password_reset_token_expires_at is None
+
+    def test_reset_password_with_invalid_token(self, client):
+        """Test password reset with invalid token"""
+        response = client.post("/api/auth/reset-password", json={
+            "token": "invalid_token_12345",
+            "new_password": "newpassword123"
+        })
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "invalid" in response.json()["detail"].lower()
+
+    def test_reset_password_with_expired_token(self, client, db_session):
+        """Test password reset with expired token"""
+        from app.models.user import User, UserRole
+        from app.utils.email import generate_verification_token
+        from datetime import datetime, timezone, timedelta
+
+        # Create user with expired reset token
+        reset_token = generate_verification_token()
+        user = User(
+            email="expiredreset@example.com",
+            hashed_password="old_hashed_password",
+            full_name="Expired Reset User",
+            role=UserRole.SENDER,
+            password_reset_token=reset_token,
+            password_reset_token_expires_at=datetime.now(timezone.utc) - timedelta(hours=1)  # Already expired
+        )
+        db_session.add(user)
+        db_session.commit()
+
+        # Try to reset password
+        response = client.post("/api/auth/reset-password", json={
+            "token": reset_token,
+            "new_password": "newpassword123"
+        })
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "expired" in response.json()["detail"].lower()
+
+    def test_reset_password_too_short(self, client, db_session):
+        """Test password reset with password shorter than 8 characters"""
+        from app.models.user import User, UserRole
+        from app.utils.email import generate_verification_token
+        from datetime import datetime, timezone, timedelta
+
+        # Create user with reset token
+        reset_token = generate_verification_token()
+        user = User(
+            email="shortreset@example.com",
+            hashed_password="old_hashed_password",
+            full_name="Short Reset User",
+            role=UserRole.SENDER,
+            password_reset_token=reset_token,
+            password_reset_token_expires_at=datetime.now(timezone.utc) + timedelta(hours=1)
+        )
+        db_session.add(user)
+        db_session.commit()
+
+        # Try to reset with short password
+        response = client.post("/api/auth/reset-password", json={
+            "token": reset_token,
+            "new_password": "short"
+        })
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    def test_reset_password_clears_token(self, client, db_session):
+        """Test that password reset clears the token"""
+        from app.models.user import User, UserRole
+        from app.utils.email import generate_verification_token
+        from datetime import datetime, timezone, timedelta
+
+        # Create user with reset token
+        reset_token = generate_verification_token()
+        user = User(
+            email="cleartoken@example.com",
+            hashed_password="old_hashed_password",
+            full_name="Clear Token User",
+            role=UserRole.SENDER,
+            password_reset_token=reset_token,
+            password_reset_token_expires_at=datetime.now(timezone.utc) + timedelta(hours=1)
+        )
+        db_session.add(user)
+        db_session.commit()
+
+        # Reset password
+        client.post("/api/auth/reset-password", json={
+            "token": reset_token,
+            "new_password": "newpassword123"
+        })
+
+        # Verify token is cleared
+        db_session.refresh(user)
+        assert user.password_reset_token is None
+        assert user.password_reset_token_expires_at is None
+
+    def test_reset_password_workflow_complete(self, client, db_session):
+        """Test complete password reset workflow"""
+        from app.models.user import User, UserRole
+        from app.utils.auth import get_password_hash
+
+        # Step 1: Create verified user
+        user = User(
+            email="workflow.reset@example.com",
+            hashed_password=get_password_hash("oldpassword123"),
+            full_name="Workflow User",
+            role=UserRole.SENDER,
+            is_verified=True
+        )
+        db_session.add(user)
+        db_session.commit()
+
+        # Step 2: Request password reset
+        response = client.post("/api/auth/forgot-password", json={"email": "workflow.reset@example.com"})
+        assert response.status_code == status.HTTP_200_OK
+
+        # Get the reset token from database
+        db_session.refresh(user)
+        reset_token = user.password_reset_token
+        assert reset_token is not None
+
+        # Step 3: Reset password
+        new_password = "newpassword456"
+        response = client.post("/api/auth/reset-password", json={
+            "token": reset_token,
+            "new_password": new_password
+        })
+        assert response.status_code == status.HTTP_200_OK
+
+        # Step 4: Login with new password should succeed
+        login_response = client.post("/api/auth/login", json={
+            "email": "workflow.reset@example.com",
+            "password": new_password
+        })
+        assert login_response.status_code == status.HTTP_200_OK
+
+        # Step 5: Old password should not work
+        old_login_response = client.post("/api/auth/login", json={
+            "email": "workflow.reset@example.com",
+            "password": "oldpassword123"
+        })
+        assert old_login_response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_token_cannot_be_reused(self, client, db_session):
+        """Test that reset token cannot be reused"""
+        from app.models.user import User, UserRole
+        from app.utils.email import generate_verification_token
+        from datetime import datetime, timezone, timedelta
+
+        # Create user with reset token
+        reset_token = generate_verification_token()
+        user = User(
+            email="reuse@example.com",
+            hashed_password="old_hashed_password",
+            full_name="Reuse Token User",
+            role=UserRole.SENDER,
+            password_reset_token=reset_token,
+            password_reset_token_expires_at=datetime.now(timezone.utc) + timedelta(hours=1)
+        )
+        db_session.add(user)
+        db_session.commit()
+
+        # First reset - should succeed
+        response1 = client.post("/api/auth/reset-password", json={
+            "token": reset_token,
+            "new_password": "newpassword123"
+        })
+        assert response1.status_code == status.HTTP_200_OK
+
+        # Second reset with same token - should fail
+        response2 = client.post("/api/auth/reset-password", json={
+            "token": reset_token,
+            "new_password": "anotherpassword456"
+        })
+        assert response2.status_code == status.HTTP_400_BAD_REQUEST

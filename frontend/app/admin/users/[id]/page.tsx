@@ -3,20 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
-import axios from '@/lib/api'
+import { authAPI, adminAPI, AdminUser, AdminPackage, UserResponse } from '@/lib/api'
 
-interface User {
-  id: number
-  email: string
-  full_name: string
-  role: string
-  phone_number: string | null
-  is_active: boolean
-  is_verified: boolean
-  max_deviation_km: number
-  created_at: string
-  updated_at: string | null
-}
+type User = AdminUser
 
 interface Package {
   id: number
@@ -34,7 +23,7 @@ export default function UserDetailPage() {
 
   const [user, setUser] = useState<User | null>(null)
   const [packages, setPackages] = useState<Package[]>([])
-  const [currentUser, setCurrentUser] = useState<User | null>(null)
+  const [currentUser, setCurrentUser] = useState<UserResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [isEditing, setIsEditing] = useState(false)
@@ -46,14 +35,8 @@ export default function UserDetailPage() {
 
   const loadUserData = async () => {
     try {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        router.push('/login')
-        return
-      }
-
       // Get current user
-      const currentUserResponse = await axios.get('/auth/me')
+      const currentUserResponse = await authAPI.getCurrentUser()
       setCurrentUser(currentUserResponse.data)
 
       // Check if current user is admin
@@ -63,15 +46,15 @@ export default function UserDetailPage() {
       }
 
       // Get user details
-      const userResponse = await axios.get(`/admin/users/${userId}`)
+      const userResponse = await adminAPI.getUser(parseInt(userId))
       setUser(userResponse.data)
 
       // Get user's packages
       try {
-        const packagesResponse = await axios.get('/admin/packages')
+        const packagesResponse = await adminAPI.getPackages()
         const allPackages = packagesResponse.data
         const userPackages = allPackages.filter(
-          (pkg: any) => pkg.sender_id === parseInt(userId) || pkg.courier_id === parseInt(userId)
+          (pkg: AdminPackage) => pkg.sender_id === parseInt(userId) || pkg.courier_id === parseInt(userId)
         )
         setPackages(userPackages)
       } catch (err) {
@@ -122,7 +105,7 @@ export default function UserDetailPage() {
           alert('You cannot change your own role')
           return
         }
-        await axios.put(`/admin/users/${userId}`, { role: editedUser.role })
+        await adminAPI.updateUserRole(parseInt(userId), editedUser.role)
       }
 
       // Update active status if changed
@@ -132,9 +115,7 @@ export default function UserDetailPage() {
           alert('You cannot deactivate your own account')
           return
         }
-        await axios.put(`/admin/users/${userId}/toggle-active`, {
-          is_active: editedUser.is_active
-        })
+        await adminAPI.toggleUserActive(parseInt(userId), editedUser.is_active)
       }
 
       // Update profile (full_name, phone_number, and max_deviation_km) if changed
@@ -144,7 +125,7 @@ export default function UserDetailPage() {
         (editedUser.max_deviation_km !== undefined && editedUser.max_deviation_km !== user.max_deviation_km)
 
       if (profileChanged) {
-        const profileData: any = {}
+        const profileData: { full_name?: string; phone_number?: string | null; max_deviation_km?: number } = {}
         if (editedUser.full_name !== undefined && editedUser.full_name !== user.full_name) {
           profileData.full_name = editedUser.full_name
         }
@@ -154,7 +135,7 @@ export default function UserDetailPage() {
         if (editedUser.max_deviation_km !== undefined && editedUser.max_deviation_km !== user.max_deviation_km) {
           profileData.max_deviation_km = editedUser.max_deviation_km
         }
-        await axios.put(`/admin/users/${userId}/profile`, profileData)
+        await adminAPI.updateUserProfile(parseInt(userId), profileData)
       }
 
       alert('User updated successfully')

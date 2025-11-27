@@ -677,3 +677,45 @@ async def send_package_declined_email(
     except Exception as e:
         print(f"Error sending package declined email: {e}")
         return False
+
+
+async def send_password_reset_email(email: str, token: str, full_name: str):
+    """
+    Send password reset link to user
+
+    Args:
+        email: User's email address
+        token: Password reset token
+        full_name: User's full name
+    """
+    reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+
+    content = f"""
+        <p>Hi {full_name},</p>
+        <p>We received a request to reset your password for your Chaski account.</p>
+        <p>Click the button below to reset your password:</p>
+        <div style="text-align: center;">
+            <a href="{reset_url}" class="button">Reset Password</a>
+        </div>
+        <p>Or copy and paste this link into your browser:</p>
+        <p style="word-break: break-all; color: #3b82f6;">{reset_url}</p>
+        <p>This link will expire in 1 hour for security reasons.</p>
+        <p>If you didn't request a password reset, please ignore this email. Your password will remain unchanged.</p>
+        <p>Best regards,<br>The Chaski Team</p>
+    """
+
+    html_content = _build_email_template("header-blue", "Reset Your Password", content)
+
+    message = MessageSchema(
+        subject="Reset Your Password - Chaski",
+        recipients=[email],
+        body=html_content,
+        subtype=MessageType.html
+    )
+
+    try:
+        await fm.send_message(message)
+        return True
+    except Exception as e:
+        print(f"Error sending password reset email: {e}")
+        return False

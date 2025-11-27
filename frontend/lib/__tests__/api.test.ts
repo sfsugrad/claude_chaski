@@ -85,6 +85,33 @@ describe('API Client', () => {
       authAPI.getCurrentUser()
       expect(api.get).toHaveBeenCalledWith('/auth/me')
     })
+
+    it('has forgotPassword method', () => {
+      expect(authAPI.forgotPassword).toBeDefined()
+      expect(typeof authAPI.forgotPassword).toBe('function')
+    })
+
+    it('forgotPassword calls api.post with correct endpoint', () => {
+      const forgotPasswordData = {
+        email: 'test@example.com',
+      }
+      authAPI.forgotPassword(forgotPasswordData)
+      expect(api.post).toHaveBeenCalledWith('/auth/forgot-password', forgotPasswordData)
+    })
+
+    it('has resetPassword method', () => {
+      expect(authAPI.resetPassword).toBeDefined()
+      expect(typeof authAPI.resetPassword).toBe('function')
+    })
+
+    it('resetPassword calls api.post with correct endpoint', () => {
+      const resetPasswordData = {
+        token: 'test-token-123',
+        new_password: 'newpassword123',
+      }
+      authAPI.resetPassword(resetPasswordData)
+      expect(api.post).toHaveBeenCalledWith('/auth/reset-password', resetPasswordData)
+    })
   })
 
   describe('packagesAPI', () => {

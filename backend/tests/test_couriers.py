@@ -96,7 +96,7 @@ class TestCreateRoute:
         """Test route creation without authentication"""
         response = client.post("/api/couriers/routes", json=test_route_data)
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_create_route_invalid_token(self, client, test_route_data):
         """Test route creation with invalid token"""
@@ -415,7 +415,7 @@ class TestGetRoutes:
         """Test getting routes without authentication"""
         response = client.get("/api/couriers/routes")
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_get_routes_fails_as_sender(self, client, authenticated_sender):
         """Test that senders cannot get courier routes"""
@@ -557,7 +557,7 @@ class TestGetRouteById:
         """Test getting a route without authentication"""
         response = client.get("/api/couriers/routes/1")
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_get_route_by_id_fails_as_sender(self, client, authenticated_courier, authenticated_sender, test_route_data):
         """Test that senders cannot get route details"""
@@ -701,7 +701,7 @@ class TestUpdateRoute:
             json={"max_deviation_km": 15}
         )
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_update_route_fails_as_sender(self, client, authenticated_sender):
         """Test that senders cannot update routes"""
@@ -872,7 +872,7 @@ class TestDeleteRoute:
         """Test deleting route without authentication"""
         response = client.delete("/api/couriers/routes/1")
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_delete_route_fails_as_sender(self, client, authenticated_sender):
         """Test that senders cannot delete routes"""
@@ -1155,7 +1155,7 @@ class TestActivateRoute:
         """Test activating route without authentication"""
         response = client.put("/api/couriers/routes/1/activate")
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_activate_route_fails_as_sender(self, client, authenticated_sender):
         """Test that senders cannot activate routes"""

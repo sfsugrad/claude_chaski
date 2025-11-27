@@ -8,17 +8,15 @@ function AuthCallbackContent() {
   const searchParams = useSearchParams()
 
   useEffect(() => {
-    const token = searchParams.get('token')
+    // Check for error parameter
+    const error = searchParams.get('error')
 
-    if (token) {
-      // Store the token
-      localStorage.setItem('token', token)
-
-      // Redirect to dashboard
-      router.push('/dashboard')
-    } else {
-      // No token, redirect to login with error
+    if (error) {
+      // OAuth failed, redirect to login with error
       router.push('/login?error=oauth_failed')
+    } else {
+      // Cookie is set by the backend, redirect to dashboard
+      router.push('/dashboard')
     }
   }, [searchParams, router])
 

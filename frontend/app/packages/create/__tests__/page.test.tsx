@@ -2,7 +2,7 @@ import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { useRouter } from 'next/navigation'
 import CreatePackagePage from '../page'
-import axios, { packagesAPI, authAPI } from '@/lib/api'
+import axios, { packagesAPI, authAPI, adminAPI } from '@/lib/api'
 
 // Mock next/navigation
 jest.mock('next/navigation', () => ({
@@ -20,6 +20,9 @@ jest.mock('@/lib/api', () => ({
   },
   authAPI: {
     getCurrentUser: jest.fn(),
+  },
+  adminAPI: {
+    getUsers: jest.fn(),
   },
 }))
 
@@ -544,7 +547,7 @@ describe('CreatePackagePage', () => {
 
     it('shows user dropdown for admin users', async () => {
       ;(authAPI.getCurrentUser as jest.Mock).mockResolvedValue({ data: mockAdminUser })
-      ;(axios.get as jest.Mock).mockResolvedValue({ data: mockUsers })
+      ;(adminAPI.getUsers as jest.Mock).mockResolvedValue({ data: mockUsers })
 
       render(<CreatePackagePage />)
 
@@ -569,7 +572,7 @@ describe('CreatePackagePage', () => {
 
     it('filters out courier and admin users from the dropdown', async () => {
       ;(authAPI.getCurrentUser as jest.Mock).mockResolvedValue({ data: mockAdminUser })
-      ;(axios.get as jest.Mock).mockResolvedValue({ data: mockUsers })
+      ;(adminAPI.getUsers as jest.Mock).mockResolvedValue({ data: mockUsers })
 
       render(<CreatePackagePage />)
 
@@ -592,7 +595,7 @@ describe('CreatePackagePage', () => {
 
     it('includes default empty option in dropdown', async () => {
       ;(authAPI.getCurrentUser as jest.Mock).mockResolvedValue({ data: mockAdminUser })
-      ;(axios.get as jest.Mock).mockResolvedValue({ data: mockUsers })
+      ;(adminAPI.getUsers as jest.Mock).mockResolvedValue({ data: mockUsers })
 
       render(<CreatePackagePage />)
 

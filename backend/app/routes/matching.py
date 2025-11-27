@@ -4,7 +4,6 @@ from sqlalchemy import and_
 from app.database import get_db
 from pydantic import BaseModel
 from typing import List
-from math import radians, cos, sin, asin, sqrt
 from shapely.geometry import LineString, Point
 from shapely.ops import nearest_points
 
@@ -12,6 +11,7 @@ from app.models.package import Package, PackageStatus, CourierRoute
 from app.models.user import User, UserRole
 from app.models.notification import NotificationType
 from app.utils.dependencies import get_current_user
+from app.utils.geo import haversine_distance
 from app.routes.notifications import create_notification, create_notification_with_broadcast
 from app.utils.email import (
     send_package_matched_email,
@@ -20,23 +20,6 @@ from app.utils.email import (
 )
 
 router = APIRouter()
-
-
-def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """
-    Calculate the great circle distance between two points
-    on the earth (specified in decimal degrees) in kilometers.
-    """
-    # Convert decimal degrees to radians
-    lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
-
-    # Haversine formula
-    dlon = lon2 - lon1
-    dlat = lat2 - lat1
-    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
-    c = 2 * asin(sqrt(a))
-    r = 6371  # Radius of earth in kilometers
-    return c * r
 
 
 def calculate_detour(route_line: LineString, pickup_point: Point, dropoff_point: Point) -> float:

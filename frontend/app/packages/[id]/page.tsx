@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
-import axios, { ratingsAPI, RatingResponse, messagesAPI, MessageResponse, matchingAPI } from '@/lib/api'
+import { authAPI, adminAPI, packagesAPI, ratingsAPI, RatingResponse, messagesAPI, MessageResponse, matchingAPI } from '@/lib/api'
 import StarRating from '@/components/StarRating'
 import RatingModal from '@/components/RatingModal'
 import ChatWindow from '@/components/ChatWindow'
@@ -92,25 +92,19 @@ export default function PackageDetailPage() {
 
   const loadPackageData = async () => {
     try {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        router.push('/login')
-        return
-      }
-
       // Get current user
-      const userResponse = await axios.get('/auth/me')
+      const userResponse = await authAPI.getCurrentUser()
       setCurrentUser(userResponse.data)
 
       // Get package details
-      const packageResponse = await axios.get(`/packages/${packageId}`)
+      const packageResponse = await packagesAPI.getById(parseInt(packageId))
       const packageData = packageResponse.data
       setPkg(packageData)
 
       // Get sender information
       if (userResponse.data.role === 'admin' || userResponse.data.role === 'ADMIN') {
         try {
-          const senderResponse = await axios.get(`/admin/users/${packageData.sender_id}`)
+          const senderResponse = await adminAPI.getUser(packageData.sender_id)
           setSender(senderResponse.data)
         } catch (err) {
           console.error('Error loading sender:', err)
@@ -119,7 +113,7 @@ export default function PackageDetailPage() {
         // Get courier information if assigned
         if (packageData.courier_id) {
           try {
-            const courierResponse = await axios.get(`/admin/users/${packageData.courier_id}`)
+            const courierResponse = await adminAPI.getUser(packageData.courier_id)
             setCourier(courierResponse.data)
           } catch (err) {
             console.error('Error loading courier:', err)
@@ -284,7 +278,7 @@ export default function PackageDetailPage() {
 
   const handleSave = async () => {
     try {
-      await axios.put(`/packages/${packageId}`, editedPackage)
+      await packagesAPI.update(parseInt(packageId), editedPackage)
       alert('Package updated successfully')
       setIsEditing(false)
       await loadPackageData()

@@ -76,6 +76,11 @@ describe('LoginPage', () => {
       render(<LoginPage />)
       expect(screen.getByText(/create one now/i)).toBeInTheDocument()
     })
+
+    it('renders forgot password link', () => {
+      render(<LoginPage />)
+      expect(screen.getByText(/forgot password/i)).toBeInTheDocument()
+    })
   })
 
   describe('Success Messages', () => {
@@ -102,6 +107,19 @@ describe('LoginPage', () => {
 
       await waitFor(() => {
         expect(screen.getByText(/email verified/i)).toBeInTheDocument()
+      })
+    })
+
+    it('shows success message when reset=true in URL', async () => {
+      mockSearchParams.get.mockImplementation((param: string) => {
+        if (param === 'reset') return 'true'
+        return null
+      })
+
+      render(<LoginPage />)
+
+      await waitFor(() => {
+        expect(screen.getByText(/password reset successful/i)).toBeInTheDocument()
       })
     })
   })

@@ -133,7 +133,7 @@ class TestGetNotifications:
         """Test getting notifications without authentication"""
         response = client.get("/api/notifications/")
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_get_notifications_ordered_by_newest(self, client, db_session, authenticated_sender):
         """Test that notifications are ordered by newest first (by id desc as proxy for created_at)"""
@@ -210,7 +210,7 @@ class TestGetUnreadCount:
         """Test unread count without authentication"""
         response = client.get("/api/notifications/unread-count")
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
 class TestGetNotificationById:

@@ -10,7 +10,6 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
-from math import radians, cos, sin, asin, sqrt
 from shapely.geometry import LineString, Point
 from shapely.ops import nearest_points
 
@@ -18,22 +17,9 @@ from app.database import SessionLocal
 from app.models.package import Package, PackageStatus, CourierRoute
 from app.models.user import User
 from app.models.notification import Notification, NotificationType
+from app.utils.geo import haversine_distance
 
 logger = logging.getLogger(__name__)
-
-
-def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """
-    Calculate the great circle distance between two points
-    on the earth (specified in decimal degrees) in kilometers.
-    """
-    lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
-    dlon = lon2 - lon1
-    dlat = lat2 - lat1
-    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
-    c = 2 * asin(sqrt(a))
-    r = 6371  # Radius of earth in kilometers
-    return c * r
 
 
 def calculate_detour(route_line: LineString, pickup_point: Point, dropoff_point: Point) -> float:

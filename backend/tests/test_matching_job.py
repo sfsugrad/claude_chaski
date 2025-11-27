@@ -493,4 +493,4 @@ class TestAdminMatchingJobEndpoint:
             json={"dry_run": True}
         )
 
-        assert response.status_code == 403
+        assert response.status_code == 401

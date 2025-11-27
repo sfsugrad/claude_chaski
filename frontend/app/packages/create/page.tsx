@@ -3,16 +3,10 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { packagesAPI, PackageCreate, authAPI } from '@/lib/api'
+import { packagesAPI, PackageCreate, authAPI, adminAPI, AdminUser } from '@/lib/api'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
-import axios from '@/lib/api'
 
-interface User {
-  id: number
-  email: string
-  full_name: string
-  role: string
-}
+type User = AdminUser
 
 export default function CreatePackagePage() {
   const router = useRouter()
@@ -60,7 +54,7 @@ export default function CreatePackagePage() {
   const loadUsers = async () => {
     setLoadingUsers(true)
     try {
-      const response = await axios.get('/admin/users')
+      const response = await adminAPI.getUsers()
       setUsers(response.data)
     } catch (err) {
       console.error('Error loading users:', err)

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import axios from 'axios'
+import { verificationAPI } from '@/lib/api'
 
 export default function ResendVerificationPage() {
   const router = useRouter()
@@ -18,8 +18,7 @@ export default function ResendVerificationPage() {
     setLoading(true)
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      await axios.post(`${apiUrl}/api/auth/resend-verification?email=${encodeURIComponent(email)}`)
+      await verificationAPI.resendVerification(email)
 
       setSuccess(true)
     } catch (err: any) {

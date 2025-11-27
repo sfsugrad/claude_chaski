@@ -3,48 +3,15 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import axios from '@/lib/api'
+import { authAPI, adminAPI, AdminUser, AdminPackage, AdminStats, MatchingJobResult, UserResponse } from '@/lib/api'
 
-interface User {
-  id: number
-  email: string
-  full_name: string
-  role: 'SENDER' | 'COURIER' | 'BOTH' | 'ADMIN'
-  is_verified: boolean
-  is_active: boolean
-  created_at: string
-}
-
-interface Package {
-  id: number
-  sender_id: number
-  description: string
-  size: string
-  weight_kg: number
-  pickup_address: string
-  dropoff_address: string
-  status: string
-  price: number
-  is_active: boolean
-  created_at: string
-}
-
-interface Stats {
-  total_users: number
-  total_senders: number
-  total_couriers: number
-  total_both: number
-  total_admins: number
-  total_packages: number
-  active_packages: number
-  completed_packages: number
-  pending_packages: number
-  total_revenue: number
-}
+type User = AdminUser
+type Package = AdminPackage
+type Stats = AdminStats
 
 export default function AdminPage() {
   const router = useRouter()
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<UserResponse | null>(null)
   const [users, setUsers] = useState<User[]>([])
   const [packages, setPackages] = useState<Package[]>([])
   const [stats, setStats] = useState<Stats>({
@@ -77,27 +44,7 @@ export default function AdminPage() {
     max_deviation_km: 5
   })
   const [matchingJobRunning, setMatchingJobRunning] = useState(false)
-  const [matchingJobResult, setMatchingJobResult] = useState<{
-    routes_processed: number
-    total_matches_found: number
-    notifications_created: number
-    notifications_skipped: number
-    route_details?: Array<{
-      route_id: number
-      courier_id: number
-      courier_name: string
-      route: string
-      matches_found: number
-      notifications_sent: number
-      matched_packages?: Array<{
-        package_id: number
-        description: string
-        distance_km: number
-        detour_km: number
-        notified: boolean
-      }>
-    }>
-  } | null>(null)
+  const [matchingJobResult, setMatchingJobResult] = useState<MatchingJobResult | null>(null)
 
   useEffect(() => {
     checkAuth()
@@ -105,13 +52,7 @@ export default function AdminPage() {
 
   const checkAuth = async () => {
     try {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        router.push('/login')
-        return
-      }
-
-      const response = await axios.get('/auth/me')
+      const response = await authAPI.getCurrentUser()
       const currentUser = response.data
 
       if (currentUser.role !== 'ADMIN' && currentUser.role !== 'admin') {
@@ -133,7 +74,7 @@ export default function AdminPage() {
   const loadData = async () => {
     // Load users
     try {
-      const usersResponse = await axios.get('/admin/users')
+      const usersResponse = await adminAPI.getUsers()
       setUsers(usersResponse.data)
     } catch (err) {
       console.error('Error loading users:', err)
@@ -141,7 +82,7 @@ export default function AdminPage() {
 
     // Load packages
     try {
-      const packagesResponse = await axios.get('/admin/packages')
+      const packagesResponse = await adminAPI.getPackages()
       setPackages(packagesResponse.data)
     } catch (err) {
       console.error('Error loading packages:', err)
@@ -149,7 +90,7 @@ export default function AdminPage() {
 
     // Load stats from backend
     try {
-      const statsResponse = await axios.get('/admin/stats')
+      const statsResponse = await adminAPI.getStats()
       setStats(statsResponse.data)
     } catch (err) {
       console.error('Error loading stats:', err)
@@ -158,7 +99,7 @@ export default function AdminPage() {
 
   const handleRoleChange = async (userId: number, newRole: string) => {
     try {
-      await axios.put(`/admin/users/${userId}`, { role: newRole })
+      await adminAPI.updateUserRole(userId, newRole)
       await loadData()
       alert('User role updated successfully')
     } catch (err) {
@@ -174,9 +115,7 @@ export default function AdminPage() {
     }
 
     try {
-      await axios.put(`/admin/users/${userId}/toggle-active`, {
-        is_active: !currentStatus
-      })
+      await adminAPI.toggleUserActive(userId, !currentStatus)
       await loadData()
       alert(`User ${action}d successfully`)
     } catch (err: any) {
@@ -193,9 +132,7 @@ export default function AdminPage() {
     }
 
     try {
-      await axios.put(`/admin/packages/${packageId}/toggle-active`, {
-        is_active: !currentStatus
-      })
+      await adminAPI.togglePackageActive(packageId, !currentStatus)
       await loadData()
       alert(`Package ${action}d successfully`)
     } catch (err: any) {
@@ -208,7 +145,7 @@ export default function AdminPage() {
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      await axios.post('/admin/users', newUserData)
+      await adminAPI.createUser(newUserData)
       await loadData()
       setShowCreateUserModal(false)
       setNewUserData({
@@ -234,10 +171,7 @@ export default function AdminPage() {
     setMatchingJobResult(null)
 
     try {
-      const response = await axios.post('/admin/jobs/run-matching', {
-        dry_run: false,
-        notify_hours_threshold: 24
-      })
+      const response = await adminAPI.runMatchingJob(false, 24)
       setMatchingJobResult(response.data)
     } catch (err: any) {
       console.error('Error running matching job:', err)
@@ -322,8 +256,12 @@ export default function AdminPage() {
                 {user?.full_name} ({user?.email})
               </span>
               <button
-                onClick={() => {
-                  localStorage.removeItem('token')
+                onClick={async () => {
+                  try {
+                    await authAPI.logout()
+                  } catch (err) {
+                    console.error('Logout failed:', err)
+                  }
                   router.push('/login')
                 }}
                 className="bg-purple-700 hover:bg-purple-800 px-4 py-2 rounded transition"

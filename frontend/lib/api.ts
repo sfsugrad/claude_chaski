@@ -7,15 +7,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-})
-
-// Add token to requests if available
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
-  return config
+  withCredentials: true, // Send cookies with requests
 })
 
 export default api
@@ -52,6 +44,10 @@ export interface UserResponse {
 export interface TokenResponse {
   access_token: string
   token_type: string
+}
+
+export interface AuthResponse {
+  message: string
 }
 
 export interface PackageCreate {
@@ -97,11 +93,27 @@ export interface PackageResponse {
   updated_at: string | null
 }
 
+export interface ForgotPasswordData {
+  email: string
+}
+
+export interface ResetPasswordData {
+  token: string
+  new_password: string
+}
+
+export interface MessageResponse {
+  message: string
+}
+
 // Auth API
 export const authAPI = {
   register: (data: RegisterData) => api.post<UserResponse>('/auth/register', data),
-  login: (data: LoginData) => api.post<TokenResponse>('/auth/login', data),
+  login: (data: LoginData) => api.post<AuthResponse>('/auth/login', data),
+  logout: () => api.post<AuthResponse>('/auth/logout'),
   getCurrentUser: () => api.get<UserResponse>('/auth/me'),
+  forgotPassword: (data: ForgotPasswordData) => api.post<MessageResponse>('/auth/forgot-password', data),
+  resetPassword: (data: ResetPasswordData) => api.post<MessageResponse>('/auth/reset-password', data),
 }
 
 // Packages API
@@ -109,6 +121,8 @@ export const packagesAPI = {
   create: (data: PackageCreate) => api.post<PackageResponse>('/packages', data),
   getAll: () => api.get<PackageResponse[]>('/packages'),
   getById: (id: number) => api.get<PackageResponse>(`/packages/${id}`),
+  update: (id: number, data: Partial<PackageCreate>) =>
+    api.put<PackageResponse>(`/packages/${id}`, data),
   updateStatus: (id: number, status: string) =>
     api.put(`/packages/${id}/status`, { status }),
   cancel: (id: number) => api.put<PackageResponse>(`/packages/${id}/cancel`),
@@ -334,4 +348,113 @@ export const messagesAPI = {
     api.put(`/messages/package/${packageId}/read-all`),
   getUnreadCount: () =>
     api.get<MessageUnreadCountResponse>('/messages/unread-count'),
+}
+
+// Admin Types
+export interface AdminUser {
+  id: number
+  email: string
+  full_name: string
+  role: string
+  phone_number: string | null
+  is_active: boolean
+  is_verified: boolean
+  max_deviation_km: number
+  created_at: string
+  updated_at: string | null
+}
+
+export interface AdminPackage {
+  id: number
+  sender_id: number
+  courier_id: number | null
+  description: string
+  size: string
+  weight_kg: number
+  pickup_address: string
+  dropoff_address: string
+  status: string
+  price: number
+  is_active: boolean
+  created_at: string
+}
+
+export interface AdminStats {
+  total_users: number
+  total_senders: number
+  total_couriers: number
+  total_both: number
+  total_admins: number
+  total_packages: number
+  active_packages: number
+  completed_packages: number
+  pending_packages: number
+  total_revenue: number
+}
+
+export interface CreateUserData {
+  email: string
+  password: string
+  full_name: string
+  role: string
+  phone_number?: string
+  max_deviation_km?: number
+}
+
+export interface MatchingJobResult {
+  routes_processed: number
+  total_matches_found: number
+  notifications_created: number
+  notifications_skipped: number
+  route_details?: Array<{
+    route_id: number
+    courier_id: number
+    courier_name: string
+    route: string
+    matches_found: number
+    notifications_sent: number
+    matched_packages?: Array<{
+      package_id: number
+      description: string
+      distance_km: number
+      detour_km: number
+      notified: boolean
+    }>
+  }>
+}
+
+// Admin API
+export const adminAPI = {
+  // Users
+  getUsers: () => api.get<AdminUser[]>('/admin/users'),
+  getUser: (userId: number) => api.get<AdminUser>(`/admin/users/${userId}`),
+  createUser: (data: CreateUserData) => api.post<AdminUser>('/admin/users', data),
+  updateUserRole: (userId: number, role: string) =>
+    api.put(`/admin/users/${userId}`, { role }),
+  toggleUserActive: (userId: number, isActive: boolean) =>
+    api.put(`/admin/users/${userId}/toggle-active`, { is_active: isActive }),
+  updateUserProfile: (userId: number, data: { full_name?: string; phone_number?: string | null; max_deviation_km?: number }) =>
+    api.put(`/admin/users/${userId}/profile`, data),
+
+  // Packages
+  getPackages: () => api.get<AdminPackage[]>('/admin/packages'),
+  togglePackageActive: (packageId: number, isActive: boolean) =>
+    api.put(`/admin/packages/${packageId}/toggle-active`, { is_active: isActive }),
+
+  // Stats
+  getStats: () => api.get<AdminStats>('/admin/stats'),
+
+  // Jobs
+  runMatchingJob: (dryRun: boolean = false, notifyHoursThreshold: number = 24) =>
+    api.post<MatchingJobResult>('/admin/jobs/run-matching', {
+      dry_run: dryRun,
+      notify_hours_threshold: notifyHoursThreshold
+    }),
+}
+
+// Auth verification API (public endpoints)
+export const verificationAPI = {
+  verifyEmail: (token: string) => api.get(`/auth/verify-email/${token}`),
+  resendVerification: (email: string) =>
+    api.post(`/auth/resend-verification?email=${encodeURIComponent(email)}`),
 }

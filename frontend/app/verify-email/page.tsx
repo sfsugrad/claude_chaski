@@ -3,9 +3,7 @@
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import axios from 'axios'
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+import { verificationAPI } from '@/lib/api'
 
 function VerifyEmailContent() {
   const router = useRouter()
@@ -29,9 +27,7 @@ function VerifyEmailContent() {
       }
 
       try {
-        const response = await axios.get(
-          `${API_URL}/api/auth/verify-email/${token}`
-        )
+        const response = await verificationAPI.verifyEmail(token)
 
         if (response.data) {
           setStatus('success')

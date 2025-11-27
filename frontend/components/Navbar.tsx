@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
-import { UserResponse, messagesAPI } from '@/lib/api'
+import { UserResponse, messagesAPI, authAPI } from '@/lib/api'
 import NotificationDropdown from './NotificationDropdown'
 import StarRating from './StarRating'
 import { useWebSocketContext } from '@/contexts/WebSocketContext'
@@ -52,8 +52,13 @@ export default function Navbar({ user }: NavbarProps) {
     return () => clearInterval(interval)
   }, [user, pathname]) // Re-fetch when navigating away from messages page
 
-  const handleLogout = () => {
-    localStorage.removeItem('token')
+  const handleLogout = async () => {
+    try {
+      await authAPI.logout()
+    } catch (err) {
+      // Continue with logout even if API call fails
+      console.error('Logout API call failed:', err)
+    }
     router.push('/')
   }
 

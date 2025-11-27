@@ -82,6 +82,7 @@ async def websocket_endpoint(
     WebSocket endpoint for real-time updates.
 
     Connection URL: ws://localhost:8000/api/ws?token=<jwt_token>
+    Or with httpOnly cookie authentication.
 
     Events sent to client:
     - notification_created: New notification
@@ -93,12 +94,17 @@ async def websocket_endpoint(
     - pong: Response to ping
     - mark_read: Mark notification as read
     """
+    # Try to get token from query param first, then from cookie
+    auth_token = token
+    if not auth_token:
+        auth_token = websocket.cookies.get("access_token")
+
     # Validate token before accepting connection
-    if not token:
+    if not auth_token:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
-    user_id = await get_user_from_token(token)
+    user_id = await get_user_from_token(auth_token)
     if not user_id:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return

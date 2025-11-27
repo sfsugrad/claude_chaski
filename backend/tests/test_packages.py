@@ -94,7 +94,7 @@ class TestCreatePackage:
         """Test package creation without authentication"""
         response = client.post("/api/packages", json=test_package_data)
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_create_package_invalid_token(self, client, test_package_data):
         """Test package creation with invalid token"""
@@ -270,7 +270,7 @@ class TestGetPackages:
         """Test getting packages without authentication"""
         response = client.get("/api/packages")
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_get_packages_only_own_packages(self, client, authenticated_sender, authenticated_both_role, test_package_data):
         """Test that users only see their own packages"""
@@ -383,7 +383,7 @@ class TestGetPackageById:
         """Test getting a package without authentication"""
         response = client.get("/api/packages/1")
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
 class TestUpdatePackage:
@@ -680,7 +680,7 @@ class TestUpdatePackage:
             json={"description": "Update without auth"}
         )
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_update_package_addresses_immutable(self, client, authenticated_sender, test_package_data):
         """Test that addresses and coordinates cannot be changed via update endpoint"""
@@ -857,7 +857,7 @@ class TestUpdatePackageStatus:
             json={"status": "picked_up"}
         )
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
 class TestPackageIntegration:
@@ -1187,7 +1187,7 @@ class TestCancelPackage:
         # Try to cancel without auth
         response = client.put(f"/api/packages/{package_id}/cancel")
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_cancel_package_updates_timestamp(self, client, authenticated_sender, test_package_data):
         """Test that cancelling updates the updated_at timestamp"""
