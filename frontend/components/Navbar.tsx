@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { UserResponse, messagesAPI } from '@/lib/api'
 import NotificationDropdown from './NotificationDropdown'
 import StarRating from './StarRating'
+import { useWebSocket } from '@/hooks/useWebSocket'
 
 interface NavbarProps {
   user: UserResponse | null
@@ -13,8 +14,22 @@ interface NavbarProps {
 
 export default function Navbar({ user }: NavbarProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [unreadMessageCount, setUnreadMessageCount] = useState(0)
+
+  // Handle incoming WebSocket messages
+  const handleMessageReceived = useCallback(() => {
+    // Only increment if not currently on the messages page
+    if (!pathname?.startsWith('/messages')) {
+      setUnreadMessageCount(prev => prev + 1)
+    }
+  }, [pathname])
+
+  // Connect to WebSocket for real-time message notifications
+  useWebSocket({
+    onMessageReceived: handleMessageReceived,
+  })
 
   // Fetch unread message count
   useEffect(() => {
@@ -31,10 +46,10 @@ export default function Navbar({ user }: NavbarProps) {
     }
 
     fetchUnreadCount()
-    // Poll every 30 seconds
+    // Poll every 30 seconds as fallback
     const interval = setInterval(fetchUnreadCount, 30000)
     return () => clearInterval(interval)
-  }, [user])
+  }, [user, pathname]) // Re-fetch when navigating away from messages page
 
   const handleLogout = () => {
     localStorage.removeItem('token')
