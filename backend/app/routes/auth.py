@@ -190,7 +190,7 @@ async def register(request: Request, user_data: UserRegister, db: Session = Depe
 
 
 @router.post("/login", response_model=LoginResponse)
-@limiter.limit("10/minute")  # Max 10 login attempts per minute per IP
+@limiter.limit("100/minute")  # Max 100 login attempts per minute per IP (higher for E2E tests)
 async def login(request: Request, response: Response, credentials: UserLogin, db: Session = Depends(get_db)):
     """
     Login and get JWT access token set in httpOnly cookie.

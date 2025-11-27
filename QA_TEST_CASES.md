@@ -38,9 +38,9 @@ This document contains comprehensive manual QA test cases for the Chaski logisti
 
 | Email | Password | Role | Purpose |
 |-------|----------|------|---------|
-| john.sender@example.com | password123 | sender | Sender workflow testing |
-| mike.courier@example.com | password123 | courier | Courier workflow testing |
-| sarah.both@example.com | password123 | both | Dual-role testing |
+| john.sender@example.com | sender123 | sender | Sender workflow testing |
+| mike.courier@example.com | courier123 | courier | Courier workflow testing |
+| alex.both@example.com | both123 | both | Dual-role testing |
 | admin@chaski.com | admin123 | admin | Admin testing |
 
 ---
