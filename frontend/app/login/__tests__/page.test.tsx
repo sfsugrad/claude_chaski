@@ -188,8 +188,8 @@ describe('LoginPage', () => {
       })
     })
 
-    it('stores token in localStorage on successful login', async () => {
-      mockLogin.mockResolvedValue({ data: { access_token: 'test-token' } })
+    it('fetches current user after successful login (cookie-based auth)', async () => {
+      mockLogin.mockResolvedValue({ data: {} })
       mockGetCurrentUser.mockResolvedValue({ data: { role: 'sender' } })
 
       render(<LoginPage />)
@@ -203,7 +203,8 @@ describe('LoginPage', () => {
       fireEvent.click(submitButton)
 
       await waitFor(() => {
-        expect(localStorage.setItem).toHaveBeenCalledWith('token', 'test-token')
+        // After login, should fetch current user to determine redirect
+        expect(mockGetCurrentUser).toHaveBeenCalled()
       })
     })
 

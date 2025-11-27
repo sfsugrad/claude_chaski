@@ -38,6 +38,12 @@ jest.mock('@/lib/api', () => ({
   default: {
     get: jest.fn(() => Promise.resolve({ data: { count: 0 } })),
   },
+  messagesAPI: {
+    getUnreadCount: jest.fn(() => Promise.resolve({ data: { unread_count: 0 } })),
+  },
+  authAPI: {
+    logout: jest.fn(() => Promise.resolve({ data: { message: 'Logged out' } })),
+  },
 }))
 
 const mockUser = {
@@ -154,13 +160,16 @@ describe('Navbar', () => {
   })
 
   describe('Logout', () => {
-    it('removes token and redirects on logout', () => {
+    it('calls logout API and redirects on logout', async () => {
+      const { authAPI } = require('@/lib/api')
       render(<Navbar user={mockUser} />)
 
       const logoutButton = screen.getByText('Logout')
       fireEvent.click(logoutButton)
 
-      expect(localStorage.removeItem).toHaveBeenCalledWith('token')
+      expect(authAPI.logout).toHaveBeenCalled()
+      // Wait for async logout to complete
+      await new Promise(resolve => setTimeout(resolve, 0))
       expect(mockPush).toHaveBeenCalledWith('/')
     })
   })

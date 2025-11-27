@@ -2,7 +2,6 @@ import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { useParams, useRouter } from 'next/navigation'
 import PackageDetailPage from '../page'
-import axios, { matchingAPI, ratingsAPI, messagesAPI } from '@/lib/api'
 
 // Mock next/navigation
 jest.mock('next/navigation', () => ({
@@ -40,6 +39,15 @@ jest.mock('@/hooks/useWebSocket', () => ({
   }),
 }))
 
+// Create mock functions for API calls
+const mockGetCurrentUser = jest.fn()
+const mockGetPackageById = jest.fn()
+const mockUpdatePackageStatus = jest.fn()
+const mockAcceptPackage = jest.fn()
+const mockGetPackageRatings = jest.fn()
+const mockGetPackageMessages = jest.fn()
+const mockGetConversations = jest.fn()
+
 // Mock the API modules
 jest.mock('@/lib/api', () => ({
   __esModule: true,
@@ -47,15 +55,22 @@ jest.mock('@/lib/api', () => ({
     get: jest.fn(),
     put: jest.fn(),
   },
+  authAPI: {
+    getCurrentUser: () => mockGetCurrentUser(),
+  },
+  packagesAPI: {
+    getById: (id: number) => mockGetPackageById(id),
+    updateStatus: (id: number, status: string) => mockUpdatePackageStatus(id, status),
+  },
   matchingAPI: {
-    acceptPackage: jest.fn(),
+    acceptPackage: (id: number) => mockAcceptPackage(id),
   },
   ratingsAPI: {
-    getPackageRatings: jest.fn(),
+    getPackageRatings: (id: number) => mockGetPackageRatings(id),
   },
   messagesAPI: {
-    getPackageMessages: jest.fn(),
-    getConversations: jest.fn(),
+    getPackageMessages: (id: number) => mockGetPackageMessages(id),
+    getConversations: () => mockGetConversations(),
   },
 }))
 
@@ -135,25 +150,12 @@ const setupMocks = (user: any, packageData: any) => {
   // Mock localStorage
   Storage.prototype.getItem = jest.fn(() => 'fake-token')
 
-  // Mock axios.get to return different data based on URL
-  ;(axios.get as jest.Mock).mockImplementation((url: string) => {
-    if (url === '/auth/me') {
-      return Promise.resolve({ data: user })
-    }
-    if (url.startsWith('/packages/')) {
-      return Promise.resolve({ data: packageData })
-    }
-    return Promise.reject(new Error(`Unexpected URL: ${url}`))
-  })
-
-  // Mock messagesAPI
-  ;(messagesAPI.getPackageMessages as jest.Mock).mockResolvedValue({ data: [] })
-  ;(messagesAPI.getConversations as jest.Mock).mockResolvedValue({
-    data: { conversations: [] },
-  })
-
-  // Mock ratingsAPI
-  ;(ratingsAPI.getPackageRatings as jest.Mock).mockResolvedValue({ data: [] })
+  // Mock API calls
+  mockGetCurrentUser.mockResolvedValue({ data: user })
+  mockGetPackageById.mockResolvedValue({ data: packageData })
+  mockGetPackageMessages.mockResolvedValue({ data: [] })
+  mockGetConversations.mockResolvedValue({ data: { conversations: [] } })
+  mockGetPackageRatings.mockResolvedValue({ data: [] })
 }
 
 describe('PackageDetailPage', () => {
@@ -228,7 +230,7 @@ describe('PackageDetailPage', () => {
   describe('Accept Package Functionality', () => {
     it('calls acceptPackage API when Accept Package is clicked', async () => {
       setupMocks(mockCourier, mockPendingPackage)
-      ;(matchingAPI.acceptPackage as jest.Mock).mockResolvedValue({
+      mockAcceptPackage.mockResolvedValue({
         data: { ...mockPendingPackage, status: 'matched', courier_id: 2 },
       })
       window.alert = jest.fn()
@@ -243,13 +245,13 @@ describe('PackageDetailPage', () => {
       fireEvent.click(acceptButton)
 
       await waitFor(() => {
-        expect(matchingAPI.acceptPackage).toHaveBeenCalledWith(123)
+        expect(mockAcceptPackage).toHaveBeenCalledWith(123)
       })
     })
 
     it('shows success alert after accepting package', async () => {
       setupMocks(mockCourier, mockPendingPackage)
-      ;(matchingAPI.acceptPackage as jest.Mock).mockResolvedValue({
+      mockAcceptPackage.mockResolvedValue({
         data: { ...mockPendingPackage, status: 'matched', courier_id: 2 },
       })
       window.alert = jest.fn()
@@ -270,7 +272,7 @@ describe('PackageDetailPage', () => {
 
     it('shows error alert when accepting fails', async () => {
       setupMocks(mockCourier, mockPendingPackage)
-      ;(matchingAPI.acceptPackage as jest.Mock).mockRejectedValue({
+      mockAcceptPackage.mockRejectedValue({
         response: { data: { detail: 'Package already accepted' } },
       })
       window.alert = jest.fn()
@@ -292,7 +294,7 @@ describe('PackageDetailPage', () => {
     it('shows loading state while accepting', async () => {
       setupMocks(mockCourier, mockPendingPackage)
       // Never resolve to keep loading state
-      ;(matchingAPI.acceptPackage as jest.Mock).mockImplementation(
+      mockAcceptPackage.mockImplementation(
         () => new Promise(() => {})
       )
 
@@ -312,7 +314,7 @@ describe('PackageDetailPage', () => {
 
     it('disables button while accepting', async () => {
       setupMocks(mockCourier, mockPendingPackage)
-      ;(matchingAPI.acceptPackage as jest.Mock).mockImplementation(
+      mockAcceptPackage.mockImplementation(
         () => new Promise(() => {})
       )
 

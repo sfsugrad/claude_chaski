@@ -173,6 +173,133 @@ class TestUserModel:
         # created_at should not change
         assert user.created_at == original_created_at
 
+    def test_user_password_reset_fields(self, db_session):
+        """Test password reset token fields exist and work correctly.
+
+        This test ensures the database schema includes password_reset_token
+        and password_reset_token_expires_at columns, which are required for
+        the password reset functionality.
+        """
+        from datetime import timedelta, timezone
+
+        user = User(
+            email="passwordreset@example.com",
+            hashed_password=get_password_hash("password123"),
+            full_name="Password Reset User",
+            role=UserRole.SENDER
+        )
+        db_session.add(user)
+        db_session.commit()
+
+        # Initially these should be None
+        assert user.password_reset_token is None
+        assert user.password_reset_token_expires_at is None
+
+        # Set password reset token
+        reset_token = "test-reset-token-12345"
+        reset_expires = datetime.now(timezone.utc) + timedelta(hours=1)
+
+        user.password_reset_token = reset_token
+        user.password_reset_token_expires_at = reset_expires
+        db_session.commit()
+        db_session.refresh(user)
+
+        # Verify the values were saved
+        assert user.password_reset_token == reset_token
+        assert user.password_reset_token_expires_at is not None
+
+        # Clear the token (simulating password reset completion)
+        user.password_reset_token = None
+        user.password_reset_token_expires_at = None
+        db_session.commit()
+        db_session.refresh(user)
+
+        assert user.password_reset_token is None
+        assert user.password_reset_token_expires_at is None
+
+    def test_user_verification_token_fields(self, db_session):
+        """Test verification token fields exist and work correctly.
+
+        This ensures the database schema includes verification_token
+        and verification_token_expires_at columns for email verification.
+        """
+        from datetime import timedelta, timezone
+
+        user = User(
+            email="verification@example.com",
+            hashed_password=get_password_hash("password123"),
+            full_name="Verification User",
+            role=UserRole.SENDER,
+            verification_token="verify-token-12345",
+            verification_token_expires_at=datetime.now(timezone.utc) + timedelta(hours=24)
+        )
+        db_session.add(user)
+        db_session.commit()
+        db_session.refresh(user)
+
+        assert user.verification_token == "verify-token-12345"
+        assert user.verification_token_expires_at is not None
+
+        # Simulate email verification
+        user.is_verified = True
+        user.verification_token = None
+        user.verification_token_expires_at = None
+        db_session.commit()
+        db_session.refresh(user)
+
+        assert user.is_verified is True
+        assert user.verification_token is None
+        assert user.verification_token_expires_at is None
+
+    def test_user_model_all_columns_accessible(self, db_session):
+        """Test that all User model columns can be queried.
+
+        This test catches database schema mismatches where the SQLAlchemy model
+        defines columns that don't exist in the actual database. If the database
+        is missing columns defined in the model, this query will fail.
+        """
+        from datetime import timedelta, timezone
+
+        # Create a user with all fields populated
+        user = User(
+            email="allcolumns@example.com",
+            hashed_password=get_password_hash("password123"),
+            full_name="All Columns User",
+            phone_number="+1234567890",
+            role=UserRole.BOTH,
+            is_active=True,
+            is_verified=True,
+            verification_token="verify-token",
+            verification_token_expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
+            password_reset_token="reset-token",
+            password_reset_token_expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+            max_deviation_km=15
+        )
+        db_session.add(user)
+        db_session.commit()
+
+        # Query the user back - this will fail if any model column is missing from DB
+        queried_user = db_session.query(User).filter(
+            User.email == "allcolumns@example.com"
+        ).first()
+
+        # Verify all columns are accessible
+        assert queried_user is not None
+        assert queried_user.id is not None
+        assert queried_user.email == "allcolumns@example.com"
+        assert queried_user.hashed_password is not None
+        assert queried_user.full_name == "All Columns User"
+        assert queried_user.phone_number == "+1234567890"
+        assert queried_user.role == UserRole.BOTH
+        assert queried_user.is_active is True
+        assert queried_user.is_verified is True
+        assert queried_user.verification_token == "verify-token"
+        assert queried_user.verification_token_expires_at is not None
+        assert queried_user.password_reset_token == "reset-token"
+        assert queried_user.password_reset_token_expires_at is not None
+        assert queried_user.max_deviation_km == 15
+        assert queried_user.created_at is not None
+
 
 class TestPackageModel:
     """Tests for Package model"""

@@ -19,6 +19,7 @@ jest.mock('@/lib/api', () => ({
   },
   couriersAPI: {
     getMyRoutes: () => mockGetMyRoutes(),
+    getRoutes: () => mockGetMyRoutes(),
   },
   ratingsAPI: {
     getMyPendingRatings: () => mockGetMyPendingRatings(),

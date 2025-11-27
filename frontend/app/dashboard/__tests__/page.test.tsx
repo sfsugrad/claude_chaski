@@ -64,18 +64,7 @@ describe('DashboardPage', () => {
   })
 
   describe('Authentication', () => {
-    it('redirects to login if no token', async () => {
-      ;(Storage.prototype.getItem as jest.Mock).mockReturnValue(null)
-
-      render(<DashboardPage />)
-
-      await waitFor(() => {
-        expect(mockRouter.push).toHaveBeenCalledWith('/login')
-      })
-    })
-
     it('redirects to login if API call fails', async () => {
-      ;(Storage.prototype.getItem as jest.Mock).mockReturnValue('fake-token')
       mockGetCurrentUser.mockRejectedValue(new Error('Unauthorized'))
 
       render(<DashboardPage />)
@@ -85,21 +74,30 @@ describe('DashboardPage', () => {
       })
     })
 
-    it('removes token on API failure', async () => {
-      ;(Storage.prototype.getItem as jest.Mock).mockReturnValue('fake-token')
-      mockGetCurrentUser.mockRejectedValue(new Error('Unauthorized'))
+    it('shows dashboard when user is authenticated', async () => {
+      mockGetCurrentUser.mockResolvedValue({
+        data: {
+          id: 1,
+          email: 'test@example.com',
+          full_name: 'Test User',
+          role: 'sender',
+          is_active: true,
+          is_verified: true,
+          max_deviation_km: 5,
+        },
+      })
+      mockGetMyPendingRatings.mockResolvedValue({ data: [] })
 
       render(<DashboardPage />)
 
       await waitFor(() => {
-        expect(localStorage.removeItem).toHaveBeenCalledWith('token')
+        expect(screen.getByText(/welcome/i)).toBeInTheDocument()
       })
     })
   })
 
   describe('Loading State', () => {
     it('shows loading state initially', () => {
-      ;(Storage.prototype.getItem as jest.Mock).mockReturnValue('fake-token')
       mockGetCurrentUser.mockImplementation(() => new Promise(() => {}))
 
       render(<DashboardPage />)

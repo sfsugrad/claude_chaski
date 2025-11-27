@@ -102,23 +102,25 @@ describe('useWebSocket', () => {
       })
     })
 
-    it('does not connect when no token is available', () => {
+    it('connects unconditionally on mount', async () => {
       Storage.prototype.getItem = jest.fn(() => null)
 
       const { result } = renderHook(() => useWebSocket())
 
-      expect(result.current.connectionStatus).toBe('disconnected')
-      expect(mockWebSocketInstances.length).toBe(0)
+      // Should start connecting even without token (auth via cookies now)
+      expect(result.current.connectionStatus).toBe('connecting')
+      expect(mockWebSocketInstances.length).toBe(1)
     })
 
-    it('constructs WebSocket URL with token', async () => {
+    it('constructs WebSocket URL without token (uses cookies)', async () => {
       renderHook(() => useWebSocket())
 
       await waitFor(() => {
         expect(mockWebSocketInstances.length).toBeGreaterThan(0)
       })
 
-      expect(mockWebSocketInstances[0].url).toContain('token=test-token')
+      // URL should be the base WS URL without token query param
+      expect(mockWebSocketInstances[0].url).toBe('ws://localhost:8000/api/ws')
     })
 
     it('updates isConnected when connected', async () => {
@@ -306,16 +308,18 @@ describe('useWebSocket', () => {
     })
 
     it('does not send when not connected', () => {
-      Storage.prototype.getItem = jest.fn(() => null)
-
       const { result } = renderHook(() => useWebSocket())
 
+      // WebSocket is created but not yet connected (still in CONNECTING state)
+      // Send should fail because readyState is not OPEN
       act(() => {
         result.current.sendMessage({ action: 'test' })
       })
 
-      // No WebSocket should be created
-      expect(mockWebSocketInstances.length).toBe(0)
+      // WebSocket was created but send should not have been called
+      // because readyState is CONNECTING, not OPEN
+      expect(mockWebSocketInstances.length).toBe(1)
+      expect(mockWebSocketInstances[0].send).not.toHaveBeenCalled()
     })
   })
 

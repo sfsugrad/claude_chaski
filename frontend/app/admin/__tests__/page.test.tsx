@@ -1,7 +1,6 @@
 import React from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import { useRouter } from 'next/navigation'
-import axios from '@/lib/api'
 import AdminPage from '../page'
 
 // Mock dependencies
@@ -9,8 +8,83 @@ jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
 }))
 
-jest.mock('@/lib/api')
-const mockedAxios = axios as jest.Mocked<typeof axios>
+// Create mock functions for API calls
+const mockGetCurrentUser = jest.fn()
+const mockLogout = jest.fn()
+const mockGetUsers = jest.fn()
+const mockGetPackages = jest.fn()
+const mockGetStats = jest.fn()
+const mockUpdateUserRole = jest.fn()
+const mockToggleUserActive = jest.fn()
+const mockTogglePackageActive = jest.fn()
+const mockCreateUser = jest.fn()
+const mockRunMatchingJob = jest.fn()
+
+jest.mock('@/lib/api', () => ({
+  __esModule: true,
+  default: {
+    get: jest.fn(),
+    post: jest.fn(),
+    put: jest.fn(),
+  },
+  authAPI: {
+    getCurrentUser: () => mockGetCurrentUser(),
+    logout: () => mockLogout(),
+  },
+  adminAPI: {
+    getUsers: () => mockGetUsers(),
+    getPackages: () => mockGetPackages(),
+    getStats: () => mockGetStats(),
+    updateUserRole: (userId: number, role: string) => mockUpdateUserRole(userId, role),
+    toggleUserActive: (userId: number, isActive: boolean) => mockToggleUserActive(userId, isActive),
+    togglePackageActive: (packageId: number, isActive: boolean) => mockTogglePackageActive(packageId, isActive),
+    createUser: (data: any) => mockCreateUser(data),
+    runMatchingJob: (dryRun: boolean, hours: number) => mockRunMatchingJob(dryRun, hours),
+  },
+}))
+
+// Helper to set up admin mocks with default data
+const setupAdminMocks = (options: {
+  user?: any
+  users?: any[]
+  packages?: any[]
+  stats?: any
+  userError?: Error
+} = {}) => {
+  const {
+    user = {
+      id: 1,
+      email: 'admin@example.com',
+      full_name: 'Admin User',
+      role: 'ADMIN',
+    },
+    users = [],
+    packages = [],
+    stats = {
+      total_users: 0,
+      total_senders: 0,
+      total_couriers: 0,
+      total_both: 0,
+      total_admins: 0,
+      total_packages: 0,
+      active_packages: 0,
+      completed_packages: 0,
+      pending_packages: 0,
+      total_revenue: 0,
+    },
+    userError,
+  } = options
+
+  if (userError) {
+    mockGetCurrentUser.mockRejectedValue(userError)
+  } else {
+    mockGetCurrentUser.mockResolvedValue({ data: user })
+  }
+  mockGetUsers.mockResolvedValue({ data: users })
+  mockGetPackages.mockResolvedValue({ data: packages })
+  mockGetStats.mockResolvedValue({ data: stats })
+  mockLogout.mockResolvedValue({ data: { message: 'Logged out' } })
+}
 
 describe('AdminPage', () => {
   const mockRouter = {
@@ -26,19 +100,8 @@ describe('AdminPage', () => {
   })
 
   describe('Authentication and Authorization', () => {
-    it('redirects to login if no token exists', async () => {
-      ;(localStorage.getItem as jest.Mock).mockReturnValue(null)
-
-      render(<AdminPage />)
-
-      await waitFor(() => {
-        expect(mockRouter.push).toHaveBeenCalledWith('/login')
-      })
-    })
-
     it('redirects to login if user fetch fails', async () => {
-      ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
-      mockedAxios.get.mockRejectedValueOnce(new Error('Unauthorized'))
+      setupAdminMocks({ userError: new Error('Unauthorized') })
 
       render(<AdminPage />)
 
@@ -48,9 +111,8 @@ describe('AdminPage', () => {
     })
 
     it('shows access denied message for non-admin users', async () => {
-      ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
-      mockedAxios.get.mockResolvedValueOnce({
-        data: {
+      setupAdminMocks({
+        user: {
           id: 1,
           email: 'user@example.com',
           full_name: 'Regular User',
@@ -70,15 +132,7 @@ describe('AdminPage', () => {
     })
 
     it('allows access for admin users', async () => {
-      ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
-      mockedAxios.get.mockResolvedValueOnce({
-        data: {
-          id: 1,
-          email: 'admin@example.com',
-          full_name: 'Admin User',
-          role: 'ADMIN',
-        },
-      })
+      setupAdminMocks()
 
       render(<AdminPage />)
 
@@ -90,35 +144,7 @@ describe('AdminPage', () => {
 
   describe('Page Rendering', () => {
     beforeEach(() => {
-      ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
-      // Mock auth check
-      mockedAxios.get.mockResolvedValueOnce({
-        data: {
-          id: 1,
-          email: 'admin@example.com',
-          full_name: 'Admin User',
-          role: 'ADMIN',
-        },
-      })
-      // Mock users list
-      .mockResolvedValueOnce({ data: [] })
-      // Mock packages list
-      .mockResolvedValueOnce({ data: [] })
-      // Mock stats
-      .mockResolvedValueOnce({
-        data: {
-          total_users: 0,
-          total_senders: 0,
-          total_couriers: 0,
-          total_both: 0,
-          total_admins: 0,
-          total_packages: 0,
-          active_packages: 0,
-          completed_packages: 0,
-          pending_packages: 0,
-          total_revenue: 0,
-        },
-      })
+      setupAdminMocks()
     })
 
     it('renders loading state initially', () => {
@@ -148,35 +174,7 @@ describe('AdminPage', () => {
 
   describe('Navigation Tabs', () => {
     beforeEach(async () => {
-      ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
-      // Mock auth check
-      mockedAxios.get.mockResolvedValueOnce({
-        data: {
-          id: 1,
-          email: 'admin@example.com',
-          full_name: 'Admin User',
-          role: 'ADMIN',
-        },
-      })
-      // Mock users list
-      .mockResolvedValueOnce({ data: [] })
-      // Mock packages list
-      .mockResolvedValueOnce({ data: [] })
-      // Mock stats
-      .mockResolvedValueOnce({
-        data: {
-          total_users: 0,
-          total_senders: 0,
-          total_couriers: 0,
-          total_both: 0,
-          total_admins: 0,
-          total_packages: 0,
-          active_packages: 0,
-          completed_packages: 0,
-          pending_packages: 0,
-          total_revenue: 0,
-        },
-      })
+      setupAdminMocks()
     })
 
     it('renders all navigation tabs', async () => {
@@ -230,35 +228,7 @@ describe('AdminPage', () => {
 
   describe('Overview Tab', () => {
     beforeEach(async () => {
-      ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
-      // Mock auth check
-      mockedAxios.get.mockResolvedValueOnce({
-        data: {
-          id: 1,
-          email: 'admin@example.com',
-          full_name: 'Admin User',
-          role: 'ADMIN',
-        },
-      })
-      // Mock users list
-      .mockResolvedValueOnce({ data: [] })
-      // Mock packages list
-      .mockResolvedValueOnce({ data: [] })
-      // Mock stats
-      .mockResolvedValueOnce({
-        data: {
-          total_users: 0,
-          total_senders: 0,
-          total_couriers: 0,
-          total_both: 0,
-          total_admins: 0,
-          total_packages: 0,
-          active_packages: 0,
-          completed_packages: 0,
-          pending_packages: 0,
-          total_revenue: 0,
-        },
-      })
+      setupAdminMocks()
     })
 
     it('renders stats cards', async () => {
@@ -301,35 +271,7 @@ describe('AdminPage', () => {
 
   describe('Users Tab', () => {
     beforeEach(async () => {
-      ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
-      // Mock auth check
-      mockedAxios.get.mockResolvedValueOnce({
-        data: {
-          id: 1,
-          email: 'admin@example.com',
-          full_name: 'Admin User',
-          role: 'ADMIN',
-        },
-      })
-      // Mock users list
-      .mockResolvedValueOnce({ data: [] })
-      // Mock packages list
-      .mockResolvedValueOnce({ data: [] })
-      // Mock stats
-      .mockResolvedValueOnce({
-        data: {
-          total_users: 0,
-          total_senders: 0,
-          total_couriers: 0,
-          total_both: 0,
-          total_admins: 0,
-          total_packages: 0,
-          active_packages: 0,
-          completed_packages: 0,
-          pending_packages: 0,
-          total_revenue: 0,
-        },
-      })
+      setupAdminMocks()
     })
 
     it('shows no users message when users list is empty', async () => {
@@ -361,35 +303,7 @@ describe('AdminPage', () => {
 
   describe('Packages Tab', () => {
     beforeEach(async () => {
-      ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
-      // Mock auth check
-      mockedAxios.get.mockResolvedValueOnce({
-        data: {
-          id: 1,
-          email: 'admin@example.com',
-          full_name: 'Admin User',
-          role: 'ADMIN',
-        },
-      })
-      // Mock users list
-      .mockResolvedValueOnce({ data: [] })
-      // Mock packages list
-      .mockResolvedValueOnce({ data: [] })
-      // Mock stats
-      .mockResolvedValueOnce({
-        data: {
-          total_users: 0,
-          total_senders: 0,
-          total_couriers: 0,
-          total_both: 0,
-          total_admins: 0,
-          total_packages: 0,
-          active_packages: 0,
-          completed_packages: 0,
-          pending_packages: 0,
-          total_revenue: 0,
-        },
-      })
+      setupAdminMocks()
     })
 
     it('shows no packages message when packages list is empty', async () => {
@@ -421,38 +335,10 @@ describe('AdminPage', () => {
 
   describe('Logout Functionality', () => {
     beforeEach(async () => {
-      ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
-      // Mock auth check
-      mockedAxios.get.mockResolvedValueOnce({
-        data: {
-          id: 1,
-          email: 'admin@example.com',
-          full_name: 'Admin User',
-          role: 'ADMIN',
-        },
-      })
-      // Mock users list
-      .mockResolvedValueOnce({ data: [] })
-      // Mock packages list
-      .mockResolvedValueOnce({ data: [] })
-      // Mock stats
-      .mockResolvedValueOnce({
-        data: {
-          total_users: 0,
-          total_senders: 0,
-          total_couriers: 0,
-          total_both: 0,
-          total_admins: 0,
-          total_packages: 0,
-          active_packages: 0,
-          completed_packages: 0,
-          pending_packages: 0,
-          total_revenue: 0,
-        },
-      })
+      setupAdminMocks()
     })
 
-    it('clears token and redirects on logout', async () => {
+    it('calls logout API and redirects on logout', async () => {
       const { getByText } = render(<AdminPage />)
 
       await waitFor(() => {
@@ -462,42 +348,16 @@ describe('AdminPage', () => {
       const logoutBtn = getByText('Logout')
       logoutBtn.click()
 
-      expect(localStorage.removeItem).toHaveBeenCalledWith('token')
-      expect(mockRouter.push).toHaveBeenCalledWith('/login')
+      await waitFor(() => {
+        expect(mockLogout).toHaveBeenCalled()
+        expect(mockRouter.push).toHaveBeenCalledWith('/login')
+      })
     })
   })
 
   describe('Styling and Layout', () => {
     beforeEach(async () => {
-      ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
-      // Mock auth check
-      mockedAxios.get.mockResolvedValueOnce({
-        data: {
-          id: 1,
-          email: 'admin@example.com',
-          full_name: 'Admin User',
-          role: 'ADMIN',
-        },
-      })
-      // Mock users list
-      .mockResolvedValueOnce({ data: [] })
-      // Mock packages list
-      .mockResolvedValueOnce({ data: [] })
-      // Mock stats
-      .mockResolvedValueOnce({
-        data: {
-          total_users: 0,
-          total_senders: 0,
-          total_couriers: 0,
-          total_both: 0,
-          total_admins: 0,
-          total_packages: 0,
-          active_packages: 0,
-          completed_packages: 0,
-          pending_packages: 0,
-          total_revenue: 0,
-        },
-      })
+      setupAdminMocks()
     })
 
     it('uses purple color scheme for admin branding', async () => {
@@ -523,35 +383,7 @@ describe('AdminPage', () => {
 
   describe('Accessibility', () => {
     beforeEach(async () => {
-      ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
-      // Mock auth check
-      mockedAxios.get.mockResolvedValueOnce({
-        data: {
-          id: 1,
-          email: 'admin@example.com',
-          full_name: 'Admin User',
-          role: 'ADMIN',
-        },
-      })
-      // Mock users list
-      .mockResolvedValueOnce({ data: [] })
-      // Mock packages list
-      .mockResolvedValueOnce({ data: [] })
-      // Mock stats
-      .mockResolvedValueOnce({
-        data: {
-          total_users: 0,
-          total_senders: 0,
-          total_couriers: 0,
-          total_both: 0,
-          total_admins: 0,
-          total_packages: 0,
-          active_packages: 0,
-          completed_packages: 0,
-          pending_packages: 0,
-          total_revenue: 0,
-        },
-      })
+      setupAdminMocks()
     })
 
     it('uses proper heading hierarchy', async () => {
@@ -581,35 +413,7 @@ describe('AdminPage', () => {
 
   describe('Role-Based Content', () => {
     it('shows all four role options in user management', async () => {
-      ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
-      // Mock auth check
-      mockedAxios.get.mockResolvedValueOnce({
-        data: {
-          id: 1,
-          email: 'admin@example.com',
-          full_name: 'Admin User',
-          role: 'ADMIN',
-        },
-      })
-      // Mock users list
-      .mockResolvedValueOnce({ data: [] })
-      // Mock packages list
-      .mockResolvedValueOnce({ data: [] })
-      // Mock stats
-      .mockResolvedValueOnce({
-        data: {
-          total_users: 0,
-          total_senders: 0,
-          total_couriers: 0,
-          total_both: 0,
-          total_admins: 0,
-          total_packages: 0,
-          active_packages: 0,
-          completed_packages: 0,
-          pending_packages: 0,
-          total_revenue: 0,
-        },
-      })
+      setupAdminMocks()
 
       render(<AdminPage />)
 
@@ -623,47 +427,31 @@ describe('AdminPage', () => {
   })
 
   describe('Self-Deactivation Prevention', () => {
+    const testUsers = [
+      {
+        id: 1,
+        email: 'admin@example.com',
+        full_name: 'Admin User',
+        role: 'admin',
+        is_verified: true,
+        is_active: true,
+        created_at: '2024-01-01T00:00:00Z',
+      },
+      {
+        id: 2,
+        email: 'other@example.com',
+        full_name: 'Other User',
+        role: 'sender',
+        is_verified: true,
+        is_active: true,
+        created_at: '2024-01-02T00:00:00Z',
+      },
+    ]
+
     it('disables deactivate button for currently logged-in admin', async () => {
-      ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
-
-      // Mock the auth check
-      mockedAxios.get.mockResolvedValueOnce({
-        data: {
-          id: 1,
-          email: 'admin@example.com',
-          full_name: 'Admin User',
-          role: 'ADMIN',
-        },
-      })
-
-      // Mock users list API call (use lowercase role values to match select options)
-      .mockResolvedValueOnce({
-        data: [
-          {
-            id: 1,
-            email: 'admin@example.com',
-            full_name: 'Admin User',
-            role: 'admin',
-            is_verified: true,
-            is_active: true,
-            created_at: '2024-01-01T00:00:00Z',
-          },
-          {
-            id: 2,
-            email: 'other@example.com',
-            full_name: 'Other User',
-            role: 'sender',
-            is_verified: true,
-            is_active: true,
-            created_at: '2024-01-02T00:00:00Z',
-          },
-        ],
-      })
-
-      // Mock packages and stats
-      .mockResolvedValueOnce({ data: [] })
-      .mockResolvedValueOnce({
-        data: {
+      setupAdminMocks({
+        users: testUsers,
+        stats: {
           total_users: 2,
           total_senders: 1,
           total_couriers: 0,
@@ -699,46 +487,9 @@ describe('AdminPage', () => {
     })
 
     it('allows deactivating other users', async () => {
-      ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
-
-      // Mock the auth check
-      mockedAxios.get.mockResolvedValueOnce({
-        data: {
-          id: 1,
-          email: 'admin@example.com',
-          full_name: 'Admin User',
-          role: 'ADMIN',
-        },
-      })
-
-      // Mock users list API call (use lowercase role values to match select options)
-      .mockResolvedValueOnce({
-        data: [
-          {
-            id: 1,
-            email: 'admin@example.com',
-            full_name: 'Admin User',
-            role: 'admin',
-            is_verified: true,
-            is_active: true,
-            created_at: '2024-01-01T00:00:00Z',
-          },
-          {
-            id: 2,
-            email: 'other@example.com',
-            full_name: 'Other User',
-            role: 'sender',
-            is_verified: true,
-            is_active: true,
-            created_at: '2024-01-02T00:00:00Z',
-          },
-        ],
-      })
-
-      // Mock packages and stats
-      .mockResolvedValueOnce({ data: [] })
-      .mockResolvedValueOnce({
-        data: {
+      setupAdminMocks({
+        users: testUsers,
+        stats: {
           total_users: 2,
           total_senders: 1,
           total_couriers: 0,
@@ -777,47 +528,31 @@ describe('AdminPage', () => {
   })
 
   describe('Self-Role Change Prevention', () => {
+    const testUsers = [
+      {
+        id: 1,
+        email: 'admin@example.com',
+        full_name: 'Admin User',
+        role: 'admin',
+        is_verified: true,
+        is_active: true,
+        created_at: '2024-01-01T00:00:00Z',
+      },
+      {
+        id: 2,
+        email: 'other@example.com',
+        full_name: 'Other User',
+        role: 'sender',
+        is_verified: true,
+        is_active: true,
+        created_at: '2024-01-02T00:00:00Z',
+      },
+    ]
+
     it('disables role dropdown for currently logged-in admin', async () => {
-      ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
-
-      // Mock the auth check
-      mockedAxios.get.mockResolvedValueOnce({
-        data: {
-          id: 1,
-          email: 'admin@example.com',
-          full_name: 'Admin User',
-          role: 'ADMIN',
-        },
-      })
-
-      // Mock users list API call (use lowercase role values to match select options)
-      .mockResolvedValueOnce({
-        data: [
-          {
-            id: 1,
-            email: 'admin@example.com',
-            full_name: 'Admin User',
-            role: 'admin',
-            is_verified: true,
-            is_active: true,
-            created_at: '2024-01-01T00:00:00Z',
-          },
-          {
-            id: 2,
-            email: 'other@example.com',
-            full_name: 'Other User',
-            role: 'sender',
-            is_verified: true,
-            is_active: true,
-            created_at: '2024-01-02T00:00:00Z',
-          },
-        ],
-      })
-
-      // Mock packages and stats
-      .mockResolvedValueOnce({ data: [] })
-      .mockResolvedValueOnce({
-        data: {
+      setupAdminMocks({
+        users: testUsers,
+        stats: {
           total_users: 2,
           total_senders: 1,
           total_couriers: 0,
@@ -854,46 +589,9 @@ describe('AdminPage', () => {
     })
 
     it('allows changing role for other users', async () => {
-      ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
-
-      // Mock the auth check
-      mockedAxios.get.mockResolvedValueOnce({
-        data: {
-          id: 1,
-          email: 'admin@example.com',
-          full_name: 'Admin User',
-          role: 'ADMIN',
-        },
-      })
-
-      // Mock users list API call (use lowercase role values to match select options)
-      .mockResolvedValueOnce({
-        data: [
-          {
-            id: 1,
-            email: 'admin@example.com',
-            full_name: 'Admin User',
-            role: 'admin',
-            is_verified: true,
-            is_active: true,
-            created_at: '2024-01-01T00:00:00Z',
-          },
-          {
-            id: 2,
-            email: 'other@example.com',
-            full_name: 'Other User',
-            role: 'sender',
-            is_verified: true,
-            is_active: true,
-            created_at: '2024-01-02T00:00:00Z',
-          },
-        ],
-      })
-
-      // Mock packages and stats
-      .mockResolvedValueOnce({ data: [] })
-      .mockResolvedValueOnce({
-        data: {
+      setupAdminMocks({
+        users: testUsers,
+        stats: {
           total_users: 2,
           total_senders: 1,
           total_couriers: 0,

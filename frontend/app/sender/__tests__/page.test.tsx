@@ -2,7 +2,7 @@ import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { useRouter } from 'next/navigation'
 import SenderDashboard from '../page'
-import { packagesAPI, authAPI } from '@/lib/api'
+import { packagesAPI, authAPI, ratingsAPI } from '@/lib/api'
 
 // Mock next/navigation
 jest.mock('next/navigation', () => ({
@@ -24,6 +24,9 @@ jest.mock('@/lib/api', () => ({
   },
   authAPI: {
     getCurrentUser: jest.fn(),
+  },
+  ratingsAPI: {
+    getMyPendingRatings: jest.fn(),
   },
 }))
 
@@ -48,6 +51,8 @@ const mockPackages = [
     id: 1,
     sender_id: 1,
     courier_id: null,
+    sender_name: 'Test Sender',
+    courier_name: null,
     description: 'Test package 1',
     size: 'small',
     weight_kg: 2.5,
@@ -70,6 +75,8 @@ const mockPackages = [
     id: 2,
     sender_id: 1,
     courier_id: 5,
+    sender_name: 'Test Sender',
+    courier_name: 'Test Courier',
     description: 'Test package 2 - matched',
     size: 'medium',
     weight_kg: 5.0,
@@ -92,6 +99,8 @@ const mockPackages = [
     id: 3,
     sender_id: 1,
     courier_id: 5,
+    sender_name: 'Test Sender',
+    courier_name: 'Test Courier',
     description: 'Delivered package',
     size: 'large',
     weight_kg: 10.0,
@@ -118,6 +127,7 @@ describe('SenderDashboard', () => {
     ;(useRouter as jest.Mock).mockReturnValue(mockRouter)
     ;(authAPI.getCurrentUser as jest.Mock).mockResolvedValue({ data: mockUser })
     ;(packagesAPI.getAll as jest.Mock).mockResolvedValue({ data: mockPackages })
+    ;(ratingsAPI.getMyPendingRatings as jest.Mock).mockResolvedValue({ data: [] })
   })
 
   describe('Page Rendering', () => {
