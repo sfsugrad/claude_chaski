@@ -118,15 +118,19 @@ Users have one role: `sender`, `courier`, `both`, or `admin`
 - **Courier Routes**: Create/update/delete routes, one active route per courier
 - **Matching Algorithm**: Geospatial matching using haversine/cross-track distance, accept/decline packages
 - **Admin Dashboard**: User management, package management, platform statistics
-- **Notification System (Backend)**:
+- **Notification System (Backend - Complete)**:
   - Notification model with types (package_matched, accepted, declined, picked_up, in_transit, delivered, cancelled, route_match_found, system)
   - Full API: GET /api/notifications, GET /api/notifications/unread-count, PUT /api/notifications/{id}/read, PUT /api/notifications/mark-read, DELETE endpoints
   - Email notification functions for all package events (matched, accepted, picked up, in transit, delivered, cancelled, declined, route match found)
+  - Integration into existing endpoints:
+    - `matching.py`: Notifications on accept/decline package
+    - `packages.py`: Notifications on status updates (picked_up, in_transit, delivered) and cancellation
+    - `couriers.py`: Notifications when courier creates route with matching packages
+  - Comprehensive test coverage (65 tests): API tests, email function tests, integration tests
 
 ### Not Yet Implemented
 - Real-time updates (WebSockets)
 - Frontend notification UI (dropdown component, badge in nav)
-- Integration of notifications into existing endpoints (trigger on status changes)
 - Rating & review system
 - Payment integration
 - Mobile app
@@ -135,11 +139,11 @@ Users have one role: `sender`, `courier`, `both`, or `admin`
 
 ### Phase 1: Core Platform Completion
 
-**1. Notification System (Remaining)**
+**1. Notification System**
 - ~~Create `Notification` model (user_id, type, message, read, created_at)~~ DONE
 - ~~Backend endpoints: GET /api/notifications, PUT /api/notifications/{id}/read~~ DONE
 - ~~Extend `app/utils/email.py` for event notifications (matched, status change, delivered)~~ DONE
-- Integrate notifications into existing endpoints (call `create_notification()` and email functions on events)
+- ~~Integrate notifications into existing endpoints (call `create_notification()` and email functions on events)~~ DONE
 - Frontend: notification dropdown component, badge in nav
 
 **2. Rating & Review System**
