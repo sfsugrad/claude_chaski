@@ -70,17 +70,21 @@ npm run lint
   - `admin.py` - Admin-only user/package management
   - `notifications.py` - User notification management
   - `ratings.py` - Rating and review system
+  - `ws.py` - WebSocket endpoint for real-time updates
 - `app/utils/` - Shared utilities:
   - `dependencies.py` - FastAPI dependencies (`get_current_user`, `get_current_admin_user`)
   - `auth.py` - JWT token and password hashing
   - `email.py` - Email sending via FastAPI-Mail (includes event notification emails)
   - `geo.py` - Geospatial calculations for route matching
   - `oauth.py` - Google OAuth configuration
-- `app/services/` - Business logic services
+- `app/services/` - Business logic services:
+  - `websocket_manager.py` - WebSocket connection manager and broadcast functions
 
 ### Frontend Structure
 - `app/` - Next.js 14 App Router pages
 - `lib/api.ts` - Axios client with auth interceptor and TypeScript interfaces for all API types
+- `hooks/` - Custom React hooks:
+  - `useWebSocket.ts` - WebSocket connection hook with auto-reconnect
 - `components/` - Reusable React components
 
 ### Key Patterns
@@ -130,9 +134,16 @@ Users have one role: `sender`, `courier`, `both`, or `admin`
   - Frontend: StarRating component, RatingModal for post-delivery ratings, reviews page at /profile/reviews
   - User ratings displayed in navbar with link to reviews page
   - Automatic rating prompts on dashboard after package delivery
+- **Real-time Updates (WebSocket)**:
+  - Backend: WebSocket endpoint at `/api/ws` with JWT authentication
+  - Connection manager supporting multiple connections per user
+  - Real-time notification broadcast on all package events (status changes, matching, cancellation)
+  - Events: `notification_created`, `unread_count_updated`, `ping/pong`
+  - Frontend: `useWebSocket` hook with auto-reconnect and fallback polling
+  - NotificationDropdown integrates WebSocket for instant updates with visual connection indicator
+  - Comprehensive test suite (12 tests)
 
 ## Pending Features
 
-- Real-time updates (WebSockets)
 - Payment integration (Stripe)
 - Mobile app (React Native)

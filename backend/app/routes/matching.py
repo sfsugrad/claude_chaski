@@ -12,7 +12,7 @@ from app.models.package import Package, PackageStatus, CourierRoute
 from app.models.user import User, UserRole
 from app.models.notification import NotificationType
 from app.utils.dependencies import get_current_user
-from app.routes.notifications import create_notification
+from app.routes.notifications import create_notification, create_notification_with_broadcast
 from app.utils.email import (
     send_package_matched_email,
     send_package_accepted_email,
@@ -238,8 +238,8 @@ async def accept_package(
     db.commit()
     db.refresh(package)
 
-    # Create in-app notification for sender
-    create_notification(
+    # Create in-app notification for sender with WebSocket broadcast
+    await create_notification_with_broadcast(
         db=db,
         user_id=package.sender_id,
         notification_type=NotificationType.PACKAGE_MATCHED,
@@ -316,8 +316,8 @@ async def decline_package(
     db.commit()
     db.refresh(package)
 
-    # Create in-app notification for sender
-    create_notification(
+    # Create in-app notification for sender with WebSocket broadcast
+    await create_notification_with_broadcast(
         db=db,
         user_id=package.sender_id,
         notification_type=NotificationType.PACKAGE_DECLINED,

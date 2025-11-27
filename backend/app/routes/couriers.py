@@ -6,7 +6,7 @@ from app.models.package import CourierRoute, Package, PackageStatus
 from app.models.user import User, UserRole
 from app.models.notification import NotificationType
 from app.utils.dependencies import get_current_user
-from app.routes.notifications import create_notification
+from app.routes.notifications import create_notification, create_notification_with_broadcast
 from app.utils.email import send_route_match_found_email
 from pydantic import BaseModel, Field
 from typing import List
@@ -157,8 +157,8 @@ async def create_route(
     # Check for matching packages and notify courier
     matching_count = count_matching_packages(db, new_route)
     if matching_count > 0:
-        # Create in-app notification
-        create_notification(
+        # Create in-app notification with WebSocket broadcast
+        await create_notification_with_broadcast(
             db=db,
             user_id=current_user.id,
             notification_type=NotificationType.ROUTE_MATCH_FOUND,
@@ -354,8 +354,8 @@ async def activate_route(
     # Check for matching packages and notify courier
     matching_count = count_matching_packages(db, route)
     if matching_count > 0:
-        # Create in-app notification
-        create_notification(
+        # Create in-app notification with WebSocket broadcast
+        await create_notification_with_broadcast(
             db=db,
             user_id=current_user.id,
             notification_type=NotificationType.ROUTE_MATCH_FOUND,

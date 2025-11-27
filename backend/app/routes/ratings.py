@@ -9,7 +9,7 @@ from app.models.package import Package, PackageStatus
 from app.models.rating import Rating
 from app.models.notification import NotificationType
 from app.utils.dependencies import get_current_user
-from app.routes.notifications import create_notification
+from app.routes.notifications import create_notification_with_broadcast
 
 router = APIRouter()
 
@@ -124,8 +124,8 @@ async def create_rating(
     db.commit()
     db.refresh(new_rating)
 
-    # Create notification for the rated user
-    create_notification(
+    # Create notification for the rated user with WebSocket broadcast
+    await create_notification_with_broadcast(
         db=db,
         user_id=rated_user_id,
         notification_type=NotificationType.SYSTEM,

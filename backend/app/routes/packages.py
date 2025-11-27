@@ -5,7 +5,7 @@ from app.models.package import Package, PackageSize, PackageStatus
 from app.models.user import User
 from app.models.notification import NotificationType
 from app.utils.dependencies import get_current_user
-from app.routes.notifications import create_notification
+from app.routes.notifications import create_notification, create_notification_with_broadcast
 from app.utils.email import (
     send_package_picked_up_email,
     send_package_in_transit_email,
@@ -343,8 +343,8 @@ async def update_package_status(
 
     # Send notifications based on new status
     if new_status == PackageStatus.PICKED_UP and old_status != PackageStatus.PICKED_UP:
-        # Create in-app notification
-        create_notification(
+        # Create in-app notification with WebSocket broadcast
+        await create_notification_with_broadcast(
             db=db,
             user_id=package.sender_id,
             notification_type=NotificationType.PACKAGE_PICKED_UP,
@@ -364,8 +364,8 @@ async def update_package_status(
             )
 
     elif new_status == PackageStatus.IN_TRANSIT and old_status != PackageStatus.IN_TRANSIT:
-        # Create in-app notification
-        create_notification(
+        # Create in-app notification with WebSocket broadcast
+        await create_notification_with_broadcast(
             db=db,
             user_id=package.sender_id,
             notification_type=NotificationType.PACKAGE_IN_TRANSIT,
@@ -384,8 +384,8 @@ async def update_package_status(
             )
 
     elif new_status == PackageStatus.DELIVERED and old_status != PackageStatus.DELIVERED:
-        # Create in-app notification
-        create_notification(
+        # Create in-app notification with WebSocket broadcast
+        await create_notification_with_broadcast(
             db=db,
             user_id=package.sender_id,
             notification_type=NotificationType.PACKAGE_DELIVERED,
@@ -457,8 +457,8 @@ async def cancel_package(
     if courier_id:
         courier = db.query(User).filter(User.id == courier_id).first()
         if courier:
-            # Create in-app notification for courier
-            create_notification(
+            # Create in-app notification for courier with WebSocket broadcast
+            await create_notification_with_broadcast(
                 db=db,
                 user_id=courier_id,
                 notification_type=NotificationType.PACKAGE_CANCELLED,
@@ -475,8 +475,8 @@ async def cancel_package(
                 package_id=package.id
             )
 
-    # Create in-app notification for sender (confirmation)
-    create_notification(
+    # Create in-app notification for sender (confirmation) with WebSocket broadcast
+    await create_notification_with_broadcast(
         db=db,
         user_id=package.sender_id,
         notification_type=NotificationType.PACKAGE_CANCELLED,

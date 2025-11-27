@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { notificationsAPI, NotificationType } from '@/lib/api'
+import { useWebSocket, ConnectionStatus } from '@/hooks/useWebSocket'
 
 // Internal notification type with transformed fields from backend
 interface DisplayNotification {
@@ -71,7 +72,49 @@ export default function NotificationDropdown({ className = '' }: NotificationDro
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [wsStatus, setWsStatus] = useState<ConnectionStatus>('disconnected')
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Handle new notifications from WebSocket
+  const handleNewNotification = useCallback((notification: any) => {
+    if (!notification) return
+
+    const displayNotification: DisplayNotification = {
+      id: notification.id,
+      user_id: notification.user_id,
+      type: notification.type as NotificationType,
+      title: NOTIFICATION_TITLES[notification.type as NotificationType] || 'Notification',
+      message: notification.message,
+      is_read: notification.read,
+      package_id: notification.package_id,
+      created_at: notification.created_at,
+    }
+
+    // Add new notification to the top of the list
+    setNotifications(prev => {
+      // Check if notification already exists
+      const exists = prev.some(n => n.id === displayNotification.id)
+      if (exists) return prev
+      return [displayNotification, ...prev]
+    })
+  }, [])
+
+  // Handle unread count updates from WebSocket
+  const handleUnreadCountUpdate = useCallback((count: number) => {
+    setUnreadCount(count)
+  }, [])
+
+  // Handle WebSocket connection status changes
+  const handleConnectionChange = useCallback((status: ConnectionStatus) => {
+    setWsStatus(status)
+  }, [])
+
+  // Initialize WebSocket connection
+  const { isConnected, markNotificationRead } = useWebSocket({
+    onNotification: handleNewNotification,
+    onUnreadCountUpdate: handleUnreadCountUpdate,
+    onConnectionChange: handleConnectionChange,
+  })
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -85,12 +128,14 @@ export default function NotificationDropdown({ className = '' }: NotificationDro
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Fetch unread count on mount and periodically
+  // Fetch unread count on mount and periodically (fallback when WebSocket not connected)
   useEffect(() => {
     fetchUnreadCount()
-    const interval = setInterval(fetchUnreadCount, 30000) // Poll every 30 seconds
+    // Use longer polling interval when WebSocket is connected
+    const pollInterval = isConnected ? 60000 : 30000
+    const interval = setInterval(fetchUnreadCount, pollInterval)
     return () => clearInterval(interval)
-  }, [])
+  }, [isConnected])
 
   const fetchUnreadCount = async () => {
     try {
@@ -137,6 +182,11 @@ export default function NotificationDropdown({ className = '' }: NotificationDro
   const handleMarkAsRead = async (id: number, event: React.MouseEvent) => {
     event.stopPropagation()
     try {
+      // Use WebSocket if connected, otherwise use REST API
+      if (isConnected) {
+        markNotificationRead(id)
+      }
+      // Always call REST API for persistence
       await notificationsAPI.markAsRead(id)
       setNotifications(prev =>
         prev.map(n => n.id === id ? { ...n, is_read: true } : n)
@@ -203,7 +253,16 @@ export default function NotificationDropdown({ className = '' }: NotificationDro
         <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
-            <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
+              {/* WebSocket connection indicator */}
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  isConnected ? 'bg-green-500' : 'bg-gray-300'
+                }`}
+                title={isConnected ? 'Real-time updates active' : 'Using periodic refresh'}
+              />
+            </div>
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllAsRead}

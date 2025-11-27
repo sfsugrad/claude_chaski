@@ -238,3 +238,51 @@ def create_notification(
     db.commit()
     db.refresh(notification)
     return notification
+
+
+async def create_notification_with_broadcast(
+    db: Session,
+    user_id: int,
+    notification_type: NotificationType,
+    message: str,
+    package_id: int | None = None
+) -> Notification:
+    """
+    Create a new notification and broadcast it via WebSocket.
+
+    This is the preferred method for creating notifications as it provides
+    real-time updates to connected clients.
+    """
+    from app.services.websocket_manager import broadcast_notification, broadcast_unread_count
+
+    # Create the notification in database
+    notification = Notification(
+        user_id=user_id,
+        type=notification_type,
+        message=message,
+        package_id=package_id
+    )
+    db.add(notification)
+    db.commit()
+    db.refresh(notification)
+
+    # Broadcast via WebSocket
+    notification_data = {
+        "id": notification.id,
+        "user_id": notification.user_id,
+        "type": notification.type.value,
+        "message": notification.message,
+        "read": notification.read,
+        "package_id": notification.package_id,
+        "created_at": notification.created_at.isoformat()
+    }
+    await broadcast_notification(user_id, notification_data)
+
+    # Also broadcast updated unread count
+    unread_count = db.query(Notification).filter(
+        Notification.user_id == user_id,
+        Notification.read == False
+    ).count()
+    await broadcast_unread_count(user_id, unread_count)
+
+    return notification
