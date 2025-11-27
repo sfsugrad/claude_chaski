@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { messagesAPI, MessageResponse } from '@/lib/api'
+import { useWebSocketContext } from '@/contexts/WebSocketContext'
 
 interface ChatWindowProps {
   packageId: number
@@ -51,6 +52,9 @@ export default function ChatWindow({
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // Get shared WebSocket context
+  const { onMessageReceived } = useWebSocketContext()
+
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [])
@@ -79,25 +83,21 @@ export default function ChatWindow({
     scrollToBottom()
   }, [messages, scrollToBottom])
 
-  // Handle incoming WebSocket messages
-  const handleIncomingMessage = useCallback((message: MessageResponse) => {
-    if (message.package_id === packageId) {
-      setMessages(prev => {
-        // Avoid duplicates
-        if (prev.some(m => m.id === message.id)) return prev
-        return [...prev, message]
-      })
-      // Mark as read since chat is open
-      messagesAPI.markAsRead(message.id).catch(console.error)
-    }
-  }, [packageId])
-
-  // Expose handler for parent component to call
+  // Subscribe to WebSocket message events
   useEffect(() => {
-    if (onNewMessage) {
-      // Parent can pass messages via onNewMessage prop
-    }
-  }, [onNewMessage])
+    const unsubscribe = onMessageReceived((message: any) => {
+      if (message.package_id === packageId) {
+        setMessages(prev => {
+          // Avoid duplicates
+          if (prev.some(m => m.id === message.id)) return prev
+          return [...prev, message]
+        })
+        // Mark as read since chat is open
+        messagesAPI.markAsRead(message.id).catch(console.error)
+      }
+    })
+    return unsubscribe
+  }, [onMessageReceived, packageId])
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -128,11 +128,6 @@ export default function ChatWindow({
       handleSend(e as unknown as React.FormEvent)
     }
   }
-
-  // Method to add external message (from WebSocket)
-  const addMessage = useCallback((message: MessageResponse) => {
-    handleIncomingMessage(message)
-  }, [handleIncomingMessage])
 
   if (loading) {
     return (
@@ -240,9 +235,4 @@ export default function ChatWindow({
       </form>
     </div>
   )
-}
-
-// Export a method to externally add messages (for WebSocket integration)
-export type ChatWindowHandle = {
-  addMessage: (message: MessageResponse) => void
 }
