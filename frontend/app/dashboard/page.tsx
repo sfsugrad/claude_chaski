@@ -2,14 +2,18 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { authAPI, UserResponse } from '@/lib/api'
+import { authAPI, ratingsAPI, UserResponse, PendingRating } from '@/lib/api'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
+import RatingModal from '@/components/RatingModal'
 
 export default function DashboardPage() {
   const router = useRouter()
   const [user, setUser] = useState<UserResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  const [pendingRatings, setPendingRatings] = useState<PendingRating[]>([])
+  const [showRatingModal, setShowRatingModal] = useState(false)
+  const [currentRatingIndex, setCurrentRatingIndex] = useState(0)
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -22,6 +26,9 @@ export default function DashboardPage() {
 
         const response = await authAPI.getCurrentUser()
         setUser(response.data)
+
+        // Load pending ratings
+        await loadPendingRatings()
       } catch (error) {
         localStorage.removeItem('token')
         router.push('/login')
@@ -32,6 +39,36 @@ export default function DashboardPage() {
 
     fetchUser()
   }, [router])
+
+  const loadPendingRatings = async () => {
+    try {
+      const response = await ratingsAPI.getMyPendingRatings()
+      setPendingRatings(response.data)
+      if (response.data.length > 0) {
+        setShowRatingModal(true)
+      }
+    } catch (err) {
+      console.error('Failed to load pending ratings:', err)
+    }
+  }
+
+  const handleRatingSubmitted = () => {
+    if (currentRatingIndex < pendingRatings.length - 1) {
+      setCurrentRatingIndex(currentRatingIndex + 1)
+    } else {
+      setShowRatingModal(false)
+      setCurrentRatingIndex(0)
+      loadPendingRatings()
+    }
+  }
+
+  const handleRatingModalClose = () => {
+    if (currentRatingIndex < pendingRatings.length - 1) {
+      setCurrentRatingIndex(currentRatingIndex + 1)
+    } else {
+      setShowRatingModal(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -49,8 +86,41 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
       <Navbar user={user} />
 
+      {/* Rating Modal */}
+      {pendingRatings.length > 0 && (
+        <RatingModal
+          isOpen={showRatingModal}
+          onClose={handleRatingModalClose}
+          pendingRating={pendingRatings[currentRatingIndex]}
+          onRatingSubmitted={handleRatingSubmitted}
+        />
+      )}
+
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
+          {/* Pending Ratings Banner */}
+          {pendingRatings.length > 0 && !showRatingModal && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">⭐</span>
+                <div>
+                  <p className="font-medium text-yellow-800">
+                    You have {pendingRatings.length} pending {pendingRatings.length === 1 ? 'review' : 'reviews'}
+                  </p>
+                  <p className="text-sm text-yellow-600">
+                    Rate your experience with users from your completed deliveries
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowRatingModal(true)}
+                className="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 transition-colors font-medium"
+              >
+                Rate Now
+              </button>
+            </div>
+          )}
+
           <div className="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
             <div className="px-4 py-5 sm:px-6">
               <h3 className="text-lg leading-6 font-medium text-gray-900">
