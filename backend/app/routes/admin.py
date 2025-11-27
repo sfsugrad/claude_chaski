@@ -13,6 +13,8 @@ from app.services.audit_service import (
     log_user_role_change,
     log_user_deactivate,
     log_user_activate,
+    log_user_verify,
+    log_user_unverify,
     log_user_delete,
     log_package_delete,
     log_package_deactivate,
@@ -301,6 +303,10 @@ class ToggleUserActive(BaseModel):
     is_active: bool
 
 
+class ToggleUserVerified(BaseModel):
+    is_verified: bool
+
+
 class UpdateUserProfile(BaseModel):
     full_name: str | None = None
     phone_number: str | None = None
@@ -422,6 +428,53 @@ async def toggle_user_active(
         log_user_activate(db, admin, user, request)
     else:
         log_user_deactivate(db, admin, user, request)
+
+    return user
+
+
+@router.put("/users/{user_id}/toggle-verified", response_model=UserAdminResponse)
+async def toggle_user_verified(
+    request: Request,
+    user_id: int,
+    toggle_data: ToggleUserVerified,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Toggle user verified status (admin only).
+
+    Verified users have confirmed their email address or have been manually
+    verified by an admin.
+
+    Args:
+        user_id: User ID
+        toggle_data: New verified status
+        db: Database session
+        admin: Current admin user
+
+    Returns:
+        Updated user details
+
+    Raises:
+        HTTPException: If user not found
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    user.is_verified = toggle_data.is_verified
+    user.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(user)
+
+    # Audit log verification/unverification
+    if toggle_data.is_verified:
+        log_user_verify(db, admin, user, request)
+    else:
+        log_user_unverify(db, admin, user, request)
 
     return user
 

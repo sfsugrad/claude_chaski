@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { authAPI } from '@/lib/api'
 import GoogleSignInButton from '@/components/GoogleSignInButton'
+import AddressAutocomplete from '@/components/AddressAutocomplete'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -16,6 +17,9 @@ export default function RegisterPage() {
     role: 'sender' as 'sender' | 'courier' | 'both',
     phone_number: '',
     max_deviation_km: 5,
+    default_address: '',
+    default_address_lat: 0,
+    default_address_lng: 0,
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -27,6 +31,15 @@ export default function RegisterPage() {
     setFormData((prev) => ({
       ...prev,
       [name]: name === 'max_deviation_km' ? parseInt(value) || 5 : value,
+    }))
+  }
+
+  const handleAddressChange = (address: string, lat: number, lng: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      default_address: address,
+      default_address_lat: lat,
+      default_address_lng: lng,
     }))
   }
 
@@ -71,7 +84,16 @@ export default function RegisterPage() {
     setLoading(true)
 
     try {
-      const { confirmPassword, ...registerData } = formData
+      const { confirmPassword, default_address, default_address_lat, default_address_lng, ...baseData } = formData
+      // Only include address fields if address is provided
+      const registerData = {
+        ...baseData,
+        ...(default_address ? {
+          default_address,
+          default_address_lat,
+          default_address_lng,
+        } : {}),
+      }
       const response = await authAPI.register(registerData)
 
       if (response.data) {
@@ -240,6 +262,29 @@ export default function RegisterPage() {
                 placeholder="+1234567890"
               />
             </div>
+
+            {/* Default Address (for senders) */}
+            {(formData.role === 'sender' || formData.role === 'both') && (
+              <div>
+                <label
+                  htmlFor="default_address"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Default Pickup Address (Optional)
+                </label>
+                <AddressAutocomplete
+                  id="default_address"
+                  name="default_address"
+                  value={formData.default_address}
+                  onChange={handleAddressChange}
+                  placeholder="Start typing to search for your address..."
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  This will be pre-filled when you create new packages
+                </p>
+              </div>
+            )}
 
             {/* Max Deviation (only for couriers) */}
             {(formData.role === 'courier' || formData.role === 'both') && (

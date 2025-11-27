@@ -125,6 +125,23 @@ export default function AdminPage() {
     }
   }
 
+  const handleToggleUserVerified = async (userId: number, currentStatus: boolean) => {
+    const action = currentStatus ? 'unverify' : 'verify'
+    if (!confirm(`Are you sure you want to ${action} this user?`)) {
+      return
+    }
+
+    try {
+      await adminAPI.toggleUserVerified(userId, !currentStatus)
+      await loadData()
+      alert(`User ${action === 'verify' ? 'verified' : 'unverified'} successfully`)
+    } catch (err: any) {
+      console.error('Error toggling user verification:', err)
+      const errorMessage = err.response?.data?.detail || `Failed to ${action} user`
+      alert(errorMessage)
+    }
+  }
+
   const handleTogglePackageActive = async (packageId: number, currentStatus: boolean) => {
     const action = currentStatus ? 'deactivate' : 'activate'
     if (!confirm(`Are you sure you want to ${action} this package?`)) {
@@ -677,15 +694,18 @@ export default function AdminPage() {
                           </select>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span
-                            className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          <button
+                            onClick={() => handleToggleUserVerified(u.id, u.is_verified)}
+                            disabled={!u.is_active}
+                            className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full cursor-pointer transition-colors ${
                               u.is_verified
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-yellow-100 text-yellow-800'
-                            }`}
+                                ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                                : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
+                            } ${!u.is_active ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            title={u.is_active ? `Click to ${u.is_verified ? 'unverify' : 'verify'} user` : 'Cannot modify inactive user'}
                           >
                             {u.is_verified ? 'Verified' : 'Unverified'}
-                          </span>
+                          </button>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-2 py-1 text-xs font-semibold rounded-full ${

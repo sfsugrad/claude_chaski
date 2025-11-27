@@ -543,6 +543,138 @@ class TestAdminUserToggleActive:
         assert users[2].is_active is True
 
 
+class TestAdminUserToggleVerified:
+    """Tests for admin user toggle-verified functionality"""
+
+    def test_toggle_user_to_unverified(self, client, db_session, authenticated_admin, test_user_data):
+        """Test admin can unverify a verified user"""
+        # Create and verify a user
+        client.post("/api/auth/register", json=test_user_data)
+        user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+        user.is_verified = True
+        db_session.commit()
+        assert user.is_verified is True
+
+        # Unverify user
+        response = client.put(
+            f"/api/admin/users/{user.id}/toggle-verified",
+            json={"is_verified": False},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["is_verified"] is False
+        assert data["id"] == user.id
+
+        # Verify in database
+        db_session.refresh(user)
+        assert user.is_verified is False
+
+    def test_toggle_user_to_verified(self, client, db_session, authenticated_admin, test_user_data):
+        """Test admin can verify an unverified user"""
+        # Create an unverified user
+        client.post("/api/auth/register", json=test_user_data)
+        user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+        assert user.is_verified is False  # Users start unverified
+
+        # Verify user
+        response = client.put(
+            f"/api/admin/users/{user.id}/toggle-verified",
+            json={"is_verified": True},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["is_verified"] is True
+
+        # Verify in database
+        db_session.refresh(user)
+        assert user.is_verified is True
+
+    def test_toggle_verified_user_not_found(self, client, authenticated_admin):
+        """Test toggling verification for non-existent user returns 404"""
+        response = client.put(
+            "/api/admin/users/99999/toggle-verified",
+            json={"is_verified": False},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert "not found" in response.json()["detail"].lower()
+
+    def test_toggle_verified_as_non_admin(self, client, authenticated_sender):
+        """Test non-admin cannot toggle user verification status"""
+        response = client.put(
+            "/api/admin/users/1/toggle-verified",
+            json={"is_verified": False},
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_toggle_verified_without_authentication(self, client):
+        """Test cannot toggle user verification without authentication"""
+        response = client.put(
+            "/api/admin/users/1/toggle-verified",
+            json={"is_verified": False}
+        )
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_toggle_verified_creates_audit_log(self, client, db_session, authenticated_admin, test_user_data):
+        """Test that toggling verification creates audit log entries"""
+        from app.models.audit_log import AuditLog, AuditAction
+
+        # Create a user
+        client.post("/api/auth/register", json=test_user_data)
+        user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+
+        # Get initial audit log count
+        initial_count = db_session.query(AuditLog).filter(
+            AuditLog.action.in_([AuditAction.USER_VERIFY, AuditAction.USER_UNVERIFY])
+        ).count()
+
+        # Verify the user
+        response = client.put(
+            f"/api/admin/users/{user.id}/toggle-verified",
+            json={"is_verified": True},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+        assert response.status_code == status.HTTP_200_OK
+
+        # Check verify audit log was created
+        verify_log = db_session.query(AuditLog).filter(
+            AuditLog.action == AuditAction.USER_VERIFY,
+            AuditLog.resource_id == user.id
+        ).first()
+        assert verify_log is not None
+        assert verify_log.resource_type == "user"
+
+        # Unverify the user
+        response = client.put(
+            f"/api/admin/users/{user.id}/toggle-verified",
+            json={"is_verified": False},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+        assert response.status_code == status.HTTP_200_OK
+
+        # Check unverify audit log was created
+        unverify_log = db_session.query(AuditLog).filter(
+            AuditLog.action == AuditAction.USER_UNVERIFY,
+            AuditLog.resource_id == user.id
+        ).first()
+        assert unverify_log is not None
+        assert unverify_log.resource_type == "user"
+
+        # Verify total count increased by 2
+        final_count = db_session.query(AuditLog).filter(
+            AuditLog.action.in_([AuditAction.USER_VERIFY, AuditAction.USER_UNVERIFY])
+        ).count()
+        assert final_count == initial_count + 2
+
+
 class TestAdminUserProfileUpdate:
     """Tests for admin user profile update endpoint"""
 

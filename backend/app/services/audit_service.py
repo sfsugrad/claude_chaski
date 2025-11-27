@@ -307,6 +307,42 @@ def log_user_activate(
     )
 
 
+def log_user_verify(
+    db: Session,
+    admin: User,
+    verified_user: User,
+    request: Optional[Request] = None,
+) -> AuditLog:
+    """Log admin verifying a user."""
+    return create_audit_log(
+        db=db,
+        action=AuditAction.USER_VERIFY,
+        user=admin,
+        resource_type="user",
+        resource_id=verified_user.id,
+        details={"target_email": verified_user.email},
+        request=request,
+    )
+
+
+def log_user_unverify(
+    db: Session,
+    admin: User,
+    unverified_user: User,
+    request: Optional[Request] = None,
+) -> AuditLog:
+    """Log admin unverifying a user."""
+    return create_audit_log(
+        db=db,
+        action=AuditAction.USER_UNVERIFY,
+        user=admin,
+        resource_type="user",
+        resource_id=unverified_user.id,
+        details={"target_email": unverified_user.email},
+        request=request,
+    )
+
+
 def log_user_delete(
     db: Session,
     admin: User,

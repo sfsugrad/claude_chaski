@@ -16,6 +16,7 @@ const mockGetPackages = jest.fn()
 const mockGetStats = jest.fn()
 const mockUpdateUserRole = jest.fn()
 const mockToggleUserActive = jest.fn()
+const mockToggleUserVerified = jest.fn()
 const mockTogglePackageActive = jest.fn()
 const mockCreateUser = jest.fn()
 const mockRunMatchingJob = jest.fn()
@@ -37,6 +38,7 @@ jest.mock('@/lib/api', () => ({
     getStats: () => mockGetStats(),
     updateUserRole: (userId: number, role: string) => mockUpdateUserRole(userId, role),
     toggleUserActive: (userId: number, isActive: boolean) => mockToggleUserActive(userId, isActive),
+    toggleUserVerified: (userId: number, isVerified: boolean) => mockToggleUserVerified(userId, isVerified),
     togglePackageActive: (packageId: number, isActive: boolean) => mockTogglePackageActive(packageId, isActive),
     createUser: (data: any) => mockCreateUser(data),
     runMatchingJob: (dryRun: boolean, hours: number) => mockRunMatchingJob(dryRun, hours),
@@ -524,6 +526,278 @@ describe('AdminPage', () => {
         btn => btn.tagName === 'BUTTON' && !btn.hasAttribute('disabled')
       )
       expect(activeDeactivateButton).toBeDefined()
+    })
+  })
+
+  describe('User Verification Toggle', () => {
+    const testUsers = [
+      {
+        id: 1,
+        email: 'admin@example.com',
+        full_name: 'Admin User',
+        role: 'admin',
+        is_verified: true,
+        is_active: true,
+        created_at: '2024-01-01T00:00:00Z',
+      },
+      {
+        id: 2,
+        email: 'verified@example.com',
+        full_name: 'Verified User',
+        role: 'sender',
+        is_verified: true,
+        is_active: true,
+        created_at: '2024-01-02T00:00:00Z',
+      },
+      {
+        id: 3,
+        email: 'unverified@example.com',
+        full_name: 'Unverified User',
+        role: 'courier',
+        is_verified: false,
+        is_active: true,
+        created_at: '2024-01-03T00:00:00Z',
+      },
+    ]
+
+    beforeEach(() => {
+      mockToggleUserVerified.mockResolvedValue({ data: {} })
+    })
+
+    it('displays verification badge as clickable button', async () => {
+      setupAdminMocks({
+        users: testUsers,
+        stats: {
+          total_users: 3,
+          total_senders: 1,
+          total_couriers: 1,
+          total_both: 0,
+          total_admins: 1,
+          total_packages: 0,
+          active_packages: 0,
+          completed_packages: 0,
+          pending_packages: 0,
+          total_revenue: 0,
+        },
+      })
+
+      const { getByText } = render(<AdminPage />)
+
+      // Navigate to Users tab
+      await waitFor(() => {
+        const usersTab = getByText('Users')
+        usersTab.click()
+      })
+
+      // Wait for users to load
+      await waitFor(() => {
+        expect(screen.getByText('verified@example.com')).toBeInTheDocument()
+        expect(screen.getByText('unverified@example.com')).toBeInTheDocument()
+      })
+
+      // Find verification buttons - they should be clickable buttons
+      const verifiedButtons = screen.getAllByRole('button', { name: /verified/i })
+      expect(verifiedButtons.length).toBeGreaterThan(0)
+    })
+
+    it('shows "Verified" badge for verified users', async () => {
+      setupAdminMocks({
+        users: testUsers,
+        stats: {
+          total_users: 3,
+          total_senders: 1,
+          total_couriers: 1,
+          total_both: 0,
+          total_admins: 1,
+          total_packages: 0,
+          active_packages: 0,
+          completed_packages: 0,
+          pending_packages: 0,
+          total_revenue: 0,
+        },
+      })
+
+      const { getByText } = render(<AdminPage />)
+
+      await waitFor(() => {
+        const usersTab = getByText('Users')
+        usersTab.click()
+      })
+
+      await waitFor(() => {
+        expect(screen.getByText('verified@example.com')).toBeInTheDocument()
+      })
+
+      // Find the verified user row and check for Verified badge
+      const verifiedBadges = screen.getAllByRole('button', { name: 'Verified' })
+      expect(verifiedBadges.length).toBeGreaterThanOrEqual(1)
+    })
+
+    it('shows "Unverified" badge for unverified users', async () => {
+      setupAdminMocks({
+        users: testUsers,
+        stats: {
+          total_users: 3,
+          total_senders: 1,
+          total_couriers: 1,
+          total_both: 0,
+          total_admins: 1,
+          total_packages: 0,
+          active_packages: 0,
+          completed_packages: 0,
+          pending_packages: 0,
+          total_revenue: 0,
+        },
+      })
+
+      const { getByText } = render(<AdminPage />)
+
+      await waitFor(() => {
+        const usersTab = getByText('Users')
+        usersTab.click()
+      })
+
+      await waitFor(() => {
+        expect(screen.getByText('unverified@example.com')).toBeInTheDocument()
+      })
+
+      // Find the Unverified badge
+      const unverifiedBadge = screen.getByRole('button', { name: 'Unverified' })
+      expect(unverifiedBadge).toBeInTheDocument()
+      expect(unverifiedBadge).toHaveClass('bg-yellow-100')
+    })
+
+    it('disables verification toggle for inactive users', async () => {
+      const usersWithInactive = [
+        ...testUsers,
+        {
+          id: 4,
+          email: 'inactive@example.com',
+          full_name: 'Inactive User',
+          role: 'sender',
+          is_verified: true,
+          is_active: false,
+          created_at: '2024-01-04T00:00:00Z',
+        },
+      ]
+
+      setupAdminMocks({
+        users: usersWithInactive,
+        stats: {
+          total_users: 4,
+          total_senders: 2,
+          total_couriers: 1,
+          total_both: 0,
+          total_admins: 1,
+          total_packages: 0,
+          active_packages: 0,
+          completed_packages: 0,
+          pending_packages: 0,
+          total_revenue: 0,
+        },
+      })
+
+      const { getByText } = render(<AdminPage />)
+
+      await waitFor(() => {
+        const usersTab = getByText('Users')
+        usersTab.click()
+      })
+
+      await waitFor(() => {
+        expect(screen.getByText('inactive@example.com')).toBeInTheDocument()
+      })
+
+      // Find the disabled verification button by its title
+      const disabledButton = screen.getByTitle('Cannot modify inactive user')
+      expect(disabledButton).toBeInTheDocument()
+      expect(disabledButton).toBeDisabled()
+      expect(disabledButton).toHaveClass('opacity-50')
+    })
+
+    it('calls toggleUserVerified API when verification badge is clicked', async () => {
+      // Mock window.confirm to return true
+      const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true)
+      const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => {})
+
+      setupAdminMocks({
+        users: testUsers,
+        stats: {
+          total_users: 3,
+          total_senders: 1,
+          total_couriers: 1,
+          total_both: 0,
+          total_admins: 1,
+          total_packages: 0,
+          active_packages: 0,
+          completed_packages: 0,
+          pending_packages: 0,
+          total_revenue: 0,
+        },
+      })
+
+      const { getByText } = render(<AdminPage />)
+
+      await waitFor(() => {
+        const usersTab = getByText('Users')
+        usersTab.click()
+      })
+
+      await waitFor(() => {
+        expect(screen.getByText('unverified@example.com')).toBeInTheDocument()
+      })
+
+      // Click on the Unverified badge to verify the user
+      const unverifiedBadge = screen.getByRole('button', { name: 'Unverified' })
+      unverifiedBadge.click()
+
+      await waitFor(() => {
+        expect(mockToggleUserVerified).toHaveBeenCalledWith(3, true) // user id 3, set verified to true
+      })
+
+      confirmSpy.mockRestore()
+      alertSpy.mockRestore()
+    })
+
+    it('does not call API when confirmation is cancelled', async () => {
+      // Mock window.confirm to return false
+      const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(false)
+
+      setupAdminMocks({
+        users: testUsers,
+        stats: {
+          total_users: 3,
+          total_senders: 1,
+          total_couriers: 1,
+          total_both: 0,
+          total_admins: 1,
+          total_packages: 0,
+          active_packages: 0,
+          completed_packages: 0,
+          pending_packages: 0,
+          total_revenue: 0,
+        },
+      })
+
+      const { getByText } = render(<AdminPage />)
+
+      await waitFor(() => {
+        const usersTab = getByText('Users')
+        usersTab.click()
+      })
+
+      await waitFor(() => {
+        expect(screen.getByText('unverified@example.com')).toBeInTheDocument()
+      })
+
+      // Click on the Unverified badge
+      const unverifiedBadge = screen.getByRole('button', { name: 'Unverified' })
+      unverifiedBadge.click()
+
+      // API should not be called
+      expect(mockToggleUserVerified).not.toHaveBeenCalled()
+
+      confirmSpy.mockRestore()
     })
   })
 

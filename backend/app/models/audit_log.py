@@ -21,6 +21,8 @@ class AuditAction(str, enum.Enum):
     USER_ROLE_CHANGE = "user_role_change"
     USER_DEACTIVATE = "user_deactivate"
     USER_ACTIVATE = "user_activate"
+    USER_VERIFY = "user_verify"
+    USER_UNVERIFY = "user_unverify"
     USER_DELETE = "user_delete"
 
     # Package Operations

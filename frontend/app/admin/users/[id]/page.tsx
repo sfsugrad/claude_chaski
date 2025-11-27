@@ -118,6 +118,11 @@ export default function UserDetailPage() {
         await adminAPI.toggleUserActive(parseInt(userId), editedUser.is_active)
       }
 
+      // Update verified status if changed
+      if (editedUser.is_verified !== undefined && editedUser.is_verified !== user.is_verified) {
+        await adminAPI.toggleUserVerified(parseInt(userId), editedUser.is_verified)
+      }
+
       // Update profile (full_name, phone_number, and max_deviation_km) if changed
       const profileChanged =
         (editedUser.full_name !== undefined && editedUser.full_name !== user.full_name) ||
@@ -431,34 +436,31 @@ export default function UserDetailPage() {
                 {isEditing ? (
                   <>
                     <div className="mt-1 flex items-center gap-3">
-                      <label className="flex items-center gap-2">
+                      <label className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="radio"
                           name="is_verified"
                           checked={editedUser.is_verified === true}
                           onChange={() => setEditedUser({ ...editedUser, is_verified: true })}
                           className="focus:ring-purple-500"
-                          disabled
                         />
-                        <span className="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 opacity-50">
+                        <span className="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
                           Verified
                         </span>
                       </label>
-                      <label className="flex items-center gap-2">
+                      <label className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="radio"
                           name="is_verified"
                           checked={editedUser.is_verified === false}
                           onChange={() => setEditedUser({ ...editedUser, is_verified: false })}
                           className="focus:ring-purple-500"
-                          disabled
                         />
-                        <span className="px-3 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800 opacity-50">
+                        <span className="px-3 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
                           Unverified
                         </span>
                       </label>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">Verification status editing coming soon</p>
                   </>
                 ) : (
                   <div className="mt-1">

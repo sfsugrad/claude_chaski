@@ -450,6 +450,8 @@ export const adminAPI = {
     api.put(`/admin/users/${userId}`, { role }),
   toggleUserActive: (userId: number, isActive: boolean) =>
     api.put(`/admin/users/${userId}/toggle-active`, { is_active: isActive }),
+  toggleUserVerified: (userId: number, isVerified: boolean) =>
+    api.put(`/admin/users/${userId}/toggle-verified`, { is_verified: isVerified }),
   updateUserProfile: (userId: number, data: { full_name?: string; phone_number?: string | null; max_deviation_km?: number }) =>
     api.put(`/admin/users/${userId}/profile`, data),
 
