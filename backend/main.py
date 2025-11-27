@@ -70,8 +70,8 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Initialize rate limiter
-limiter = Limiter(key_func=get_remote_address)
+# Initialize rate limiter (disabled during automated tests)
+limiter = Limiter(key_func=get_remote_address, enabled=settings.ENVIRONMENT != "test")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 

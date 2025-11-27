@@ -1,15 +1,19 @@
+import os
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+# Ensure the application uses the in-memory SQLite database during tests
+SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
+os.environ.setdefault("DATABASE_URL", SQLALCHEMY_DATABASE_URL)
+os.environ.setdefault("ENVIRONMENT", "test")
+
 from app.models.base import Base
 from app.database import get_db
 from main import app
-
-# Use SQLite in-memory database for testing
-SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
