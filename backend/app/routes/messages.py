@@ -317,19 +317,29 @@ async def send_message(
         created_at=message.created_at
     )
 
-    # Broadcast to the other participant
-    other_user = get_other_user(package, current_user, db)
-    if other_user:
-        message_data_dict = {
-            "id": message.id,
-            "package_id": message.package_id,
-            "sender_id": message.sender_id,
-            "sender_name": current_user.full_name,
-            "content": message.content,
-            "is_read": message.is_read,
-            "created_at": message.created_at.isoformat()
-        }
-        await broadcast_message(other_user.id, message_data_dict)
+    # Broadcast to the other participant(s)
+    message_data_dict = {
+        "id": message.id,
+        "package_id": message.package_id,
+        "sender_id": message.sender_id,
+        "sender_name": current_user.full_name,
+        "content": message.content,
+        "is_read": message.is_read,
+        "created_at": message.created_at.isoformat()
+    }
+
+    # For pending packages, we need to notify based on who's in the conversation
+    if current_user.id == package.sender_id:
+        # Sender is sending - notify all couriers who have messaged about this package
+        courier_ids = db.query(Message.sender_id).filter(
+            Message.package_id == package_id,
+            Message.sender_id != package.sender_id
+        ).distinct().all()
+        for (courier_id,) in courier_ids:
+            await broadcast_message(courier_id, message_data_dict)
+    else:
+        # Courier is sending - notify the sender
+        await broadcast_message(package.sender_id, message_data_dict)
 
     return response
 
