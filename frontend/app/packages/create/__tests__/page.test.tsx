@@ -2,7 +2,7 @@ import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { useRouter } from 'next/navigation'
 import CreatePackagePage from '../page'
-import { packagesAPI } from '@/lib/api'
+import axios, { packagesAPI, authAPI } from '@/lib/api'
 
 // Mock next/navigation
 jest.mock('next/navigation', () => ({
@@ -11,8 +11,15 @@ jest.mock('next/navigation', () => ({
 
 // Mock API
 jest.mock('@/lib/api', () => ({
+  __esModule: true,
+  default: {
+    get: jest.fn(),
+  },
   packagesAPI: {
     create: jest.fn(),
+  },
+  authAPI: {
+    getCurrentUser: jest.fn(),
   },
 }))
 
@@ -514,6 +521,83 @@ describe('CreatePackagePage', () => {
       await waitFor(() => {
         // The form should attempt to validate again
         expect(packagesAPI.create).not.toHaveBeenCalled()
+      })
+    })
+  })
+
+  describe('Admin User Selection', () => {
+    const mockAdminUser = {
+      id: 1,
+      email: 'admin@example.com',
+      full_name: 'Admin User',
+      role: 'admin',
+    }
+
+    const mockUsers = [
+      { id: 2, email: 'sender@example.com', full_name: 'Sender User', role: 'sender' },
+      { id: 3, email: 'courier@example.com', full_name: 'Courier User', role: 'courier' },
+      { id: 4, email: 'both@example.com', full_name: 'Both User', role: 'both' },
+      { id: 5, email: 'courier2@example.com', full_name: 'Another Courier', role: 'COURIER' },
+      { id: 6, email: 'admin2@example.com', full_name: 'Another Admin', role: 'admin' },
+      { id: 7, email: 'admin3@example.com', full_name: 'Third Admin', role: 'ADMIN' },
+    ]
+
+    it('shows user dropdown for admin users', async () => {
+      ;(authAPI.getCurrentUser as jest.Mock).mockResolvedValue({ data: mockAdminUser })
+      ;(axios.get as jest.Mock).mockResolvedValue({ data: mockUsers })
+
+      render(<CreatePackagePage />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Create Package For User (Admin Only)')).toBeInTheDocument()
+      })
+    })
+
+    it('does not show user dropdown for non-admin users', async () => {
+      ;(authAPI.getCurrentUser as jest.Mock).mockResolvedValue({
+        data: { id: 2, email: 'sender@example.com', full_name: 'Sender', role: 'sender' },
+      })
+
+      render(<CreatePackagePage />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Create Package Delivery')).toBeInTheDocument()
+      })
+
+      expect(screen.queryByText('Create Package For User (Admin Only)')).not.toBeInTheDocument()
+    })
+
+    it('filters out courier and admin users from the dropdown', async () => {
+      ;(authAPI.getCurrentUser as jest.Mock).mockResolvedValue({ data: mockAdminUser })
+      ;(axios.get as jest.Mock).mockResolvedValue({ data: mockUsers })
+
+      render(<CreatePackagePage />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Create Package For User (Admin Only)')).toBeInTheDocument()
+      })
+
+      // Should show sender and both users
+      expect(screen.getByText(/Sender User.*sender@example.com.*sender/)).toBeInTheDocument()
+      expect(screen.getByText(/Both User.*both@example.com.*both/)).toBeInTheDocument()
+
+      // Should NOT show courier users
+      expect(screen.queryByText(/Courier User.*courier@example.com/)).not.toBeInTheDocument()
+      expect(screen.queryByText(/Another Courier.*courier2@example.com/)).not.toBeInTheDocument()
+
+      // Should NOT show admin users
+      expect(screen.queryByText(/Another Admin.*admin2@example.com/)).not.toBeInTheDocument()
+      expect(screen.queryByText(/Third Admin.*admin3@example.com/)).not.toBeInTheDocument()
+    })
+
+    it('includes default empty option in dropdown', async () => {
+      ;(authAPI.getCurrentUser as jest.Mock).mockResolvedValue({ data: mockAdminUser })
+      ;(axios.get as jest.Mock).mockResolvedValue({ data: mockUsers })
+
+      render(<CreatePackagePage />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Select a user (leave empty to create for yourself)')).toBeInTheDocument()
       })
     })
   })

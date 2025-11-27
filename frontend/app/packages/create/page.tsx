@@ -230,7 +230,12 @@ export default function CreatePackagePage() {
                         className="mt-1 block w-full px-3 py-2 border border-purple-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500 bg-white"
                       >
                         <option value="">Select a user (leave empty to create for yourself)</option>
-                        {users.map((user) => (
+                        {users
+                          .filter((user) =>
+                            user.role !== 'courier' && user.role !== 'COURIER' &&
+                            user.role !== 'admin' && user.role !== 'ADMIN'
+                          )
+                          .map((user) => (
                           <option key={user.id} value={user.id}>
                             {user.full_name} ({user.email}) - {user.role}
                           </option>
