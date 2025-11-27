@@ -15,6 +15,7 @@ from app.database import SessionLocal, engine
 from app.models.user import User, UserRole
 from app.models.package import Package, PackageStatus, PackageSize, CourierRoute
 from app.models.notification import Notification, NotificationType
+from app.models.rating import Rating
 from app.models.base import Base
 from app.utils.auth import get_password_hash
 
@@ -137,9 +138,44 @@ def load_notifications(
     return created_notifications
 
 
+def load_ratings(
+    db: Session, data_file: Path, user_id_mapping: dict, package_id_mapping: dict
+):
+    """Load ratings from JSON file with updated user and package IDs"""
+    with open(data_file) as f:
+        ratings_data = json.load(f)
+
+    created_ratings = []
+    for rating_data in ratings_data:
+        # Update rater_id to use actual ID
+        if rating_data.get("rater_id"):
+            rating_data["rater_id"] = user_id_mapping.get(rating_data["rater_id"])
+
+        # Update rated_user_id to use actual ID
+        if rating_data.get("rated_user_id"):
+            rating_data["rated_user_id"] = user_id_mapping.get(
+                rating_data["rated_user_id"]
+            )
+
+        # Update package_id to use actual ID
+        if rating_data.get("package_id"):
+            rating_data["package_id"] = package_id_mapping.get(
+                rating_data["package_id"]
+            )
+
+        rating = Rating(**rating_data)
+        db.add(rating)
+        created_ratings.append(rating)
+
+    db.commit()
+    print(f"Created {len(created_ratings)} ratings")
+    return created_ratings
+
+
 def clear_all_data(db: Session):
     """Clear all existing data from tables"""
     try:
+        db.query(Rating).delete()
         db.query(Notification).delete()
         db.query(CourierRoute).delete()
         db.query(Package).delete()
@@ -185,6 +221,12 @@ def main():
             user_id_mapping,
             package_id_mapping,
         )
+        ratings = load_ratings(
+            db,
+            test_data_dir / "ratings.json",
+            user_id_mapping,
+            package_id_mapping,
+        )
 
         print("-" * 50)
         print("Test data loaded successfully!")
@@ -193,6 +235,7 @@ def main():
         print(f"  Packages: {len(packages)}")
         print(f"  Courier Routes: {len(routes)}")
         print(f"  Notifications: {len(notifications)}")
+        print(f"  Ratings: {len(ratings)}")
 
         print("\nTest credentials:")
         print("  Admin: admin@chaski.com / admin123")

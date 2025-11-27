@@ -98,5 +98,85 @@
     "is_active": true,
     "is_verified": false,
     "max_deviation_km": 5
+  },
+  {
+    "email": "inactive.user@example.com",
+    "password": "inactive123",
+    "full_name": "Inactive User",
+    "phone_number": "+1234567800",
+    "role": "sender",
+    "is_active": false,
+    "is_verified": true,
+    "max_deviation_km": 5
+  },
+  {
+    "email": "maria.sender@example.com",
+    "password": "sender123",
+    "full_name": "Maria Garcia",
+    "phone_number": "+1415555001",
+    "role": "sender",
+    "is_active": true,
+    "is_verified": true,
+    "max_deviation_km": 5
+  },
+  {
+    "email": "carlos.courier@example.com",
+    "password": "courier123",
+    "full_name": "Carlos Rodriguez",
+    "phone_number": "+1415555002",
+    "role": "courier",
+    "is_active": true,
+    "is_verified": true,
+    "max_deviation_km": 20
+  },
+  {
+    "email": "high.volume.sender@example.com",
+    "password": "sender123",
+    "full_name": "Business Shipping Co",
+    "phone_number": "+1415555003",
+    "role": "sender",
+    "is_active": true,
+    "is_verified": true,
+    "max_deviation_km": 5
+  },
+  {
+    "email": "premium.courier@example.com",
+    "password": "courier123",
+    "full_name": "Premium Express Delivery",
+    "phone_number": "+1415555004",
+    "role": "courier",
+    "is_active": true,
+    "is_verified": true,
+    "max_deviation_km": 25
+  },
+  {
+    "email": "new.sender@example.com",
+    "password": "sender123",
+    "full_name": "New Sender",
+    "phone_number": "+1415555005",
+    "role": "sender",
+    "is_active": true,
+    "is_verified": true,
+    "max_deviation_km": 5
+  },
+  {
+    "email": "new.courier@example.com",
+    "password": "courier123",
+    "full_name": "New Courier",
+    "phone_number": "+1415555006",
+    "role": "courier",
+    "is_active": true,
+    "is_verified": true,
+    "max_deviation_km": 5
+  },
+  {
+    "email": "frequent.both@example.com",
+    "password": "both123",
+    "full_name": "Frequent User",
+    "phone_number": "+1415555007",
+    "role": "both",
+    "is_active": true,
+    "is_verified": true,
+    "max_deviation_km": 12
   }
 ]
