@@ -6,7 +6,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { UserResponse, messagesAPI } from '@/lib/api'
 import NotificationDropdown from './NotificationDropdown'
 import StarRating from './StarRating'
-import { useWebSocket } from '@/hooks/useWebSocket'
+import { useWebSocketContext } from '@/contexts/WebSocketContext'
 
 interface NavbarProps {
   user: UserResponse | null
@@ -18,18 +18,19 @@ export default function Navbar({ user }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [unreadMessageCount, setUnreadMessageCount] = useState(0)
 
-  // Handle incoming WebSocket messages
-  const handleMessageReceived = useCallback(() => {
-    // Only increment if not currently on the messages page
-    if (!pathname?.startsWith('/messages')) {
-      setUnreadMessageCount(prev => prev + 1)
-    }
-  }, [pathname])
+  // Get shared WebSocket context
+  const { onMessageReceived } = useWebSocketContext()
 
-  // Connect to WebSocket for real-time message notifications
-  useWebSocket({
-    onMessageReceived: handleMessageReceived,
-  })
+  // Subscribe to message events
+  useEffect(() => {
+    const unsubscribe = onMessageReceived(() => {
+      // Only increment if not currently on the messages page
+      if (!pathname?.startsWith('/messages')) {
+        setUnreadMessageCount(prev => prev + 1)
+      }
+    })
+    return unsubscribe
+  }, [onMessageReceived, pathname])
 
   // Fetch unread message count
   useEffect(() => {

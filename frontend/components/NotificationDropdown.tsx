@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { notificationsAPI, NotificationType } from '@/lib/api'
-import { useWebSocket, ConnectionStatus } from '@/hooks/useWebSocket'
+import { useWebSocketContext } from '@/contexts/WebSocketContext'
+import { ConnectionStatus } from '@/hooks/useWebSocket'
 
 // Internal notification type with transformed fields from backend
 interface DisplayNotification {
@@ -75,46 +76,54 @@ export default function NotificationDropdown({ className = '' }: NotificationDro
   const [wsStatus, setWsStatus] = useState<ConnectionStatus>('disconnected')
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Handle new notifications from WebSocket
-  const handleNewNotification = useCallback((notification: any) => {
-    if (!notification) return
+  // Get shared WebSocket context
+  const {
+    isConnected,
+    connectionStatus,
+    onNotification,
+    onUnreadCountUpdate,
+    markNotificationRead
+  } = useWebSocketContext()
 
-    const displayNotification: DisplayNotification = {
-      id: notification.id,
-      user_id: notification.user_id,
-      type: notification.type as NotificationType,
-      title: NOTIFICATION_TITLES[notification.type as NotificationType] || 'Notification',
-      message: notification.message,
-      is_read: notification.read,
-      package_id: notification.package_id,
-      created_at: notification.created_at,
-    }
+  // Update wsStatus when connection status changes
+  useEffect(() => {
+    setWsStatus(connectionStatus)
+  }, [connectionStatus])
 
-    // Add new notification to the top of the list
-    setNotifications(prev => {
-      // Check if notification already exists
-      const exists = prev.some(n => n.id === displayNotification.id)
-      if (exists) return prev
-      return [displayNotification, ...prev]
+  // Subscribe to notification events
+  useEffect(() => {
+    const unsubscribe = onNotification((notification: any) => {
+      if (!notification) return
+
+      const displayNotification: DisplayNotification = {
+        id: notification.id,
+        user_id: notification.user_id,
+        type: notification.type as NotificationType,
+        title: NOTIFICATION_TITLES[notification.type as NotificationType] || 'Notification',
+        message: notification.message,
+        is_read: notification.read,
+        package_id: notification.package_id,
+        created_at: notification.created_at,
+      }
+
+      // Add new notification to the top of the list
+      setNotifications(prev => {
+        // Check if notification already exists
+        const exists = prev.some(n => n.id === displayNotification.id)
+        if (exists) return prev
+        return [displayNotification, ...prev]
+      })
     })
-  }, [])
+    return unsubscribe
+  }, [onNotification])
 
-  // Handle unread count updates from WebSocket
-  const handleUnreadCountUpdate = useCallback((count: number) => {
-    setUnreadCount(count)
-  }, [])
-
-  // Handle WebSocket connection status changes
-  const handleConnectionChange = useCallback((status: ConnectionStatus) => {
-    setWsStatus(status)
-  }, [])
-
-  // Initialize WebSocket connection
-  const { isConnected, markNotificationRead } = useWebSocket({
-    onNotification: handleNewNotification,
-    onUnreadCountUpdate: handleUnreadCountUpdate,
-    onConnectionChange: handleConnectionChange,
-  })
+  // Subscribe to unread count updates
+  useEffect(() => {
+    const unsubscribe = onUnreadCountUpdate((count: number) => {
+      setUnreadCount(count)
+    })
+    return unsubscribe
+  }, [onUnreadCountUpdate])
 
   // Close dropdown when clicking outside
   useEffect(() => {

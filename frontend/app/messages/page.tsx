@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { authAPI, messagesAPI, UserResponse, ConversationSummary, MessageResponse } from '@/lib/api'
 import Navbar from '@/components/Navbar'
 import ChatWindow from '@/components/ChatWindow'
-import { useWebSocket } from '@/hooks/useWebSocket'
+import { useWebSocketContext } from '@/contexts/WebSocketContext'
 
 function formatTimeAgo(dateString: string): string {
   const date = new Date(dateString)
@@ -20,7 +20,7 @@ function formatTimeAgo(dateString: string): string {
   return date.toLocaleDateString()
 }
 
-export default function MessagesPage() {
+function MessagesPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [user, setUser] = useState<UserResponse | null>(null)
@@ -28,6 +28,9 @@ export default function MessagesPage() {
   const [selectedPackageId, setSelectedPackageId] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+
+  // Get shared WebSocket context
+  const { onMessageReceived } = useWebSocketContext()
 
   // Get package ID from URL if present
   useEffect(() => {
@@ -37,38 +40,36 @@ export default function MessagesPage() {
     }
   }, [searchParams])
 
-  // Handle incoming WebSocket messages
-  const handleMessageReceived = useCallback((message: MessageResponse) => {
-    // Update conversation list with new message
-    setConversations(prev => {
-      const conversationIndex = prev.findIndex(c => c.package_id === message.package_id)
-      if (conversationIndex === -1) {
-        // New conversation - reload the list
-        loadConversations()
-        return prev
-      }
+  // Subscribe to WebSocket message events
+  useEffect(() => {
+    const unsubscribe = onMessageReceived((message: any) => {
+      // Update conversation list with new message
+      setConversations(prev => {
+        const conversationIndex = prev.findIndex(c => c.package_id === message.package_id)
+        if (conversationIndex === -1) {
+          // New conversation - reload the list
+          loadConversations()
+          return prev
+        }
 
-      const updated = [...prev]
-      const conversation = { ...updated[conversationIndex] }
-      conversation.last_message = message.content.slice(0, 100)
-      conversation.last_message_at = message.created_at
-      if (message.package_id !== selectedPackageId) {
-        conversation.unread_count += 1
-      }
-      updated[conversationIndex] = conversation
+        const updated = [...prev]
+        const conversation = { ...updated[conversationIndex] }
+        conversation.last_message = message.content.slice(0, 100)
+        conversation.last_message_at = message.created_at
+        if (message.package_id !== selectedPackageId) {
+          conversation.unread_count += 1
+        }
+        updated[conversationIndex] = conversation
 
-      // Move to top
-      updated.splice(conversationIndex, 1)
-      updated.unshift(conversation)
+        // Move to top
+        updated.splice(conversationIndex, 1)
+        updated.unshift(conversation)
 
-      return updated
+        return updated
+      })
     })
-  }, [selectedPackageId])
-
-  // Initialize WebSocket
-  useWebSocket({
-    onMessageReceived: handleMessageReceived,
-  })
+    return unsubscribe
+  }, [onMessageReceived, selectedPackageId])
 
   const loadConversations = async () => {
     try {
@@ -270,5 +271,20 @@ export default function MessagesPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function MessagesPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading messages...</p>
+        </div>
+      </div>
+    }>
+      <MessagesPageContent />
+    </Suspense>
   )
 }
