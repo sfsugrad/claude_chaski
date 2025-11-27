@@ -115,13 +115,49 @@ npm run lint
 
 ### Testing
 
-**Backend:** Pytest with fixtures in `tests/conftest.py` providing:
+**Backend (527 tests):** Pytest with fixtures in `tests/conftest.py` providing:
 - `client` - TestClient with database override
 - `authenticated_sender`, `authenticated_courier`, `authenticated_both_role`, `authenticated_admin` - Pre-authenticated tokens
 - `test_package_data`, `test_user_data`, `test_courier_data` - Sample data fixtures
 - `test_verified_user`, `test_admin` - User objects (not tokens) for direct database operations
 
-**Frontend:** Jest with React Testing Library. Test files colocated in `__tests__/` directories.
+Test files:
+- `test_auth.py` - Authentication endpoints (register, login, OAuth)
+- `test_packages.py` - Package CRUD and status management
+- `test_couriers.py` - Courier route management
+- `test_matching.py` - Package-courier matching
+- `test_admin.py` - Admin operations
+- `test_notifications.py` - Notification API
+- `test_ratings.py` - Rating system
+- `test_messages.py` - Messaging API
+- `test_websocket.py` - WebSocket connections
+- `test_auth_utils.py` - Password hashing and JWT tokens
+- `test_geo_utils.py` - Geospatial calculations
+- `test_email_utils.py` - Email templates and sending
+- `test_websocket_manager.py` - Connection manager
+- `test_dependencies.py` - FastAPI auth dependencies
+
+**Frontend (497 tests):** Jest with React Testing Library. Test files colocated in `__tests__/` directories.
+
+Test coverage:
+- `lib/__tests__/api.test.ts` - API client endpoints
+- `hooks/__tests__/useWebSocket.test.ts` - WebSocket hook
+- `contexts/__tests__/WebSocketContext.test.tsx` - WebSocket context provider
+- `app/__tests__/page.test.tsx` - Home page
+- `app/login/__tests__/` - Login page
+- `app/register/__tests__/` - Registration page
+- `app/dashboard/__tests__/` - Dashboard page
+- `app/messages/__tests__/` - Messages page
+- `app/courier/__tests__/` - Courier dashboard
+- `app/courier/routes/create/__tests__/` - Route creation
+- `app/sender/__tests__/` - Sender dashboard
+- `app/packages/create/__tests__/` - Package creation
+- `app/packages/[id]/__tests__/` - Package details
+- `app/admin/__tests__/` - Admin dashboard
+- `app/notifications/__tests__/` - Notifications page
+- `app/profile/reviews/__tests__/` - Reviews page
+- `app/verify-email/__tests__/` - Email verification
+- `components/__tests__/` - Navbar, ChatWindow, StarRating, RatingModal, NotificationDropdown, GoogleSignInButton, AddressAutocomplete
 
 ## Role System
 
