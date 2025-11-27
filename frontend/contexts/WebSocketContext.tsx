@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useCallback, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useCallback, useRef, ReactNode } from 'react'
 import { useWebSocket, ConnectionStatus, ChatMessage } from '@/hooks/useWebSocket'
 
 interface WebSocketContextType {
@@ -19,23 +19,25 @@ interface WebSocketContextType {
 const WebSocketContext = createContext<WebSocketContextType | null>(null)
 
 export function WebSocketProvider({ children }: { children: ReactNode }) {
-  // Store callbacks in refs to allow multiple subscribers
-  const [messageCallbacks, setMessageCallbacks] = useState<Set<(message: ChatMessage) => void>>(new Set())
-  const [notificationCallbacks, setNotificationCallbacks] = useState<Set<(notification: any) => void>>(new Set())
-  const [unreadCountCallbacks, setUnreadCountCallbacks] = useState<Set<(count: number) => void>>(new Set())
+  // Store callbacks in refs to avoid stale closure issues
+  const messageCallbacksRef = useRef<Set<(message: ChatMessage) => void>>(new Set())
+  const notificationCallbacksRef = useRef<Set<(notification: any) => void>>(new Set())
+  const unreadCountCallbacksRef = useRef<Set<(count: number) => void>>(new Set())
 
   // Handle incoming messages and dispatch to all subscribers
   const handleMessageReceived = useCallback((message: ChatMessage) => {
-    messageCallbacks.forEach(callback => callback(message))
-  }, [messageCallbacks])
+    console.log('[WebSocket] Message received:', message)
+    console.log('[WebSocket] Callback count:', messageCallbacksRef.current.size)
+    messageCallbacksRef.current.forEach(callback => callback(message))
+  }, [])
 
   const handleNotification = useCallback((notification: any) => {
-    notificationCallbacks.forEach(callback => callback(notification))
-  }, [notificationCallbacks])
+    notificationCallbacksRef.current.forEach(callback => callback(notification))
+  }, [])
 
   const handleUnreadCountUpdate = useCallback((count: number) => {
-    unreadCountCallbacks.forEach(callback => callback(count))
-  }, [unreadCountCallbacks])
+    unreadCountCallbacksRef.current.forEach(callback => callback(count))
+  }, [])
 
   // Single WebSocket connection for the entire app
   const {
@@ -51,38 +53,28 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
   // Subscribe to message events
   const onMessageReceived = useCallback((callback: (message: ChatMessage) => void) => {
-    setMessageCallbacks(prev => new Set(prev).add(callback))
+    messageCallbacksRef.current.add(callback)
+    console.log('[WebSocket] Added message callback, total:', messageCallbacksRef.current.size)
     // Return unsubscribe function
     return () => {
-      setMessageCallbacks(prev => {
-        const next = new Set(prev)
-        next.delete(callback)
-        return next
-      })
+      messageCallbacksRef.current.delete(callback)
+      console.log('[WebSocket] Removed message callback, total:', messageCallbacksRef.current.size)
     }
   }, [])
 
   // Subscribe to notification events
   const onNotification = useCallback((callback: (notification: any) => void) => {
-    setNotificationCallbacks(prev => new Set(prev).add(callback))
+    notificationCallbacksRef.current.add(callback)
     return () => {
-      setNotificationCallbacks(prev => {
-        const next = new Set(prev)
-        next.delete(callback)
-        return next
-      })
+      notificationCallbacksRef.current.delete(callback)
     }
   }, [])
 
   // Subscribe to unread count updates
   const onUnreadCountUpdate = useCallback((callback: (count: number) => void) => {
-    setUnreadCountCallbacks(prev => new Set(prev).add(callback))
+    unreadCountCallbacksRef.current.add(callback)
     return () => {
-      setUnreadCountCallbacks(prev => {
-        const next = new Set(prev)
-        next.delete(callback)
-        return next
-      })
+      unreadCountCallbacksRef.current.delete(callback)
     }
   }, [])
 

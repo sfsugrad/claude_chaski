@@ -44,6 +44,8 @@ class PackageResponse(BaseModel):
     id: int
     sender_id: int
     courier_id: int | None
+    sender_name: str | None = None
+    courier_name: str | None = None
     description: str
     size: str
     weight_kg: float
@@ -64,6 +66,39 @@ class PackageResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+def package_to_response(package: Package, db: Session) -> PackageResponse:
+    """Convert a Package model to PackageResponse with user names."""
+    sender = db.query(User).filter(User.id == package.sender_id).first()
+    courier = None
+    if package.courier_id:
+        courier = db.query(User).filter(User.id == package.courier_id).first()
+
+    return PackageResponse(
+        id=package.id,
+        sender_id=package.sender_id,
+        courier_id=package.courier_id,
+        sender_name=sender.full_name if sender else None,
+        courier_name=courier.full_name if courier else None,
+        description=package.description,
+        size=package.size.value,
+        weight_kg=package.weight_kg,
+        status=package.status.value,
+        pickup_address=package.pickup_address,
+        pickup_lat=package.pickup_lat,
+        pickup_lng=package.pickup_lng,
+        dropoff_address=package.dropoff_address,
+        dropoff_lat=package.dropoff_lat,
+        dropoff_lng=package.dropoff_lng,
+        pickup_contact_name=package.pickup_contact_name,
+        pickup_contact_phone=package.pickup_contact_phone,
+        dropoff_contact_name=package.dropoff_contact_name,
+        dropoff_contact_phone=package.dropoff_contact_phone,
+        price=package.price,
+        created_at=package.created_at,
+        updated_at=package.updated_at
+    )
 
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=PackageResponse)
 async def create_package(
@@ -152,7 +187,8 @@ async def get_packages(
     """
     # Admins can see all packages
     if current_user.role.value == 'admin':
-        return db.query(Package).order_by(Package.created_at.desc()).all()
+        packages = db.query(Package).order_by(Package.created_at.desc()).all()
+        return [package_to_response(pkg, db) for pkg in packages]
 
     packages = []
 
@@ -173,7 +209,7 @@ async def get_packages(
     # Remove duplicates (for users with 'both' role)
     unique_packages = {pkg.id: pkg for pkg in packages}.values()
 
-    return list(unique_packages)
+    return [package_to_response(pkg, db) for pkg in unique_packages]
 
 
 @router.get("/{package_id}", response_model=PackageResponse)
@@ -183,6 +219,8 @@ async def get_package(
     db: Session = Depends(get_db)
 ):
     """Get specific package details"""
+    from app.models.user import UserRole
+
     package = db.query(Package).filter(Package.id == package_id).first()
 
     if not package:
@@ -193,16 +231,24 @@ async def get_package(
 
     # Admins can view any package
     if current_user.role.value == 'admin':
-        return package
+        return package_to_response(package, db)
 
-    # Check if user has access to this package
-    if package.sender_id != current_user.id and package.courier_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You don't have access to this package"
-        )
+    # Sender can always view their own packages
+    if package.sender_id == current_user.id:
+        return package_to_response(package, db)
 
-    return package
+    # Assigned courier can view the package
+    if package.courier_id == current_user.id:
+        return package_to_response(package, db)
+
+    # Couriers can view pending packages (to decide whether to accept)
+    if current_user.role in [UserRole.COURIER, UserRole.BOTH] and package.status == PackageStatus.PENDING:
+        return package_to_response(package, db)
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="You don't have access to this package"
+    )
 
 
 class PackageUpdate(BaseModel):

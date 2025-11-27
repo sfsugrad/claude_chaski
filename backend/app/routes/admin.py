@@ -602,3 +602,73 @@ async def get_platform_stats(
         pending_packages=pending_packages,
         total_revenue=float(total_revenue)
     )
+
+
+# Background Job Management
+class RunMatchingJobRequest(BaseModel):
+    dry_run: bool = False
+    notify_hours_threshold: int = 24
+
+
+class MatchedPackageInfo(BaseModel):
+    package_id: int
+    description: str
+    distance_km: float
+    detour_km: float
+    notified: bool
+
+
+class RouteMatchDetail(BaseModel):
+    route_id: int
+    courier_id: int
+    courier_name: str
+    route: str
+    matches_found: int
+    notifications_sent: int
+    matched_packages: List[MatchedPackageInfo]
+
+
+class MatchingJobResult(BaseModel):
+    started_at: str
+    completed_at: str
+    routes_processed: int
+    total_matches_found: int
+    notifications_created: int
+    notifications_skipped: int
+    route_details: List[RouteMatchDetail]
+
+
+@router.post("/jobs/run-matching", response_model=MatchingJobResult)
+async def run_matching_job_endpoint(
+    request: RunMatchingJobRequest,
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Manually trigger the package-route matching job (admin only).
+
+    This job finds packages that match active courier routes and creates
+    notifications for the couriers.
+
+    Args:
+        request: Job configuration options
+        admin: Current admin user
+
+    Returns:
+        Job execution results
+    """
+    from app.services.matching_job import run_matching_job
+
+    results = run_matching_job(
+        notify_hours_threshold=request.notify_hours_threshold,
+        dry_run=request.dry_run
+    )
+
+    return MatchingJobResult(
+        started_at=results['started_at'],
+        completed_at=results['completed_at'],
+        routes_processed=results['routes_processed'],
+        total_matches_found=results['total_matches_found'],
+        notifications_created=results['notifications_created'],
+        notifications_skipped=results['notifications_skipped'],
+        route_details=results['route_details']
+    )

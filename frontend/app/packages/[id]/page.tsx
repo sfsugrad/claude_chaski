@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
-import axios, { ratingsAPI, RatingResponse, messagesAPI, MessageResponse } from '@/lib/api'
+import axios, { ratingsAPI, RatingResponse, messagesAPI, MessageResponse, matchingAPI } from '@/lib/api'
 import StarRating from '@/components/StarRating'
 import RatingModal from '@/components/RatingModal'
 import ChatWindow from '@/components/ChatWindow'
@@ -13,6 +13,8 @@ interface Package {
   id: number
   sender_id: number
   courier_id: number | null
+  sender_name: string | null
+  courier_name: string | null
   description: string
   size: string
   weight_kg: number
@@ -68,6 +70,7 @@ export default function PackageDetailPage() {
   const [showChat, setShowChat] = useState(false)
   const [unreadMessageCount, setUnreadMessageCount] = useState(0)
   const [otherUserName, setOtherUserName] = useState<string>('')
+  const [acceptingPackage, setAcceptingPackage] = useState(false)
 
   // Handle incoming WebSocket messages
   const handleMessageReceived = useCallback((message: MessageResponse) => {
@@ -233,6 +236,31 @@ export default function PackageDetailPage() {
     return (isAdmin || isSender) && isPending
   }
 
+  const canAcceptPackage = () => {
+    if (!currentUser || !pkg) return false
+    const isCourier = currentUser.role === 'courier' || currentUser.role === 'COURIER' ||
+                      currentUser.role === 'both' || currentUser.role === 'BOTH'
+    const isPending = pkg.status.toLowerCase() === 'pending'
+    const isNotSender = pkg.sender_id !== currentUser.id
+    return isCourier && isPending && isNotSender
+  }
+
+  const handleAcceptPackage = async () => {
+    if (!pkg) return
+    setAcceptingPackage(true)
+    try {
+      await matchingAPI.acceptPackage(pkg.id)
+      alert('Package accepted successfully!')
+      await loadPackageData()
+    } catch (err: any) {
+      console.error('Error accepting package:', err)
+      const errorMessage = err.response?.data?.detail || 'Failed to accept package'
+      alert(errorMessage)
+    } finally {
+      setAcceptingPackage(false)
+    }
+  }
+
   const handleEdit = () => {
     if (pkg) {
       setEditedPackage({
@@ -324,6 +352,15 @@ export default function PackageDetailPage() {
               </span>
             </div>
             <div className="flex gap-2">
+              {canAcceptPackage() && (
+                <button
+                  onClick={handleAcceptPackage}
+                  disabled={acceptingPackage}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {acceptingPackage ? 'Accepting...' : 'Accept Package'}
+                </button>
+              )}
               {canEdit() && !isEditing && (
                 <button
                   onClick={handleEdit}
@@ -469,6 +506,8 @@ export default function PackageDetailPage() {
                     )}
                     <p className="text-gray-600 text-sm">{sender.email}</p>
                   </div>
+                ) : pkg.sender_name ? (
+                  <p className="text-gray-900 mt-1 font-medium">{pkg.sender_name}</p>
                 ) : (
                   <p className="text-gray-900 mt-1">User ID: {pkg.sender_id}</p>
                 )}
@@ -490,7 +529,7 @@ export default function PackageDetailPage() {
                     <p className="text-gray-600 text-sm">{courier.email}</p>
                   </div>
                 ) : pkg.courier_id ? (
-                  <p className="text-gray-900 mt-1">User ID: {pkg.courier_id}</p>
+                  <p className="text-gray-900 mt-1 font-medium">{pkg.courier_name || `User ID: ${pkg.courier_id}`}</p>
                 ) : (
                   <p className="text-gray-500 italic mt-1">Not assigned yet</p>
                 )}

@@ -2,7 +2,8 @@ import pytest
 from fastapi import status
 
 from app.models.package import Package, PackageStatus
-from app.models.user import User
+from app.models.user import User, UserRole
+from app.utils.auth import get_password_hash
 
 
 class TestCreatePackage:
@@ -1233,3 +1234,225 @@ class TestCancelPackage:
         data = response.json()
         assert "courier_id" in data
         assert data["courier_id"] == courier.id
+
+
+class TestCourierPackageAccess:
+    """Tests for courier access to pending packages (for accepting from notifications)."""
+
+    def test_courier_can_view_pending_package(self, client, db_session, authenticated_courier, test_package_data):
+        """Courier should be able to view pending packages (to decide whether to accept)."""
+        from app.models.user import User, UserRole
+        from app.utils.auth import get_password_hash, create_access_token
+
+        # Create a sender and their package
+        sender = User(
+            email="access_sender@test.com",
+            hashed_password=get_password_hash("password123"),
+            full_name="Access Sender",
+            role=UserRole.SENDER,
+            is_active=True,
+            is_verified=True,
+            max_deviation_km=5
+        )
+        db_session.add(sender)
+        db_session.commit()
+
+        package = Package(
+            sender_id=sender.id,
+            description="Pending package for courier view",
+            size="small",
+            weight_kg=1.0,
+            status=PackageStatus.PENDING,
+            pickup_address=test_package_data["pickup_address"],
+            pickup_lat=test_package_data["pickup_lat"],
+            pickup_lng=test_package_data["pickup_lng"],
+            dropoff_address=test_package_data["dropoff_address"],
+            dropoff_lat=test_package_data["dropoff_lat"],
+            dropoff_lng=test_package_data["dropoff_lng"],
+            price=20.00
+        )
+        db_session.add(package)
+        db_session.commit()
+
+        # Courier tries to view the pending package
+        response = client.get(
+            f"/api/packages/{package.id}",
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["id"] == package.id
+        assert data["status"] == "pending"
+
+    def test_courier_cannot_view_accepted_package_not_assigned(self, client, db_session, authenticated_courier, test_package_data):
+        """Courier should NOT be able to view accepted packages they're not assigned to."""
+        from app.models.user import User, UserRole
+        from app.utils.auth import get_password_hash, create_access_token
+
+        # Create a sender and courier
+        sender = User(
+            email="accepted_sender@test.com",
+            hashed_password=get_password_hash("password123"),
+            full_name="Accepted Sender",
+            role=UserRole.SENDER,
+            is_active=True,
+            is_verified=True,
+            max_deviation_km=5
+        )
+        other_courier = User(
+            email="other_courier@test.com",
+            hashed_password=get_password_hash("password123"),
+            full_name="Other Courier",
+            role=UserRole.COURIER,
+            is_active=True,
+            is_verified=True,
+            max_deviation_km=10
+        )
+        db_session.add_all([sender, other_courier])
+        db_session.commit()
+
+        # Create an accepted package assigned to other courier
+        package = Package(
+            sender_id=sender.id,
+            courier_id=other_courier.id,
+            description="Accepted package",
+            size="small",
+            weight_kg=1.0,
+            status=PackageStatus.MATCHED,
+            pickup_address=test_package_data["pickup_address"],
+            pickup_lat=test_package_data["pickup_lat"],
+            pickup_lng=test_package_data["pickup_lng"],
+            dropoff_address=test_package_data["dropoff_address"],
+            dropoff_lat=test_package_data["dropoff_lat"],
+            dropoff_lng=test_package_data["dropoff_lng"],
+            price=25.00
+        )
+        db_session.add(package)
+        db_session.commit()
+
+        # Our test courier tries to view the package
+        response = client.get(
+            f"/api/packages/{package.id}",
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_both_role_can_view_pending_package(self, client, db_session, authenticated_both_role, test_package_data):
+        """User with 'both' role should be able to view pending packages."""
+        from app.models.user import User, UserRole
+        from app.utils.auth import get_password_hash
+
+        # Create a sender and their package
+        sender = User(
+            email="both_access_sender@test.com",
+            hashed_password=get_password_hash("password123"),
+            full_name="Both Access Sender",
+            role=UserRole.SENDER,
+            is_active=True,
+            is_verified=True,
+            max_deviation_km=5
+        )
+        db_session.add(sender)
+        db_session.commit()
+
+        package = Package(
+            sender_id=sender.id,
+            description="Pending package for both role view",
+            size="medium",
+            weight_kg=2.0,
+            status=PackageStatus.PENDING,
+            pickup_address=test_package_data["pickup_address"],
+            pickup_lat=test_package_data["pickup_lat"],
+            pickup_lng=test_package_data["pickup_lng"],
+            dropoff_address=test_package_data["dropoff_address"],
+            dropoff_lat=test_package_data["dropoff_lat"],
+            dropoff_lng=test_package_data["dropoff_lng"],
+            price=30.00
+        )
+        db_session.add(package)
+        db_session.commit()
+
+        # User with 'both' role tries to view the pending package
+        response = client.get(
+            f"/api/packages/{package.id}",
+            headers={"Authorization": f"Bearer {authenticated_both_role}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["id"] == package.id
+
+    def test_assigned_courier_can_view_package(self, client, db_session, authenticated_courier, test_package_data):
+        """Assigned courier should be able to view package regardless of status."""
+        from app.models.user import User
+
+        # Get the courier user
+        courier = db_session.query(User).filter(User.email == "courier@example.com").first()
+
+        # Create a sender
+        sender = User(
+            email="assigned_sender@test.com",
+            hashed_password=get_password_hash("password123"),
+            full_name="Assigned Sender",
+            role=UserRole.SENDER,
+            is_active=True,
+            is_verified=True,
+            max_deviation_km=5
+        )
+        db_session.add(sender)
+        db_session.commit()
+
+        # Create a package assigned to the courier
+        package = Package(
+            sender_id=sender.id,
+            courier_id=courier.id,
+            description="Assigned package",
+            size="large",
+            weight_kg=5.0,
+            status=PackageStatus.IN_TRANSIT,
+            pickup_address=test_package_data["pickup_address"],
+            pickup_lat=test_package_data["pickup_lat"],
+            pickup_lng=test_package_data["pickup_lng"],
+            dropoff_address=test_package_data["dropoff_address"],
+            dropoff_lat=test_package_data["dropoff_lat"],
+            dropoff_lng=test_package_data["dropoff_lng"],
+            price=50.00
+        )
+        db_session.add(package)
+        db_session.commit()
+
+        # Assigned courier views the package
+        response = client.get(
+            f"/api/packages/{package.id}",
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["id"] == package.id
+        assert data["courier_id"] == courier.id
+
+    def test_package_response_includes_names(self, client, db_session, authenticated_sender, test_package_data):
+        """Package response should include sender_name and courier_name."""
+        # Create a package
+        response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = response.json()["id"]
+
+        # Get the package
+        response = client.get(
+            f"/api/packages/{package_id}",
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert "sender_name" in data
+        assert data["sender_name"] == "Test User"  # From test_user_data fixture
+        assert "courier_name" in data
+        assert data["courier_name"] is None  # No courier assigned yet

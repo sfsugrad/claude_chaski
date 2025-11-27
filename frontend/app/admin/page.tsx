@@ -76,6 +76,28 @@ export default function AdminPage() {
     phone_number: '',
     max_deviation_km: 5
   })
+  const [matchingJobRunning, setMatchingJobRunning] = useState(false)
+  const [matchingJobResult, setMatchingJobResult] = useState<{
+    routes_processed: number
+    total_matches_found: number
+    notifications_created: number
+    notifications_skipped: number
+    route_details?: Array<{
+      route_id: number
+      courier_id: number
+      courier_name: string
+      route: string
+      matches_found: number
+      notifications_sent: number
+      matched_packages?: Array<{
+        package_id: number
+        description: string
+        distance_km: number
+        detour_km: number
+        notified: boolean
+      }>
+    }>
+  } | null>(null)
 
   useEffect(() => {
     checkAuth()
@@ -202,6 +224,27 @@ export default function AdminPage() {
       console.error('Error creating user:', err)
       const errorMessage = err.response?.data?.detail || 'Failed to create user'
       alert(errorMessage)
+    }
+  }
+
+  const handleRunMatchingJob = async () => {
+    if (matchingJobRunning) return
+
+    setMatchingJobRunning(true)
+    setMatchingJobResult(null)
+
+    try {
+      const response = await axios.post('/admin/jobs/run-matching', {
+        dry_run: false,
+        notify_hours_threshold: 24
+      })
+      setMatchingJobResult(response.data)
+    } catch (err: any) {
+      console.error('Error running matching job:', err)
+      const errorMessage = err.response?.data?.detail || 'Failed to run matching job'
+      alert(errorMessage)
+    } finally {
+      setMatchingJobRunning(false)
     }
   }
 
@@ -408,7 +451,7 @@ export default function AdminPage() {
             {/* Quick Actions */}
             <div className="bg-white rounded-lg shadow p-6">
               <h3 className="text-xl font-bold mb-4">Quick Actions</h3>
-              <div className="grid md:grid-cols-3 gap-4">
+              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <button
                   onClick={() => setActiveTab('users')}
                   className="bg-purple-600 text-white px-6 py-3 rounded hover:bg-purple-700 transition"
@@ -422,12 +465,126 @@ export default function AdminPage() {
                   View Packages
                 </button>
                 <button
-                  className="bg-gray-600 text-white px-6 py-3 rounded hover:bg-gray-700 transition"
+                  onClick={handleRunMatchingJob}
+                  disabled={matchingJobRunning}
+                  className="bg-green-600 text-white px-6 py-3 rounded hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {matchingJobRunning ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Running...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Run Matching Job
+                    </>
+                  )}
+                </button>
+                <button
+                  className="bg-gray-400 text-white px-6 py-3 rounded cursor-not-allowed"
                   disabled
                 >
-                  Generate Reports (Coming Soon)
+                  Generate Reports (Soon)
                 </button>
               </div>
+
+              {/* Matching Job Results */}
+              {matchingJobResult && (
+                <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-lg font-semibold text-green-800 flex items-center gap-2">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Matching Job Completed
+                    </h4>
+                    <button
+                      onClick={() => setMatchingJobResult(null)}
+                      className="text-gray-500 hover:text-gray-700"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
+                    <div className="bg-white p-3 rounded shadow-sm">
+                      <div className="text-gray-500">Routes Processed</div>
+                      <div className="text-2xl font-bold text-purple-600">{matchingJobResult.routes_processed}</div>
+                    </div>
+                    <div className="bg-white p-3 rounded shadow-sm">
+                      <div className="text-gray-500">Matches Found</div>
+                      <div className="text-2xl font-bold text-blue-600">{matchingJobResult.total_matches_found}</div>
+                    </div>
+                    <div className="bg-white p-3 rounded shadow-sm">
+                      <div className="text-gray-500">Notifications Sent</div>
+                      <div className="text-2xl font-bold text-green-600">{matchingJobResult.notifications_created}</div>
+                    </div>
+                    <div className="bg-white p-3 rounded shadow-sm">
+                      <div className="text-gray-500">Skipped (Recent)</div>
+                      <div className="text-2xl font-bold text-gray-600">{matchingJobResult.notifications_skipped}</div>
+                    </div>
+                  </div>
+
+                  {/* Detailed Route/Package Breakdown */}
+                  {matchingJobResult.route_details && matchingJobResult.route_details.length > 0 && (
+                    <div className="mt-4 border-t border-green-200 pt-4">
+                      <h5 className="text-sm font-semibold text-green-800 mb-3">Match Details by Courier</h5>
+                      <div className="space-y-3 max-h-64 overflow-y-auto">
+                        {matchingJobResult.route_details.map((rd) => (
+                          <div key={rd.route_id} className="bg-white p-3 rounded shadow-sm">
+                            <div className="flex items-center justify-between mb-2">
+                              <div>
+                                <span className="font-medium text-gray-900">{rd.courier_name}</span>
+                                <span className="text-gray-400 text-xs ml-2">(Route #{rd.route_id})</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                                  {rd.matches_found} match{rd.matches_found !== 1 ? 'es' : ''}
+                                </span>
+                                <span className={`text-xs px-2 py-1 rounded ${rd.notifications_sent > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                                  {rd.notifications_sent} notified
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-xs text-gray-500 mb-2">
+                              {rd.route}
+                            </div>
+                            {rd.matched_packages && rd.matched_packages.length > 0 && (
+                              <div className="mt-2 space-y-1">
+                                {rd.matched_packages.map((pkg) => (
+                                  <div key={pkg.package_id} className="flex items-center justify-between text-xs bg-gray-50 p-2 rounded">
+                                    <div className="flex items-center gap-2">
+                                      <Link href={`/packages/${pkg.package_id}`} className="text-purple-600 hover:underline font-medium">
+                                        Package #{pkg.package_id}
+                                      </Link>
+                                      <span className="text-gray-500 truncate max-w-[150px]">{pkg.description}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-gray-400">{pkg.distance_km}km from route</span>
+                                      {pkg.notified ? (
+                                        <span className="text-green-600">Notified</span>
+                                      ) : (
+                                        <span className="text-gray-400">Skipped</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}

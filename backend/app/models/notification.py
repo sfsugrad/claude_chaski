@@ -14,6 +14,8 @@ class NotificationType(str, enum.Enum):
     PACKAGE_DELIVERED = "package_delivered"
     PACKAGE_CANCELLED = "package_cancelled"
     ROUTE_MATCH_FOUND = "route_match_found"
+    PACKAGE_MATCH_FOUND = "package_match_found"  # Notify courier about a package matching their route
+    NEW_RATING = "new_rating"  # Notify user about receiving a new rating
     SYSTEM = "system"
 
 

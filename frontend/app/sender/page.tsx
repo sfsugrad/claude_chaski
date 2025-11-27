@@ -422,7 +422,7 @@ function PackageCard({ pkg, onCancel, cancelling, canCancel }: PackageCardProps)
             {pkg.courier_id && pkg.status !== 'pending' && (
               <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                 <p className="text-sm text-blue-800">
-                  <span className="font-medium">Courier assigned</span> - Your package is being handled by courier #{pkg.courier_id}
+                  <span className="font-medium">Courier assigned</span> - Your package is being handled by {pkg.courier_name || `courier #${pkg.courier_id}`}
                 </p>
               </div>
             )}

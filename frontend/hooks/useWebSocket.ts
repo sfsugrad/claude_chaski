@@ -68,10 +68,26 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const pingIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
+  // Store callbacks in refs to avoid stale closures
+  const onNotificationRef = useRef(onNotification)
+  const onUnreadCountUpdateRef = useRef(onUnreadCountUpdate)
+  const onPackageUpdateRef = useRef(onPackageUpdate)
+  const onMessageReceivedRef = useRef(onMessageReceived)
+  const onConnectionChangeRef = useRef(onConnectionChange)
+
+  // Update refs when callbacks change
+  useEffect(() => {
+    onNotificationRef.current = onNotification
+    onUnreadCountUpdateRef.current = onUnreadCountUpdate
+    onPackageUpdateRef.current = onPackageUpdate
+    onMessageReceivedRef.current = onMessageReceived
+    onConnectionChangeRef.current = onConnectionChange
+  }, [onNotification, onUnreadCountUpdate, onPackageUpdate, onMessageReceived, onConnectionChange])
+
   const updateStatus = useCallback((status: ConnectionStatus) => {
     setConnectionStatus(status)
-    onConnectionChange?.(status)
-  }, [onConnectionChange])
+    onConnectionChangeRef.current?.(status)
+  }, [])
 
   const connect = useCallback(() => {
     // Get token from localStorage
@@ -108,27 +124,29 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       ws.onmessage = (event) => {
         try {
           const message: WebSocketMessage = JSON.parse(event.data)
+          console.log('[useWebSocket] Received message:', message.event_type, message)
           setLastMessage(message)
 
           switch (message.event_type) {
             case 'notification_created':
               if (message.notification) {
-                onNotification?.(message.notification)
+                onNotificationRef.current?.(message.notification)
               }
               break
             case 'unread_count_updated':
               if (typeof message.count === 'number') {
-                onUnreadCountUpdate?.(message.count)
+                onUnreadCountUpdateRef.current?.(message.count)
               }
               break
             case 'package_updated':
               if (message.package) {
-                onPackageUpdate?.(message.package)
+                onPackageUpdateRef.current?.(message.package)
               }
               break
             case 'message_received':
+              console.log('[useWebSocket] Message received event, calling callback')
               if (message.message) {
-                onMessageReceived?.(message.message)
+                onMessageReceivedRef.current?.(message.message)
               }
               break
             case 'pong':
@@ -165,7 +183,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       console.error('WebSocket connection error:', err)
       updateStatus('error')
     }
-  }, [onNotification, onUnreadCountUpdate, onPackageUpdate, onMessageReceived, updateStatus, reconnectAttempts, reconnectInterval])
+  }, [updateStatus, reconnectAttempts, reconnectInterval])
 
   const disconnect = useCallback(() => {
     // Clear reconnect timeout

@@ -125,12 +125,13 @@ async def create_rating(
     db.refresh(new_rating)
 
     # Create notification for the rated user with WebSocket broadcast
+    # Don't include package_id so it routes to reviews page instead of package page
     await create_notification_with_broadcast(
         db=db,
         user_id=rated_user_id,
-        notification_type=NotificationType.SYSTEM,
+        notification_type=NotificationType.NEW_RATING,
         message=f"You received a {rating_data.score}-star rating from {'the sender' if current_user.id == package.courier_id else 'the courier'}",
-        package_id=rating_data.package_id
+        package_id=None
     )
 
     return RatingResponse(

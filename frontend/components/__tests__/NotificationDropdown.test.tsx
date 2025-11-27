@@ -13,6 +13,18 @@ jest.mock('@/lib/api', () => ({
   },
 }))
 
+// Mock the WebSocket context
+jest.mock('@/contexts/WebSocketContext', () => ({
+  useWebSocketContext: () => ({
+    connectionStatus: 'connected',
+    isConnected: true,
+    onNotification: jest.fn(() => jest.fn()),
+    onUnreadCountUpdate: jest.fn(() => jest.fn()),
+    markNotificationRead: jest.fn(),
+    requestUnreadCount: jest.fn(),
+  }),
+}))
+
 // Mock next/link
 jest.mock('next/link', () => {
   return ({ children, href }: { children: React.ReactNode; href: string }) => (
@@ -328,6 +340,8 @@ describe('NotificationDropdown', () => {
       { type: 'package_cancelled', expectedTitle: 'Package Cancelled' },
       { type: 'new_match_available', expectedTitle: 'New Match Available' },
       { type: 'route_match_found', expectedTitle: 'Route Match Found' },
+      { type: 'new_rating', expectedTitle: 'New Rating Received' },
+      { type: 'package_match_found', expectedTitle: 'Package Match Found' },
       { type: 'system', expectedTitle: 'System Notification' },
     ]
 
@@ -360,6 +374,144 @@ describe('NotificationDropdown', () => {
           expect(screen.getByText(expectedTitle)).toBeInTheDocument()
         })
       })
+    })
+  })
+
+  describe('Notification Routing', () => {
+    it('routes new_rating notifications to /profile/reviews', async () => {
+      mockNotificationsAPI.getAll.mockResolvedValue({
+        data: {
+          notifications: [
+            {
+              id: 1,
+              user_id: 1,
+              type: 'new_rating',
+              message: 'You received a 5-star rating',
+              read: false,
+              package_id: null, // Rating notifications should not have package_id
+              created_at: new Date().toISOString(),
+            },
+          ],
+          total: 1,
+          unread_count: 1,
+        },
+      } as any)
+
+      render(<NotificationDropdown />)
+
+      const button = screen.getByRole('button', { name: /notifications/i })
+      fireEvent.click(button)
+
+      await waitFor(() => {
+        const links = screen.getAllByRole('link')
+        const notificationLink = links.find(link =>
+          link.getAttribute('href') === '/profile/reviews'
+        )
+        expect(notificationLink).toBeDefined()
+      })
+    })
+
+    it('routes package_match_found notifications to package page', async () => {
+      mockNotificationsAPI.getAll.mockResolvedValue({
+        data: {
+          notifications: [
+            {
+              id: 1,
+              user_id: 1,
+              type: 'package_match_found',
+              message: 'New package found matching your route',
+              read: false,
+              package_id: 123,
+              created_at: new Date().toISOString(),
+            },
+          ],
+          total: 1,
+          unread_count: 1,
+        },
+      } as any)
+
+      render(<NotificationDropdown />)
+
+      const button = screen.getByRole('button', { name: /notifications/i })
+      fireEvent.click(button)
+
+      await waitFor(() => {
+        const links = screen.getAllByRole('link')
+        const notificationLink = links.find(link =>
+          link.getAttribute('href') === '/packages/123'
+        )
+        expect(notificationLink).toBeDefined()
+      })
+    })
+
+    it('routes notifications with package_id to package page', async () => {
+      mockNotificationsAPI.getAll.mockResolvedValue({
+        data: {
+          notifications: [
+            {
+              id: 1,
+              user_id: 1,
+              type: 'package_delivered',
+              message: 'Your package was delivered',
+              read: false,
+              package_id: 456,
+              created_at: new Date().toISOString(),
+            },
+          ],
+          total: 1,
+          unread_count: 1,
+        },
+      } as any)
+
+      render(<NotificationDropdown />)
+
+      const button = screen.getByRole('button', { name: /notifications/i })
+      fireEvent.click(button)
+
+      await waitFor(() => {
+        const links = screen.getAllByRole('link')
+        const notificationLink = links.find(link =>
+          link.getAttribute('href') === '/packages/456'
+        )
+        expect(notificationLink).toBeDefined()
+      })
+    })
+
+    it('does not create link for system notifications without package_id', async () => {
+      mockNotificationsAPI.getAll.mockResolvedValue({
+        data: {
+          notifications: [
+            {
+              id: 1,
+              user_id: 1,
+              type: 'system',
+              message: 'System maintenance scheduled',
+              read: false,
+              package_id: null,
+              created_at: new Date().toISOString(),
+            },
+          ],
+          total: 1,
+          unread_count: 1,
+        },
+      } as any)
+
+      render(<NotificationDropdown />)
+
+      const button = screen.getByRole('button', { name: /notifications/i })
+      fireEvent.click(button)
+
+      await waitFor(() => {
+        expect(screen.getByText('System maintenance scheduled')).toBeInTheDocument()
+      })
+
+      // Should not have a link for this notification
+      const links = screen.queryAllByRole('link')
+      const notificationLink = links.find(link =>
+        link.getAttribute('href')?.startsWith('/packages') ||
+        link.getAttribute('href')?.startsWith('/profile')
+      )
+      expect(notificationLink).toBeUndefined()
     })
   })
 })

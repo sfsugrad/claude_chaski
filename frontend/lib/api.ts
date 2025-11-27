@@ -76,6 +76,8 @@ export interface PackageResponse {
   id: number
   sender_id: number
   courier_id: number | null
+  sender_name: string | null
+  courier_name: string | null
   description: string
   size: string
   weight_kg: number
@@ -190,6 +192,8 @@ export type NotificationType =
   | 'package_cancelled'
   | 'new_match_available'
   | 'route_match_found'
+  | 'new_rating'
+  | 'package_match_found'
   | 'system'
 
 export interface NotificationResponse {

@@ -26,6 +26,8 @@ const NOTIFICATION_ICONS: Record<NotificationType, string> = {
   package_cancelled: '❌',
   new_match_available: '🔔',
   route_match_found: '🛣️',
+  new_rating: '⭐',
+  package_match_found: '📍',
   system: 'ℹ️',
 }
 
@@ -37,6 +39,8 @@ const NOTIFICATION_COLORS: Record<NotificationType, string> = {
   package_cancelled: 'bg-red-50 border-red-200',
   new_match_available: 'bg-yellow-50 border-yellow-200',
   route_match_found: 'bg-teal-50 border-teal-200',
+  new_rating: 'bg-yellow-50 border-yellow-200',
+  package_match_found: 'bg-teal-50 border-teal-200',
   system: 'bg-gray-50 border-gray-200',
 }
 
@@ -48,7 +52,23 @@ const NOTIFICATION_TITLES: Record<NotificationType, string> = {
   package_cancelled: 'Package Cancelled',
   new_match_available: 'New Match Available',
   route_match_found: 'Route Match Found',
+  new_rating: 'New Rating Received',
+  package_match_found: 'Package Match Found',
   system: 'System Notification',
+}
+
+// Helper to get the appropriate link for a notification
+function getNotificationLink(notification: DisplayNotification): string | null {
+  // Rating notifications go to reviews page
+  if (notification.type === 'new_rating') {
+    return '/profile/reviews'
+  }
+  // Package-related notifications go to package page
+  if (notification.package_id) {
+    return `/packages/${notification.package_id}`
+  }
+  // No link for other notifications
+  return null
 }
 
 function formatTimeAgo(dateString: string): string {
@@ -299,36 +319,39 @@ export default function NotificationDropdown({ className = '' }: NotificationDro
               </div>
             ) : (
               <ul className="divide-y divide-gray-100">
-                {notifications.map((notification) => (
-                  <li key={notification.id}>
-                    {notification.package_id ? (
-                      <Link
-                        href={`/packages/${notification.package_id}`}
-                        onClick={() => handleNotificationClick(notification)}
-                        className={`block px-4 py-3 hover:bg-gray-50 transition-colors ${
-                          !notification.is_read ? 'bg-blue-50/50' : ''
-                        }`}
-                      >
-                        <NotificationContent
-                          notification={notification}
-                          onMarkAsRead={handleMarkAsRead}
-                        />
-                      </Link>
-                    ) : (
-                      <div
-                        onClick={() => handleNotificationClick(notification)}
-                        className={`px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${
-                          !notification.is_read ? 'bg-blue-50/50' : ''
-                        }`}
-                      >
-                        <NotificationContent
-                          notification={notification}
-                          onMarkAsRead={handleMarkAsRead}
-                        />
-                      </div>
-                    )}
-                  </li>
-                ))}
+                {notifications.map((notification) => {
+                  const link = getNotificationLink(notification)
+                  return (
+                    <li key={notification.id}>
+                      {link ? (
+                        <Link
+                          href={link}
+                          onClick={() => handleNotificationClick(notification)}
+                          className={`block px-4 py-3 hover:bg-gray-50 transition-colors ${
+                            !notification.is_read ? 'bg-blue-50/50' : ''
+                          }`}
+                        >
+                          <NotificationContent
+                            notification={notification}
+                            onMarkAsRead={handleMarkAsRead}
+                          />
+                        </Link>
+                      ) : (
+                        <div
+                          onClick={() => handleNotificationClick(notification)}
+                          className={`px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${
+                            !notification.is_read ? 'bg-blue-50/50' : ''
+                          }`}
+                        >
+                          <NotificationContent
+                            notification={notification}
+                            onMarkAsRead={handleMarkAsRead}
+                          />
+                        </div>
+                      )}
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </div>

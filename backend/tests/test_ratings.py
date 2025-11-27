@@ -615,6 +615,125 @@ class TestGetMyPendingRatings:
         assert data[0]["user_to_rate_role"] == "courier"
 
 
+class TestRatingCreatesNewRatingNotification:
+    """Tests that rating creates NEW_RATING notification type."""
+
+    @pytest.fixture
+    def delivered_package_for_notification(self, db_session):
+        """Create sender, courier, and delivered package for notification tests."""
+        # Create sender
+        sender = User(
+            email="notif_sender@test.com",
+            hashed_password=get_password_hash("password123"),
+            full_name="Notification Sender",
+            role=UserRole.SENDER,
+            is_active=True,
+            is_verified=True,
+            max_deviation_km=5
+        )
+        db_session.add(sender)
+
+        # Create courier
+        courier = User(
+            email="notif_courier@test.com",
+            hashed_password=get_password_hash("password123"),
+            full_name="Notification Courier",
+            role=UserRole.COURIER,
+            is_active=True,
+            is_verified=True,
+            max_deviation_km=10
+        )
+        db_session.add(courier)
+        db_session.commit()
+
+        # Create delivered package
+        package = Package(
+            sender_id=sender.id,
+            courier_id=courier.id,
+            description="Test package for notification",
+            size="small",
+            weight_kg=1.0,
+            status=PackageStatus.DELIVERED,
+            pickup_address="123 Main St",
+            pickup_lat=40.7128,
+            pickup_lng=-74.0060,
+            dropoff_address="456 Oak Ave",
+            dropoff_lat=40.7200,
+            dropoff_lng=-74.0100,
+            price=25.00
+        )
+        db_session.add(package)
+        db_session.commit()
+        db_session.refresh(sender)
+        db_session.refresh(courier)
+        db_session.refresh(package)
+
+        sender_token = create_access_token(data={"sub": sender.email})
+        courier_token = create_access_token(data={"sub": courier.email})
+
+        return {
+            "sender": sender,
+            "courier": courier,
+            "package": package,
+            "sender_token": sender_token,
+            "courier_token": courier_token
+        }
+
+    def test_rating_creates_new_rating_notification_type(self, client, db_session, delivered_package_for_notification):
+        """When sender rates courier, courier receives NEW_RATING notification."""
+        from app.models.notification import Notification, NotificationType
+
+        setup = delivered_package_for_notification
+
+        response = client.post(
+            "/api/ratings/",
+            json={
+                "package_id": setup["package"].id,
+                "score": 5,
+                "comment": "Great service!"
+            },
+            headers={"Authorization": f"Bearer {setup['sender_token']}"}
+        )
+
+        assert response.status_code == 201
+
+        # Check notification was created with NEW_RATING type
+        notification = db_session.query(Notification).filter(
+            Notification.user_id == setup["courier"].id,
+            Notification.type == NotificationType.NEW_RATING
+        ).first()
+
+        assert notification is not None
+        assert "5-star rating" in notification.message
+        assert notification.package_id is None  # Should not link to package
+
+    def test_rating_notification_has_no_package_id(self, client, db_session, delivered_package_for_notification):
+        """Rating notification should not have package_id (routes to reviews page)."""
+        from app.models.notification import Notification, NotificationType
+
+        setup = delivered_package_for_notification
+
+        response = client.post(
+            "/api/ratings/",
+            json={
+                "package_id": setup["package"].id,
+                "score": 4
+            },
+            headers={"Authorization": f"Bearer {setup['courier_token']}"}
+        )
+
+        assert response.status_code == 201
+
+        # Check notification was created without package_id
+        notification = db_session.query(Notification).filter(
+            Notification.user_id == setup["sender"].id,
+            Notification.type == NotificationType.NEW_RATING
+        ).first()
+
+        assert notification is not None
+        assert notification.package_id is None
+
+
 class TestAverageRatingInAuthMe:
     """Tests for average_rating in /api/auth/me response."""
 
