@@ -155,6 +155,29 @@ export default function CourierDashboard() {
           </div>
         )}
 
+        {/* Pending Ratings Banner */}
+        {pendingRatings.length > 0 && !showRatingModal && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">⭐</span>
+              <div>
+                <p className="font-medium text-yellow-800">
+                  You have {pendingRatings.length} pending {pendingRatings.length === 1 ? 'review' : 'reviews'}
+                </p>
+                <p className="text-sm text-yellow-600">
+                  Rate your experience with senders whose packages you delivered
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowRatingModal(true)}
+              className="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 transition-colors font-medium"
+            >
+              Rate Now
+            </button>
+          </div>
+        )}
+
         {/* Active Route Section */}
         {activeRoute && (
           <div className="bg-green-50 border-2 border-green-200 rounded-lg p-6 mb-8">
