@@ -2,7 +2,19 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { notificationsAPI, NotificationResponse, NotificationType } from '@/lib/api'
+import { notificationsAPI, NotificationType } from '@/lib/api'
+
+// Internal notification type with transformed fields from backend
+interface DisplayNotification {
+  id: number
+  user_id: number
+  type: NotificationType
+  title: string
+  message: string
+  is_read: boolean
+  package_id: number | null
+  created_at: string
+}
 
 const NOTIFICATION_ICONS: Record<NotificationType, string> = {
   package_matched: '🤝',
@@ -11,6 +23,7 @@ const NOTIFICATION_ICONS: Record<NotificationType, string> = {
   package_delivered: '✅',
   package_cancelled: '❌',
   new_match_available: '🔔',
+  route_match_found: '🛣️',
   system: 'ℹ️',
 }
 
@@ -21,7 +34,19 @@ const NOTIFICATION_COLORS: Record<NotificationType, string> = {
   package_delivered: 'bg-green-50 border-green-200',
   package_cancelled: 'bg-red-50 border-red-200',
   new_match_available: 'bg-yellow-50 border-yellow-200',
+  route_match_found: 'bg-teal-50 border-teal-200',
   system: 'bg-gray-50 border-gray-200',
+}
+
+const NOTIFICATION_TITLES: Record<NotificationType, string> = {
+  package_matched: 'Package Matched',
+  package_picked_up: 'Package Picked Up',
+  package_in_transit: 'Package In Transit',
+  package_delivered: 'Package Delivered',
+  package_cancelled: 'Package Cancelled',
+  new_match_available: 'New Match Available',
+  route_match_found: 'Route Match Found',
+  system: 'System Notification',
 }
 
 function formatTimeAgo(dateString: string): string {
@@ -42,7 +67,7 @@ interface NotificationDropdownProps {
 
 export default function NotificationDropdown({ className = '' }: NotificationDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [notifications, setNotifications] = useState<NotificationResponse[]>([])
+  const [notifications, setNotifications] = useState<DisplayNotification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -82,7 +107,18 @@ export default function NotificationDropdown({ className = '' }: NotificationDro
     setError(null)
     try {
       const response = await notificationsAPI.getAll()
-      setNotifications(response.data)
+      // Transform backend response to display format
+      const transformedNotifications: DisplayNotification[] = response.data.notifications.map((n: any) => ({
+        id: n.id,
+        user_id: n.user_id,
+        type: n.type as NotificationType,
+        title: NOTIFICATION_TITLES[n.type as NotificationType] || 'Notification',
+        message: n.message,
+        is_read: n.read, // Backend uses 'read', frontend uses 'is_read'
+        package_id: n.package_id,
+        created_at: n.created_at,
+      }))
+      setNotifications(transformedNotifications)
     } catch (err) {
       setError('Failed to load notifications')
       console.error('Failed to fetch notifications:', err)
@@ -121,7 +157,7 @@ export default function NotificationDropdown({ className = '' }: NotificationDro
     }
   }
 
-  const handleNotificationClick = (notification: NotificationResponse) => {
+  const handleNotificationClick = (notification: DisplayNotification) => {
     if (!notification.is_read) {
       notificationsAPI.markAsRead(notification.id).catch(console.error)
       setNotifications(prev =>
@@ -248,7 +284,7 @@ export default function NotificationDropdown({ className = '' }: NotificationDro
 }
 
 interface NotificationContentProps {
-  notification: NotificationResponse
+  notification: DisplayNotification
   onMarkAsRead: (id: number, event: React.MouseEvent) => void
 }
 

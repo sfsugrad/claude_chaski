@@ -187,6 +187,7 @@ export type NotificationType =
   | 'package_delivered'
   | 'package_cancelled'
   | 'new_match_available'
+  | 'route_match_found'
   | 'system'
 
 export interface NotificationResponse {
@@ -200,6 +201,12 @@ export interface NotificationResponse {
   created_at: string
 }
 
+export interface NotificationListResponse {
+  notifications: NotificationResponse[]
+  total: number
+  unread_count: number
+}
+
 export interface NotificationCountResponse {
   unread_count: number
 }
@@ -207,13 +214,13 @@ export interface NotificationCountResponse {
 // Notifications API
 export const notificationsAPI = {
   getAll: (unreadOnly: boolean = false) =>
-    api.get<NotificationResponse[]>(`/notifications${unreadOnly ? '?unread_only=true' : ''}`),
+    api.get<NotificationListResponse>(`/notifications/${unreadOnly ? '?unread_only=true' : ''}`),
   getUnreadCount: () =>
     api.get<NotificationCountResponse>('/notifications/unread-count'),
   markAsRead: (id: number) =>
     api.put<NotificationResponse>(`/notifications/${id}/read`),
   markAllAsRead: () =>
-    api.put('/notifications/read-all'),
+    api.put('/notifications/mark-read', {}),
   delete: (id: number) =>
     api.delete(`/notifications/${id}`),
 }
