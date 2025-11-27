@@ -352,8 +352,10 @@ class TestGetPackageById:
         assert response.status_code == status.HTTP_404_NOT_FOUND
         assert "not found" in response.json()["detail"].lower()
 
-    def test_get_package_by_id_unauthorized(self, client, authenticated_sender, authenticated_both_role, test_package_data):
-        """Test that users cannot access other users' packages"""
+    def test_get_package_by_id_unauthorized(self, client, db_session, authenticated_sender, authenticated_both_role, test_package_data):
+        """Test that users cannot access other users' non-pending packages"""
+        from app.models.package import Package, PackageStatus
+
         # User 1 creates a package
         create_response = client.post(
             "/api/packages",
@@ -362,7 +364,13 @@ class TestGetPackageById:
         )
         package_id = create_response.json()["id"]
 
-        # User 2 tries to access it
+        # Change the package status to MATCHED (non-pending) so couriers can't browse it
+        # Couriers are allowed to view PENDING packages to decide whether to accept
+        package = db_session.query(Package).filter(Package.id == package_id).first()
+        package.status = PackageStatus.MATCHED
+        db_session.commit()
+
+        # User 2 (with both role, which includes courier) tries to access it
         response = client.get(
             f"/api/packages/{package_id}",
             headers={"Authorization": f"Bearer {authenticated_both_role}"}

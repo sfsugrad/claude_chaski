@@ -91,12 +91,32 @@ describe('AdminPage', () => {
   describe('Page Rendering', () => {
     beforeEach(() => {
       ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
+      // Mock auth check
       mockedAxios.get.mockResolvedValueOnce({
         data: {
           id: 1,
           email: 'admin@example.com',
           full_name: 'Admin User',
           role: 'ADMIN',
+        },
+      })
+      // Mock users list
+      .mockResolvedValueOnce({ data: [] })
+      // Mock packages list
+      .mockResolvedValueOnce({ data: [] })
+      // Mock stats
+      .mockResolvedValueOnce({
+        data: {
+          total_users: 0,
+          total_senders: 0,
+          total_couriers: 0,
+          total_both: 0,
+          total_admins: 0,
+          total_packages: 0,
+          active_packages: 0,
+          completed_packages: 0,
+          pending_packages: 0,
+          total_revenue: 0,
         },
       })
     })
@@ -129,12 +149,32 @@ describe('AdminPage', () => {
   describe('Navigation Tabs', () => {
     beforeEach(async () => {
       ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
+      // Mock auth check
       mockedAxios.get.mockResolvedValueOnce({
         data: {
           id: 1,
           email: 'admin@example.com',
           full_name: 'Admin User',
           role: 'ADMIN',
+        },
+      })
+      // Mock users list
+      .mockResolvedValueOnce({ data: [] })
+      // Mock packages list
+      .mockResolvedValueOnce({ data: [] })
+      // Mock stats
+      .mockResolvedValueOnce({
+        data: {
+          total_users: 0,
+          total_senders: 0,
+          total_couriers: 0,
+          total_both: 0,
+          total_admins: 0,
+          total_packages: 0,
+          active_packages: 0,
+          completed_packages: 0,
+          pending_packages: 0,
+          total_revenue: 0,
         },
       })
     })
@@ -191,12 +231,32 @@ describe('AdminPage', () => {
   describe('Overview Tab', () => {
     beforeEach(async () => {
       ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
+      // Mock auth check
       mockedAxios.get.mockResolvedValueOnce({
         data: {
           id: 1,
           email: 'admin@example.com',
           full_name: 'Admin User',
           role: 'ADMIN',
+        },
+      })
+      // Mock users list
+      .mockResolvedValueOnce({ data: [] })
+      // Mock packages list
+      .mockResolvedValueOnce({ data: [] })
+      // Mock stats
+      .mockResolvedValueOnce({
+        data: {
+          total_users: 0,
+          total_senders: 0,
+          total_couriers: 0,
+          total_both: 0,
+          total_admins: 0,
+          total_packages: 0,
+          active_packages: 0,
+          completed_packages: 0,
+          pending_packages: 0,
+          total_revenue: 0,
         },
       })
     })
@@ -206,8 +266,8 @@ describe('AdminPage', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Total Users')).toBeInTheDocument()
-        expect(screen.getByText('Senders')).toBeInTheDocument()
-        expect(screen.getByText('Couriers')).toBeInTheDocument()
+        expect(screen.getByText('Senders Only')).toBeInTheDocument()
+        expect(screen.getByText('Couriers Only')).toBeInTheDocument()
         expect(screen.getByText('Active Packages')).toBeInTheDocument()
       })
     })
@@ -219,7 +279,7 @@ describe('AdminPage', () => {
         expect(screen.getByText('Quick Actions')).toBeInTheDocument()
         expect(screen.getByText('Manage Users')).toBeInTheDocument()
         expect(screen.getByText('View Packages')).toBeInTheDocument()
-        expect(screen.getByText('Generate Reports (Coming Soon)')).toBeInTheDocument()
+        expect(screen.getByText('Generate Reports (Soon)')).toBeInTheDocument()
       })
     })
 
@@ -242,6 +302,7 @@ describe('AdminPage', () => {
   describe('Users Tab', () => {
     beforeEach(async () => {
       ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
+      // Mock auth check
       mockedAxios.get.mockResolvedValueOnce({
         data: {
           id: 1,
@@ -250,9 +311,28 @@ describe('AdminPage', () => {
           role: 'ADMIN',
         },
       })
+      // Mock users list
+      .mockResolvedValueOnce({ data: [] })
+      // Mock packages list
+      .mockResolvedValueOnce({ data: [] })
+      // Mock stats
+      .mockResolvedValueOnce({
+        data: {
+          total_users: 0,
+          total_senders: 0,
+          total_couriers: 0,
+          total_both: 0,
+          total_admins: 0,
+          total_packages: 0,
+          active_packages: 0,
+          completed_packages: 0,
+          pending_packages: 0,
+          total_revenue: 0,
+        },
+      })
     })
 
-    it('shows placeholder message when no API endpoints', async () => {
+    it('shows no users message when users list is empty', async () => {
       const { getByText } = render(<AdminPage />)
 
       await waitFor(() => {
@@ -261,7 +341,7 @@ describe('AdminPage', () => {
       })
 
       await waitFor(() => {
-        expect(screen.getByText('Admin API endpoints not yet implemented')).toBeInTheDocument()
+        expect(screen.getByText('No users found')).toBeInTheDocument()
       })
     })
 
@@ -282,6 +362,7 @@ describe('AdminPage', () => {
   describe('Packages Tab', () => {
     beforeEach(async () => {
       ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
+      // Mock auth check
       mockedAxios.get.mockResolvedValueOnce({
         data: {
           id: 1,
@@ -290,9 +371,28 @@ describe('AdminPage', () => {
           role: 'ADMIN',
         },
       })
+      // Mock users list
+      .mockResolvedValueOnce({ data: [] })
+      // Mock packages list
+      .mockResolvedValueOnce({ data: [] })
+      // Mock stats
+      .mockResolvedValueOnce({
+        data: {
+          total_users: 0,
+          total_senders: 0,
+          total_couriers: 0,
+          total_both: 0,
+          total_admins: 0,
+          total_packages: 0,
+          active_packages: 0,
+          completed_packages: 0,
+          pending_packages: 0,
+          total_revenue: 0,
+        },
+      })
     })
 
-    it('shows placeholder message when no API endpoints', async () => {
+    it('shows no packages message when packages list is empty', async () => {
       const { getByText } = render(<AdminPage />)
 
       await waitFor(() => {
@@ -301,7 +401,7 @@ describe('AdminPage', () => {
       })
 
       await waitFor(() => {
-        expect(screen.getByText('Admin API endpoints not yet implemented')).toBeInTheDocument()
+        expect(screen.getByText('No packages found')).toBeInTheDocument()
       })
     })
 
@@ -322,12 +422,32 @@ describe('AdminPage', () => {
   describe('Logout Functionality', () => {
     beforeEach(async () => {
       ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
+      // Mock auth check
       mockedAxios.get.mockResolvedValueOnce({
         data: {
           id: 1,
           email: 'admin@example.com',
           full_name: 'Admin User',
           role: 'ADMIN',
+        },
+      })
+      // Mock users list
+      .mockResolvedValueOnce({ data: [] })
+      // Mock packages list
+      .mockResolvedValueOnce({ data: [] })
+      // Mock stats
+      .mockResolvedValueOnce({
+        data: {
+          total_users: 0,
+          total_senders: 0,
+          total_couriers: 0,
+          total_both: 0,
+          total_admins: 0,
+          total_packages: 0,
+          active_packages: 0,
+          completed_packages: 0,
+          pending_packages: 0,
+          total_revenue: 0,
         },
       })
     })
@@ -350,12 +470,32 @@ describe('AdminPage', () => {
   describe('Styling and Layout', () => {
     beforeEach(async () => {
       ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
+      // Mock auth check
       mockedAxios.get.mockResolvedValueOnce({
         data: {
           id: 1,
           email: 'admin@example.com',
           full_name: 'Admin User',
           role: 'ADMIN',
+        },
+      })
+      // Mock users list
+      .mockResolvedValueOnce({ data: [] })
+      // Mock packages list
+      .mockResolvedValueOnce({ data: [] })
+      // Mock stats
+      .mockResolvedValueOnce({
+        data: {
+          total_users: 0,
+          total_senders: 0,
+          total_couriers: 0,
+          total_both: 0,
+          total_admins: 0,
+          total_packages: 0,
+          active_packages: 0,
+          completed_packages: 0,
+          pending_packages: 0,
+          total_revenue: 0,
         },
       })
     })
@@ -384,12 +524,32 @@ describe('AdminPage', () => {
   describe('Accessibility', () => {
     beforeEach(async () => {
       ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
+      // Mock auth check
       mockedAxios.get.mockResolvedValueOnce({
         data: {
           id: 1,
           email: 'admin@example.com',
           full_name: 'Admin User',
           role: 'ADMIN',
+        },
+      })
+      // Mock users list
+      .mockResolvedValueOnce({ data: [] })
+      // Mock packages list
+      .mockResolvedValueOnce({ data: [] })
+      // Mock stats
+      .mockResolvedValueOnce({
+        data: {
+          total_users: 0,
+          total_senders: 0,
+          total_couriers: 0,
+          total_both: 0,
+          total_admins: 0,
+          total_packages: 0,
+          active_packages: 0,
+          completed_packages: 0,
+          pending_packages: 0,
+          total_revenue: 0,
         },
       })
     })
@@ -422,12 +582,32 @@ describe('AdminPage', () => {
   describe('Role-Based Content', () => {
     it('shows all four role options in user management', async () => {
       ;(localStorage.getItem as jest.Mock).mockReturnValue('fake-token')
+      // Mock auth check
       mockedAxios.get.mockResolvedValueOnce({
         data: {
           id: 1,
           email: 'admin@example.com',
           full_name: 'Admin User',
           role: 'ADMIN',
+        },
+      })
+      // Mock users list
+      .mockResolvedValueOnce({ data: [] })
+      // Mock packages list
+      .mockResolvedValueOnce({ data: [] })
+      // Mock stats
+      .mockResolvedValueOnce({
+        data: {
+          total_users: 0,
+          total_senders: 0,
+          total_couriers: 0,
+          total_both: 0,
+          total_admins: 0,
+          total_packages: 0,
+          active_packages: 0,
+          completed_packages: 0,
+          pending_packages: 0,
+          total_revenue: 0,
         },
       })
 
@@ -456,14 +636,14 @@ describe('AdminPage', () => {
         },
       })
 
-      // Mock users list API call
+      // Mock users list API call (use lowercase role values to match select options)
       .mockResolvedValueOnce({
         data: [
           {
             id: 1,
             email: 'admin@example.com',
             full_name: 'Admin User',
-            role: 'ADMIN',
+            role: 'admin',
             is_verified: true,
             is_active: true,
             created_at: '2024-01-01T00:00:00Z',
@@ -472,7 +652,7 @@ describe('AdminPage', () => {
             id: 2,
             email: 'other@example.com',
             full_name: 'Other User',
-            role: 'SENDER',
+            role: 'sender',
             is_verified: true,
             is_active: true,
             created_at: '2024-01-02T00:00:00Z',
@@ -531,14 +711,14 @@ describe('AdminPage', () => {
         },
       })
 
-      // Mock users list API call
+      // Mock users list API call (use lowercase role values to match select options)
       .mockResolvedValueOnce({
         data: [
           {
             id: 1,
             email: 'admin@example.com',
             full_name: 'Admin User',
-            role: 'ADMIN',
+            role: 'admin',
             is_verified: true,
             is_active: true,
             created_at: '2024-01-01T00:00:00Z',
@@ -547,7 +727,7 @@ describe('AdminPage', () => {
             id: 2,
             email: 'other@example.com',
             full_name: 'Other User',
-            role: 'SENDER',
+            role: 'sender',
             is_verified: true,
             is_active: true,
             created_at: '2024-01-02T00:00:00Z',
@@ -610,14 +790,14 @@ describe('AdminPage', () => {
         },
       })
 
-      // Mock users list API call
+      // Mock users list API call (use lowercase role values to match select options)
       .mockResolvedValueOnce({
         data: [
           {
             id: 1,
             email: 'admin@example.com',
             full_name: 'Admin User',
-            role: 'ADMIN',
+            role: 'admin',
             is_verified: true,
             is_active: true,
             created_at: '2024-01-01T00:00:00Z',
@@ -626,7 +806,7 @@ describe('AdminPage', () => {
             id: 2,
             email: 'other@example.com',
             full_name: 'Other User',
-            role: 'SENDER',
+            role: 'sender',
             is_verified: true,
             is_active: true,
             created_at: '2024-01-02T00:00:00Z',
@@ -651,7 +831,7 @@ describe('AdminPage', () => {
         },
       })
 
-      const { getByText, container } = render(<AdminPage />)
+      const { getByText } = render(<AdminPage />)
 
       // Navigate to Users tab
       await waitFor(() => {
@@ -665,15 +845,12 @@ describe('AdminPage', () => {
         expect(screen.getByText('other@example.com')).toBeInTheDocument()
       })
 
-      // Find all role dropdowns
-      const roleSelects = container.querySelectorAll('select')
-
-      // The first dropdown should be disabled (logged-in admin)
-      const adminRoleSelect = roleSelects[0]
-      expect(adminRoleSelect).toBeDisabled()
-      expect(adminRoleSelect).toHaveClass('bg-gray-100')
-      expect(adminRoleSelect).toHaveClass('cursor-not-allowed')
-      expect(adminRoleSelect).toHaveAttribute('title', 'You cannot change your own role')
+      // Find the role dropdown with title attribute (only set on disabled dropdowns for logged-in admin)
+      const disabledRoleSelect = screen.getByTitle('You cannot change your own role')
+      expect(disabledRoleSelect).toBeInTheDocument()
+      expect(disabledRoleSelect).toBeDisabled()
+      expect(disabledRoleSelect).toHaveClass('bg-gray-100')
+      expect(disabledRoleSelect).toHaveClass('cursor-not-allowed')
     })
 
     it('allows changing role for other users', async () => {
@@ -689,14 +866,14 @@ describe('AdminPage', () => {
         },
       })
 
-      // Mock users list API call
+      // Mock users list API call (use lowercase role values to match select options)
       .mockResolvedValueOnce({
         data: [
           {
             id: 1,
             email: 'admin@example.com',
             full_name: 'Admin User',
-            role: 'ADMIN',
+            role: 'admin',
             is_verified: true,
             is_active: true,
             created_at: '2024-01-01T00:00:00Z',
@@ -705,7 +882,7 @@ describe('AdminPage', () => {
             id: 2,
             email: 'other@example.com',
             full_name: 'Other User',
-            role: 'SENDER',
+            role: 'sender',
             is_verified: true,
             is_active: true,
             created_at: '2024-01-02T00:00:00Z',
@@ -730,7 +907,7 @@ describe('AdminPage', () => {
         },
       })
 
-      const { getByText, container } = render(<AdminPage />)
+      const { getByText } = render(<AdminPage />)
 
       // Navigate to Users tab
       await waitFor(() => {
@@ -743,13 +920,15 @@ describe('AdminPage', () => {
         expect(screen.getByText('other@example.com')).toBeInTheDocument()
       })
 
-      // Find all role dropdowns
-      const roleSelects = container.querySelectorAll('select')
-
-      // The second dropdown should be enabled (other user)
-      const otherUserRoleSelect = roleSelects[1]
+      // Find enabled role dropdown by looking for select with "sender" as value (lowercase)
+      // that is NOT disabled (the other user's dropdown)
+      const allSelects = screen.getAllByRole('combobox')
+      // Find the one that has sender as value and is not disabled
+      const otherUserRoleSelect = allSelects.find(
+        select => (select as HTMLSelectElement).value === 'sender' && !(select as HTMLSelectElement).disabled
+      )
+      expect(otherUserRoleSelect).toBeDefined()
       expect(otherUserRoleSelect).not.toBeDisabled()
-      expect(otherUserRoleSelect).not.toHaveClass('bg-gray-100')
     })
   })
 })

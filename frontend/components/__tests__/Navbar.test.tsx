@@ -1,3 +1,4 @@
+import React from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { useRouter } from 'next/navigation'
 import Navbar from '../Navbar'
@@ -5,6 +6,7 @@ import Navbar from '../Navbar'
 // Mock next/navigation
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
+  usePathname: jest.fn(() => '/dashboard'),
 }))
 
 // Mock NotificationDropdown
@@ -20,6 +22,23 @@ jest.mock('../StarRating', () => {
     return <span data-testid="star-rating">★ {rating}</span>
   }
 })
+
+// Mock WebSocketContext
+jest.mock('@/contexts/WebSocketContext', () => ({
+  useWebSocketContext: () => ({
+    unreadCount: 0,
+    setUnreadCount: jest.fn(),
+    onMessageReceived: jest.fn(() => () => {}), // Returns an unsubscribe function
+  }),
+}))
+
+// Mock the API calls
+jest.mock('@/lib/api', () => ({
+  __esModule: true,
+  default: {
+    get: jest.fn(() => Promise.resolve({ data: { count: 0 } })),
+  },
+}))
 
 const mockUser = {
   id: 1,

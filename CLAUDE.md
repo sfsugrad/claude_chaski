@@ -83,6 +83,8 @@ npm run lint
   - `oauth.py` - Google OAuth configuration
 - `app/services/` - Business logic services:
   - `websocket_manager.py` - WebSocket connection manager and broadcast functions
+  - `matching_job.py` - Background job for automatic package-route matching (can run as standalone script)
+  - `route_optimizer.py` - Route optimization algorithms
 - `test_data/` - JSON fixtures and loader script for seeding the database
 
 ### Frontend Structure
@@ -90,6 +92,8 @@ npm run lint
 - `lib/api.ts` - Axios client with auth interceptor and TypeScript interfaces for all API types
 - `hooks/` - Custom React hooks:
   - `useWebSocket.ts` - WebSocket connection hook with auto-reconnect
+- `contexts/` - React contexts:
+  - `WebSocketContext.tsx` - Shared WebSocket provider for app-wide real-time updates (wraps useWebSocket)
 - `components/` - Reusable React components
 
 ### Key Patterns
@@ -113,8 +117,9 @@ npm run lint
 
 **Backend:** Pytest with fixtures in `tests/conftest.py` providing:
 - `client` - TestClient with database override
-- `authenticated_sender`, `authenticated_courier`, `authenticated_admin` - Pre-authenticated tokens
-- `test_package_data`, `test_user_data` - Sample data fixtures
+- `authenticated_sender`, `authenticated_courier`, `authenticated_both_role`, `authenticated_admin` - Pre-authenticated tokens
+- `test_package_data`, `test_user_data`, `test_courier_data` - Sample data fixtures
+- `test_verified_user`, `test_admin` - User objects (not tokens) for direct database operations
 
 **Frontend:** Jest with React Testing Library. Test files colocated in `__tests__/` directories.
 
