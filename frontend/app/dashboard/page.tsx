@@ -149,35 +149,66 @@ export default function DashboardPage() {
 
           <div className="grid md:grid-cols-2 gap-6">
             {(user.role === 'sender' || user.role === 'both') && (
-              <div className="bg-white overflow-hidden shadow rounded-lg">
-                <div className="p-5">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <div className="text-4xl">📦</div>
+              <>
+                <div className="bg-white overflow-hidden shadow rounded-lg">
+                  <div className="p-5">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <div className="text-4xl">📋</div>
+                      </div>
+                      <div className="ml-5 w-0 flex-1">
+                        <dl>
+                          <dt className="text-sm font-medium text-gray-500 truncate">
+                            My Packages
+                          </dt>
+                          <dd>
+                            <div className="text-sm text-gray-900 mt-2">
+                              Track and manage your deliveries
+                            </div>
+                          </dd>
+                        </dl>
+                      </div>
                     </div>
-                    <div className="ml-5 w-0 flex-1">
-                      <dl>
-                        <dt className="text-sm font-medium text-gray-500 truncate">
-                          Send a Package
-                        </dt>
-                        <dd>
-                          <div className="text-sm text-gray-900 mt-2">
-                            Create a new package delivery request
-                          </div>
-                        </dd>
-                      </dl>
+                    <div className="mt-4">
+                      <Link
+                        href="/sender"
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                      >
+                        View Packages
+                      </Link>
                     </div>
-                  </div>
-                  <div className="mt-4">
-                    <Link
-                      href="/packages/create"
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                    >
-                      Create Package
-                    </Link>
                   </div>
                 </div>
-              </div>
+                <div className="bg-white overflow-hidden shadow rounded-lg">
+                  <div className="p-5">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <div className="text-4xl">📦</div>
+                      </div>
+                      <div className="ml-5 w-0 flex-1">
+                        <dl>
+                          <dt className="text-sm font-medium text-gray-500 truncate">
+                            Send a Package
+                          </dt>
+                          <dd>
+                            <div className="text-sm text-gray-900 mt-2">
+                              Create a new package delivery request
+                            </div>
+                          </dd>
+                        </dl>
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <Link
+                        href="/packages/create"
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+                      >
+                        Create Package
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </>
             )}
 
             {(user.role === 'courier' || user.role === 'both') && (

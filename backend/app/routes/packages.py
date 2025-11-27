@@ -35,6 +35,7 @@ class PackageCreate(BaseModel):
 class PackageResponse(BaseModel):
     id: int
     sender_id: int
+    courier_id: int | None
     description: str
     size: str
     weight_kg: float
@@ -327,3 +328,48 @@ async def update_package_status(
     db.commit()
 
     return {"message": "Package status updated successfully", "status": new_status.value}
+
+
+@router.put("/{package_id}/cancel", response_model=PackageResponse)
+async def cancel_package(
+    package_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Cancel a package.
+
+    Only the sender who created the package can cancel it.
+    Only pending or matched packages can be cancelled.
+    """
+    package = db.query(Package).filter(Package.id == package_id).first()
+
+    if not package:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Package not found"
+        )
+
+    # Check permissions: must be the sender who created it or admin
+    is_admin = current_user.role.value == 'admin'
+    is_sender = package.sender_id == current_user.id
+
+    if not (is_admin or is_sender):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to cancel this package"
+        )
+
+    # Only allow cancelling pending or matched packages
+    if package.status not in [PackageStatus.PENDING, PackageStatus.MATCHED]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot cancel package with status '{package.status.value}'. Only pending or matched packages can be cancelled."
+        )
+
+    package.status = PackageStatus.CANCELLED
+    package.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(package)
+
+    return package

@@ -952,3 +952,284 @@ class TestPackageIntegration:
         # Verify isolation
         assert len(user1_packages.json()) == 2
         assert len(user2_packages.json()) == 1
+
+
+class TestCancelPackage:
+    """Tests for package cancellation endpoint"""
+
+    def test_cancel_pending_package_success(self, client, authenticated_sender, test_package_data):
+        """Test successful cancellation of a pending package by sender"""
+        # Create a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+
+        # Cancel the package
+        response = client.put(
+            f"/api/packages/{package_id}/cancel",
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["id"] == package_id
+        assert data["status"] == "cancelled"
+
+    def test_cancel_matched_package_success(self, client, db_session, authenticated_sender, test_package_data):
+        """Test successful cancellation of a matched package by sender"""
+        # Create a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+
+        # Change status to matched
+        package = db_session.query(Package).filter(Package.id == package_id).first()
+        package.status = PackageStatus.MATCHED
+        db_session.commit()
+
+        # Cancel the package
+        response = client.put(
+            f"/api/packages/{package_id}/cancel",
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["status"] == "cancelled"
+
+    def test_cancel_package_as_admin(self, client, authenticated_sender, authenticated_admin, test_package_data):
+        """Test admin can cancel any pending package"""
+        # Sender creates a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+
+        # Admin cancels the package
+        response = client.put(
+            f"/api/packages/{package_id}/cancel",
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["status"] == "cancelled"
+
+    def test_cancel_package_fails_for_picked_up_status(self, client, db_session, authenticated_sender, test_package_data):
+        """Test that picked_up packages cannot be cancelled"""
+        # Create a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+
+        # Change status to picked_up
+        package = db_session.query(Package).filter(Package.id == package_id).first()
+        package.status = PackageStatus.PICKED_UP
+        db_session.commit()
+
+        # Try to cancel
+        response = client.put(
+            f"/api/packages/{package_id}/cancel",
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "only pending or matched packages can be cancelled" in response.json()["detail"].lower()
+
+    def test_cancel_package_fails_for_in_transit_status(self, client, db_session, authenticated_sender, test_package_data):
+        """Test that in_transit packages cannot be cancelled"""
+        # Create a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+
+        # Change status to in_transit
+        package = db_session.query(Package).filter(Package.id == package_id).first()
+        package.status = PackageStatus.IN_TRANSIT
+        db_session.commit()
+
+        # Try to cancel
+        response = client.put(
+            f"/api/packages/{package_id}/cancel",
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "only pending or matched packages can be cancelled" in response.json()["detail"].lower()
+
+    def test_cancel_package_fails_for_delivered_status(self, client, db_session, authenticated_sender, test_package_data):
+        """Test that delivered packages cannot be cancelled"""
+        # Create a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+
+        # Change status to delivered
+        package = db_session.query(Package).filter(Package.id == package_id).first()
+        package.status = PackageStatus.DELIVERED
+        db_session.commit()
+
+        # Try to cancel
+        response = client.put(
+            f"/api/packages/{package_id}/cancel",
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "only pending or matched packages can be cancelled" in response.json()["detail"].lower()
+
+    def test_cancel_already_cancelled_package(self, client, db_session, authenticated_sender, test_package_data):
+        """Test that already cancelled packages cannot be cancelled again"""
+        # Create a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+
+        # Change status to cancelled
+        package = db_session.query(Package).filter(Package.id == package_id).first()
+        package.status = PackageStatus.CANCELLED
+        db_session.commit()
+
+        # Try to cancel again
+        response = client.put(
+            f"/api/packages/{package_id}/cancel",
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_cancel_package_unauthorized(self, client, authenticated_sender, authenticated_both_role, test_package_data):
+        """Test that other users cannot cancel someone else's package"""
+        # User 1 creates a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+
+        # User 2 tries to cancel
+        response = client.put(
+            f"/api/packages/{package_id}/cancel",
+            headers={"Authorization": f"Bearer {authenticated_both_role}"}
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert "don't have permission" in response.json()["detail"].lower()
+
+    def test_cancel_package_courier_cannot_cancel(self, client, authenticated_sender, authenticated_courier, test_package_data):
+        """Test that couriers cannot cancel packages"""
+        # Sender creates a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+
+        # Courier tries to cancel
+        response = client.put(
+            f"/api/packages/{package_id}/cancel",
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_cancel_package_not_found(self, client, authenticated_sender):
+        """Test cancelling a non-existent package"""
+        response = client.put(
+            "/api/packages/99999/cancel",
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert "not found" in response.json()["detail"].lower()
+
+    def test_cancel_package_without_authentication(self, client, authenticated_sender, test_package_data):
+        """Test cancelling without authentication"""
+        # Create a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+
+        # Try to cancel without auth
+        response = client.put(f"/api/packages/{package_id}/cancel")
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_cancel_package_updates_timestamp(self, client, authenticated_sender, test_package_data):
+        """Test that cancelling updates the updated_at timestamp"""
+        # Create a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+        original_updated_at = create_response.json().get("updated_at")
+
+        # Cancel the package
+        response = client.put(
+            f"/api/packages/{package_id}/cancel",
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["updated_at"] is not None
+        # If original was None, updated_at should now be set
+        if original_updated_at is None:
+            assert data["updated_at"] is not None
+
+    def test_cancel_package_returns_courier_id(self, client, db_session, authenticated_sender, authenticated_courier, test_package_data):
+        """Test that cancel response includes courier_id field"""
+        # Create a package
+        create_response = client.post(
+            "/api/packages",
+            json=test_package_data,
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+        package_id = create_response.json()["id"]
+
+        # Simulate matching with courier
+        package = db_session.query(Package).filter(Package.id == package_id).first()
+        package.status = PackageStatus.MATCHED
+        # Get courier user id
+        from app.models.user import User
+        courier = db_session.query(User).filter(User.email == "courier@example.com").first()
+        package.courier_id = courier.id
+        db_session.commit()
+
+        # Cancel the package
+        response = client.put(
+            f"/api/packages/{package_id}/cancel",
+            headers={"Authorization": f"Bearer {authenticated_sender}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert "courier_id" in data
+        assert data["courier_id"] == courier.id

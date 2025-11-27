@@ -73,6 +73,7 @@ export interface PackageCreate {
 export interface PackageResponse {
   id: number
   sender_id: number
+  courier_id: number | null
   description: string
   size: string
   weight_kg: number
@@ -89,6 +90,7 @@ export interface PackageResponse {
   dropoff_contact_phone: string | null
   price: number | null
   created_at: string
+  updated_at: string | null
 }
 
 // Auth API
@@ -105,6 +107,7 @@ export const packagesAPI = {
   getById: (id: number) => api.get<PackageResponse>(`/packages/${id}`),
   updateStatus: (id: number, status: string) =>
     api.put(`/packages/${id}/status`, { status }),
+  cancel: (id: number) => api.put<PackageResponse>(`/packages/${id}/cancel`),
 }
 
 // Route Types
