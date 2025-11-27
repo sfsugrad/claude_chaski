@@ -121,7 +121,7 @@ class TestAcceptPackageNotification:
         ).first()
 
         # Courier name should be in the message
-        assert "Test Courier" in notification.message
+        assert "Courier User" in notification.message
 
 
 class TestDeclinePackageNotification:
@@ -352,10 +352,26 @@ class TestCancelPackageNotification:
     """Test that cancelling a package creates notifications"""
 
     def test_cancel_package_creates_sender_notification(
-        self, client, authenticated_sender, db_session
+        self, client, db_session
     ):
         """Test that cancelling a package creates notification for sender"""
-        sender = db_session.query(User).filter(User.email == "sender@example.com").first()
+        from app.utils.auth import get_password_hash, create_access_token
+
+        # Create sender user
+        sender = User(
+            email="cancel_sender@example.com",
+            hashed_password=get_password_hash("testpassword"),
+            full_name="Cancel Sender",
+            role="sender",
+            is_verified=True,
+            is_active=True
+        )
+        db_session.add(sender)
+        db_session.commit()
+        db_session.refresh(sender)
+
+        # Create token directly (avoid rate limiting)
+        token = create_access_token(data={"sub": sender.email})
 
         package = Package(
             sender_id=sender.id,
@@ -377,7 +393,7 @@ class TestCancelPackageNotification:
 
         response = client.put(
             f"/api/packages/{package.id}/cancel",
-            headers={"Authorization": f"Bearer {authenticated_sender}"}
+            headers={"Authorization": f"Bearer {token}"}
         )
 
         assert response.status_code == status.HTTP_200_OK
@@ -391,10 +407,26 @@ class TestCancelPackageNotification:
         assert "cancelled" in notification.message.lower()
 
     def test_cancel_matched_package_notifies_courier(
-        self, client, authenticated_sender, db_session
+        self, client, db_session
     ):
         """Test that cancelling a matched package notifies the courier"""
-        sender = db_session.query(User).filter(User.email == "sender@example.com").first()
+        from app.utils.auth import get_password_hash, create_access_token
+
+        # Create sender user
+        sender = User(
+            email="cancel_sender2@example.com",
+            hashed_password=get_password_hash("testpassword"),
+            full_name="Cancel Sender",
+            role="sender",
+            is_verified=True,
+            is_active=True
+        )
+        db_session.add(sender)
+        db_session.commit()
+        db_session.refresh(sender)
+
+        # Create token directly (avoid rate limiting)
+        token = create_access_token(data={"sub": sender.email})
 
         courier = User(
             email="courier_cancel@example.com",
@@ -429,7 +461,7 @@ class TestCancelPackageNotification:
         with patch('app.routes.packages.send_package_cancelled_email', new_callable=AsyncMock):
             response = client.put(
                 f"/api/packages/{package.id}/cancel",
-                headers={"Authorization": f"Bearer {authenticated_sender}"}
+                headers={"Authorization": f"Bearer {token}"}
             )
 
         assert response.status_code == status.HTTP_200_OK
