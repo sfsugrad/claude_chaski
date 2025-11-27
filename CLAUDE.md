@@ -55,17 +55,18 @@ npm run lint
 - `main.py` - FastAPI app entry point with middleware configuration (CORS, security headers, rate limiting, sessions)
 - `app/config.py` - Environment settings via pydantic-settings
 - `app/database.py` - SQLAlchemy database connection and session management
-- `app/models/` - SQLAlchemy models (User, Package)
+- `app/models/` - SQLAlchemy models (User, Package, Notification)
 - `app/routes/` - API endpoints organized by domain:
   - `auth.py` - Registration, login, email verification, OAuth
   - `packages.py` - Package CRUD for senders
   - `couriers.py` - Route management for couriers
   - `matching.py` - Package-courier matching algorithm
   - `admin.py` - Admin-only user/package management
+  - `notifications.py` - User notification management
 - `app/utils/` - Shared utilities:
   - `dependencies.py` - FastAPI dependencies (`get_current_user`, `get_current_admin_user`)
   - `auth.py` - JWT token and password hashing
-  - `email.py` - Email sending via FastAPI-Mail
+  - `email.py` - Email sending via FastAPI-Mail (includes event notification emails)
   - `geo.py` - Geospatial calculations for route matching
   - `oauth.py` - Google OAuth configuration
 - `app/services/` - Business logic services
@@ -117,10 +118,15 @@ Users have one role: `sender`, `courier`, `both`, or `admin`
 - **Courier Routes**: Create/update/delete routes, one active route per courier
 - **Matching Algorithm**: Geospatial matching using haversine/cross-track distance, accept/decline packages
 - **Admin Dashboard**: User management, package management, platform statistics
+- **Notification System (Backend)**:
+  - Notification model with types (package_matched, accepted, declined, picked_up, in_transit, delivered, cancelled, route_match_found, system)
+  - Full API: GET /api/notifications, GET /api/notifications/unread-count, PUT /api/notifications/{id}/read, PUT /api/notifications/mark-read, DELETE endpoints
+  - Email notification functions for all package events (matched, accepted, picked up, in transit, delivered, cancelled, declined, route match found)
 
 ### Not Yet Implemented
 - Real-time updates (WebSockets)
-- Notification system
+- Frontend notification UI (dropdown component, badge in nav)
+- Integration of notifications into existing endpoints (trigger on status changes)
 - Rating & review system
 - Payment integration
 - Mobile app
@@ -129,10 +135,11 @@ Users have one role: `sender`, `courier`, `both`, or `admin`
 
 ### Phase 1: Core Platform Completion
 
-**1. Notification System**
-- Create `Notification` model (user_id, type, message, read, created_at)
-- Backend endpoints: GET /api/notifications, PUT /api/notifications/{id}/read
-- Extend `app/utils/email.py` for event notifications (matched, status change, delivered)
+**1. Notification System (Remaining)**
+- ~~Create `Notification` model (user_id, type, message, read, created_at)~~ DONE
+- ~~Backend endpoints: GET /api/notifications, PUT /api/notifications/{id}/read~~ DONE
+- ~~Extend `app/utils/email.py` for event notifications (matched, status change, delivered)~~ DONE
+- Integrate notifications into existing endpoints (call `create_notification()` and email functions on events)
 - Frontend: notification dropdown component, badge in nav
 
 **2. Rating & Review System**
