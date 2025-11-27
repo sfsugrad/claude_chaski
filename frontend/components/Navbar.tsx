@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { UserResponse } from '@/lib/api'
 import NotificationDropdown from './NotificationDropdown'
+import StarRating from './StarRating'
 
 interface NavbarProps {
   user: UserResponse | null
@@ -85,10 +86,20 @@ export default function Navbar({ user }: NavbarProps) {
                 {/* Notification Dropdown */}
                 <NotificationDropdown />
 
-                {/* User Info - Hidden on mobile */}
-                <span className="hidden sm:block text-sm text-gray-700">
-                  {user.full_name}
-                </span>
+                {/* User Info with Rating - Hidden on mobile */}
+                <div className="hidden sm:flex items-center gap-2">
+                  <span className="text-sm text-gray-700">
+                    {user.full_name}
+                  </span>
+                  {user.average_rating !== null && user.average_rating !== undefined && (
+                    <div className="flex items-center gap-1">
+                      <StarRating rating={user.average_rating} size="sm" />
+                      <span className="text-xs text-gray-500">
+                        ({user.total_ratings})
+                      </span>
+                    </div>
+                  )}
+                </div>
 
                 {/* Logout Button */}
                 <button
@@ -191,7 +202,15 @@ export default function Navbar({ user }: NavbarProps) {
           </div>
           <div className="pt-4 pb-3 border-t border-gray-200">
             <div className="px-4 py-2">
-              <p className="text-sm font-medium text-gray-900">{user.full_name}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium text-gray-900">{user.full_name}</p>
+                {user.average_rating !== null && user.average_rating !== undefined && (
+                  <div className="flex items-center gap-1">
+                    <StarRating rating={user.average_rating} size="sm" />
+                    <span className="text-xs text-gray-500">({user.total_ratings})</span>
+                  </div>
+                )}
+              </div>
               <p className="text-sm text-gray-500">{user.email}</p>
             </div>
             <div className="px-2 mt-2">
