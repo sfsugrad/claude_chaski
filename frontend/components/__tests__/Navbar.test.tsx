@@ -23,6 +23,16 @@ jest.mock('../StarRating', () => {
   }
 })
 
+// Mock UI components
+jest.mock('@/components/ui', () => ({
+  Badge: ({ children, variant, size, dot }: any) => (
+    <span data-testid="badge" className={`badge badge-${variant} badge-${size}`}>
+      {dot && <span className="badge-dot" />}
+      {children}
+    </span>
+  ),
+}))
+
 // Mock WebSocketContext
 jest.mock('@/contexts/WebSocketContext', () => ({
   useWebSocketContext: () => ({
@@ -254,7 +264,10 @@ describe('Navbar', () => {
       render(<Navbar user={mockUser} />)
 
       const logo = screen.getByText('Chaski')
-      expect(logo).toHaveAttribute('href', '/dashboard')
+      expect(logo).toBeInTheDocument()
+      // The logo text is in a span, but its parent link goes to dashboard
+      const logoLink = logo.closest('a')
+      expect(logoLink).toHaveAttribute('href', '/dashboard')
     })
   })
 })

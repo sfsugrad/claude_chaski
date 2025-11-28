@@ -18,6 +18,24 @@ jest.mock('@/lib/api', () => ({
   },
 }))
 
+// Mock UI components
+jest.mock('@/components/ui', () => ({
+  Button: ({ children, loading, disabled, ...props }: any) => (
+    <button disabled={disabled || loading} {...props}>
+      {loading ? 'Creating Route...' : children}
+    </button>
+  ),
+  Card: ({ children, className }: any) => <div className={className}>{children}</div>,
+  CardBody: ({ children, className }: any) => <div className={className}>{children}</div>,
+  Alert: ({ children, variant, onClose }: any) => (
+    <div role="alert" data-variant={variant}>
+      {children}
+      {onClose && <button onClick={onClose}>Close</button>}
+    </div>
+  ),
+  Input: (props: any) => <input {...props} />,
+}))
+
 // Mock AddressAutocomplete component
 jest.mock('@/components/AddressAutocomplete', () => {
   return function MockAddressAutocomplete({
@@ -90,24 +108,24 @@ describe('CreateRoutePage', () => {
       expect(screen.getByText(/back to dashboard/i)).toBeInTheDocument()
     })
 
-    it('renders start address field', () => {
+    it('renders starting point field', () => {
       render(<CreateRoutePage />)
-      expect(screen.getByText(/start address/i)).toBeInTheDocument()
+      expect(screen.getByText(/starting point/i)).toBeInTheDocument()
     })
 
-    it('renders destination address field', () => {
+    it('renders destination field', () => {
       render(<CreateRoutePage />)
-      expect(screen.getByText(/destination address/i)).toBeInTheDocument()
+      expect(screen.getByText(/destination/i)).toBeInTheDocument()
     })
 
-    it('renders max deviation field', () => {
+    it('renders pickup radius section', () => {
       render(<CreateRoutePage />)
-      expect(screen.getByText(/maximum deviation/i)).toBeInTheDocument()
+      expect(screen.getByText(/pickup radius/i)).toBeInTheDocument()
     })
 
-    it('renders departure time field', () => {
+    it('renders when are you traveling section', () => {
       render(<CreateRoutePage />)
-      expect(screen.getByText(/departure time/i)).toBeInTheDocument()
+      expect(screen.getByText(/when are you traveling/i)).toBeInTheDocument()
     })
 
     it('renders submit button', () => {
@@ -119,8 +137,9 @@ describe('CreateRoutePage', () => {
   describe('Form Defaults', () => {
     it('has default max deviation of 5', () => {
       render(<CreateRoutePage />)
-      const deviationInput = screen.getByRole('spinbutton')
-      expect(deviationInput).toHaveValue(5)
+      // The slider has default value of 5
+      const slider = screen.getByRole('slider')
+      expect(slider).toHaveValue('5')
     })
   })
 
@@ -199,9 +218,9 @@ describe('CreateRoutePage', () => {
 
       render(<CreateRoutePage />)
 
-      // Change max deviation using fireEvent
-      const deviationInput = screen.getByRole('spinbutton')
-      fireEvent.change(deviationInput, { target: { value: '10' } })
+      // Change max deviation using slider
+      const slider = screen.getByRole('slider')
+      fireEvent.change(slider, { target: { value: '10' } })
 
       // Select addresses
       fireEvent.click(screen.getByTestId('start_address-select'))
@@ -316,22 +335,42 @@ describe('CreateRoutePage', () => {
     })
   })
 
-  describe('Max Deviation Field', () => {
-    it('has min value of 1', () => {
+  describe('Deviation Presets', () => {
+    it('renders deviation preset buttons', () => {
       render(<CreateRoutePage />)
-      const deviationInput = screen.getByRole('spinbutton')
-      expect(deviationInput).toHaveAttribute('min', '1')
+      // Use getAllByText since the km values appear multiple times (button + display)
+      expect(screen.getAllByText('2 km').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('5 km').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('10 km').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('20 km').length).toBeGreaterThan(0)
     })
 
-    it('has max value of 50', () => {
-      render(<CreateRoutePage />)
-      const deviationInput = screen.getByRole('spinbutton')
-      expect(deviationInput).toHaveAttribute('max', '50')
-    })
+    it('can change deviation via preset buttons', async () => {
+      mockCreateRoute.mockResolvedValue({ data: { id: 1 } })
 
-    it('shows help text about deviation range', () => {
       render(<CreateRoutePage />)
-      expect(screen.getByText(/1-50 km/i)).toBeInTheDocument()
+
+      // Click on 10km preset
+      fireEvent.click(screen.getByText('10 km'))
+
+      // Verify slider updated
+      const slider = screen.getByRole('slider')
+      expect(slider).toHaveValue('10')
+
+      // Select addresses and submit
+      fireEvent.click(screen.getByTestId('start_address-select'))
+      fireEvent.click(screen.getByTestId('end_address-select'))
+
+      const form = screen.getByRole('button', { name: /create route/i }).closest('form')!
+      fireEvent.submit(form)
+
+      await waitFor(() => {
+        expect(mockCreateRoute).toHaveBeenCalledWith(
+          expect.objectContaining({
+            max_deviation_km: 10,
+          })
+        )
+      })
     })
   })
 
@@ -386,6 +425,13 @@ describe('CreateRoutePage', () => {
       render(<CreateRoutePage />)
       const backLink = screen.getByText(/back to dashboard/i)
       expect(backLink.closest('a')).toHaveAttribute('href', '/courier')
+    })
+  })
+
+  describe('Info Section', () => {
+    it('shows what happens next info', () => {
+      render(<CreateRoutePage />)
+      expect(screen.getByText(/what happens next/i)).toBeInTheDocument()
     })
   })
 })

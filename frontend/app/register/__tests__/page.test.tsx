@@ -25,6 +25,48 @@ jest.mock('@/components/GoogleSignInButton', () => {
   }
 })
 
+// Mock AddressAutocomplete
+jest.mock('@/components/AddressAutocomplete', () => {
+  return function MockAddressAutocomplete({ id, name, value, onChange, placeholder, className }: any) {
+    return (
+      <input
+        id={id}
+        name={name}
+        value={value}
+        onChange={(e) => onChange(e.target.value, 0, 0)}
+        placeholder={placeholder}
+        className={className}
+      />
+    )
+  }
+})
+
+// Mock UI components
+jest.mock('@/components/ui', () => ({
+  Button: ({ children, isLoading, ...props }: any) => (
+    <button {...props}>{isLoading ? 'Creating account...' : children}</button>
+  ),
+  Input: ({ label, leftIcon, error, helperText, ...props }: any) => (
+    <div className="form-group w-full">
+      {label && <label htmlFor={props.id} className="label">{label}</label>}
+      <div className="relative input-group">
+        {leftIcon && <span className="input-group-icon">{leftIcon}</span>}
+        <input {...props} className="input pl-10" />
+      </div>
+      {error && <p className="error-text">{error}</p>}
+      {helperText && <p className="helper-text">{helperText}</p>}
+    </div>
+  ),
+  Card: ({ children, className }: any) => <div className={`card ${className || ''}`}>{children}</div>,
+  CardBody: ({ children, className }: any) => <div className={`card-body ${className || ''}`}>{children}</div>,
+  Alert: ({ children, variant, dismissible, onDismiss }: any) => (
+    <div role="alert" className={`alert alert-${variant}`}>
+      {children}
+      {dismissible && <button onClick={onDismiss} aria-label="Dismiss">X</button>}
+    </div>
+  ),
+}))
+
 describe('RegisterPage', () => {
   const mockRouter = {
     push: jest.fn(),

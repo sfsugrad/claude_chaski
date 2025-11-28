@@ -6,6 +6,56 @@ import { authAPI, ratingsAPI, UserResponse, PendingRating } from '@/lib/api'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import RatingModal from '@/components/RatingModal'
+import { Card, CardBody, CardHeader, Button, Badge, Alert } from '@/components/ui'
+
+// Icons
+const PackageIcon = () => (
+  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+  </svg>
+)
+
+const SendIcon = () => (
+  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+  </svg>
+)
+
+const CarIcon = () => (
+  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+  </svg>
+)
+
+const MailIcon = () => (
+  <svg className="w-5 h-5 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+  </svg>
+)
+
+const UserIcon = () => (
+  <svg className="w-5 h-5 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+  </svg>
+)
+
+const PhoneIcon = () => (
+  <svg className="w-5 h-5 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+  </svg>
+)
+
+const MapIcon = () => (
+  <svg className="w-5 h-5 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+  </svg>
+)
+
+const StarIcon = () => (
+  <svg className="w-5 h-5 text-warning-500" fill="currentColor" viewBox="0 0 24 24">
+    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+  </svg>
+)
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -66,8 +116,11 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center">
-        <div className="text-xl text-gray-600">Loading...</div>
+      <div className="min-h-screen bg-surface-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+          <p className="text-surface-500 font-medium">Loading dashboard...</p>
+        </div>
       </div>
     )
   }
@@ -76,8 +129,11 @@ export default function DashboardPage() {
     return null
   }
 
+  const isSender = user.role === 'sender' || user.role === 'both'
+  const isCourier = user.role === 'courier' || user.role === 'both'
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+    <div className="min-h-screen bg-surface-50">
       <Navbar user={user} />
 
       {/* Rating Modal */}
@@ -90,202 +146,167 @@ export default function DashboardPage() {
         />
       )}
 
-      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          {/* Pending Ratings Banner */}
-          {pendingRatings.length > 0 && !showRatingModal && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 flex items-center justify-between">
+      <div className="page-container py-8">
+        {/* Pending Ratings Banner */}
+        {pendingRatings.length > 0 && !showRatingModal && (
+          <Alert variant="warning" className="mb-6">
+            <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-3">
-                <span className="text-2xl">⭐</span>
+                <StarIcon />
                 <div>
-                  <p className="font-medium text-yellow-800">
+                  <p className="font-medium">
                     You have {pendingRatings.length} pending {pendingRatings.length === 1 ? 'review' : 'reviews'}
                   </p>
-                  <p className="text-sm text-yellow-600">
+                  <p className="text-sm opacity-80">
                     Rate your experience with users from your completed deliveries
                   </p>
                 </div>
               </div>
-              <button
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={() => setShowRatingModal(true)}
-                className="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 transition-colors font-medium"
               >
                 Rate Now
-              </button>
+              </Button>
             </div>
+          </Alert>
+        )}
+
+        {/* Welcome Header */}
+        <div className="mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-surface-900">
+            Welcome back, {user.full_name}!
+          </h1>
+          <p className="mt-1 text-surface-500">
+            Here&apos;s an overview of your account and quick actions
+          </p>
+        </div>
+
+        {/* User Info Card */}
+        <Card className="mb-8">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-surface-900">Account Details</h2>
+              <Badge variant="primary" className="capitalize">{user.role}</Badge>
+            </div>
+          </CardHeader>
+          <CardBody className="p-0">
+            <dl className="divide-y divide-surface-100">
+              <div className="flex items-center gap-4 px-6 py-4">
+                <MailIcon />
+                <div className="flex-1">
+                  <dt className="text-sm font-medium text-surface-500">Email</dt>
+                  <dd className="text-sm text-surface-900">{user.email}</dd>
+                </div>
+                <Badge variant={user.is_verified ? 'success' : 'warning'} size="sm">
+                  {user.is_verified ? 'Verified' : 'Not Verified'}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-4 px-6 py-4">
+                <PhoneIcon />
+                <div className="flex-1">
+                  <dt className="text-sm font-medium text-surface-500">Phone</dt>
+                  <dd className="text-sm text-surface-900">
+                    {user.phone_number || <span className="text-surface-400">Not provided</span>}
+                  </dd>
+                </div>
+              </div>
+              {isCourier && (
+                <div className="flex items-center gap-4 px-6 py-4">
+                  <MapIcon />
+                  <div className="flex-1">
+                    <dt className="text-sm font-medium text-surface-500">Max Route Deviation</dt>
+                    <dd className="text-sm text-surface-900">{user.max_deviation_km} km</dd>
+                  </div>
+                </div>
+              )}
+              <div className="flex items-center gap-4 px-6 py-4">
+                <UserIcon />
+                <div className="flex-1">
+                  <dt className="text-sm font-medium text-surface-500">Account Status</dt>
+                  <dd className="text-sm text-surface-900">
+                    <Badge variant={user.is_active ? 'success' : 'error'} size="sm">
+                      {user.is_active ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </dd>
+                </div>
+              </div>
+            </dl>
+          </CardBody>
+        </Card>
+
+        {/* Quick Actions */}
+        <h2 className="text-lg font-semibold text-surface-900 mb-4">Quick Actions</h2>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {isSender && (
+            <>
+              <Card hoverable className="group">
+                <CardBody>
+                  <div className="flex items-start gap-4">
+                    <div className="flex-shrink-0 w-14 h-14 bg-primary-50 text-primary-600 rounded-xl flex items-center justify-center group-hover:bg-primary-100 transition-colors">
+                      <PackageIcon />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-lg font-semibold text-surface-900 mb-1">My Packages</h3>
+                      <p className="text-sm text-surface-500 mb-4">
+                        Track and manage your deliveries
+                      </p>
+                      <Link href="/sender">
+                        <Button variant="primary" size="sm">
+                          View Packages
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                </CardBody>
+              </Card>
+
+              <Card hoverable className="group">
+                <CardBody>
+                  <div className="flex items-start gap-4">
+                    <div className="flex-shrink-0 w-14 h-14 bg-secondary-50 text-secondary-600 rounded-xl flex items-center justify-center group-hover:bg-secondary-100 transition-colors">
+                      <SendIcon />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-lg font-semibold text-surface-900 mb-1">Send a Package</h3>
+                      <p className="text-sm text-surface-500 mb-4">
+                        Create a new delivery request
+                      </p>
+                      <Link href="/packages/create">
+                        <Button variant="secondary" size="sm">
+                          Create Package
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                </CardBody>
+              </Card>
+            </>
           )}
 
-          <div className="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
-            <div className="px-4 py-5 sm:px-6">
-              <h3 className="text-lg leading-6 font-medium text-gray-900">
-                Welcome, {user.full_name}!
-              </h3>
-              <p className="mt-1 max-w-2xl text-sm text-gray-500">
-                Your account details and dashboard
-              </p>
-            </div>
-            <div className="border-t border-gray-200 px-4 py-5 sm:p-0">
-              <dl className="sm:divide-y sm:divide-gray-200">
-                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Email</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                    {user.email}
-                  </dd>
-                </div>
-                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Role</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                    <span className="capitalize">{user.role}</span>
-                  </dd>
-                </div>
-                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Phone</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                    {user.phone_number || 'Not provided'}
-                  </dd>
-                </div>
-                {(user.role === 'courier' || user.role === 'both') && (
-                  <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt className="text-sm font-medium text-gray-500">
-                      Max Route Deviation
-                    </dt>
-                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                      {user.max_deviation_km} km
-                    </dd>
+          {isCourier && (
+            <Card hoverable className="group">
+              <CardBody>
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 w-14 h-14 bg-success-50 text-success-600 rounded-xl flex items-center justify-center group-hover:bg-success-100 transition-colors">
+                    <CarIcon />
                   </div>
-                )}
-                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">
-                    Account Status
-                  </dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                    <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        user.is_active
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}
-                    >
-                      {user.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                  </dd>
-                </div>
-                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">
-                    Email Verified
-                  </dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                    <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        user.is_verified
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-yellow-100 text-yellow-800'
-                      }`}
-                    >
-                      {user.is_verified ? 'Verified' : 'Not Verified'}
-                    </span>
-                  </dd>
-                </div>
-              </dl>
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-6">
-            {(user.role === 'sender' || user.role === 'both') && (
-              <>
-                <div className="bg-white overflow-hidden shadow rounded-lg">
-                  <div className="p-5">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <div className="text-4xl">📋</div>
-                      </div>
-                      <div className="ml-5 w-0 flex-1">
-                        <dl>
-                          <dt className="text-sm font-medium text-gray-500 truncate">
-                            My Packages
-                          </dt>
-                          <dd>
-                            <div className="text-sm text-gray-900 mt-2">
-                              Track and manage your deliveries
-                            </div>
-                          </dd>
-                        </dl>
-                      </div>
-                    </div>
-                    <div className="mt-4">
-                      <Link
-                        href="/sender"
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                      >
-                        View Packages
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-white overflow-hidden shadow rounded-lg">
-                  <div className="p-5">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <div className="text-4xl">📦</div>
-                      </div>
-                      <div className="ml-5 w-0 flex-1">
-                        <dl>
-                          <dt className="text-sm font-medium text-gray-500 truncate">
-                            Send a Package
-                          </dt>
-                          <dd>
-                            <div className="text-sm text-gray-900 mt-2">
-                              Create a new package delivery request
-                            </div>
-                          </dd>
-                        </dl>
-                      </div>
-                    </div>
-                    <div className="mt-4">
-                      <Link
-                        href="/packages/create"
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
-                      >
-                        Create Package
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {(user.role === 'courier' || user.role === 'both') && (
-              <div className="bg-white overflow-hidden shadow rounded-lg">
-                <div className="p-5">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <div className="text-4xl">🚗</div>
-                    </div>
-                    <div className="ml-5 w-0 flex-1">
-                      <dl>
-                        <dt className="text-sm font-medium text-gray-500 truncate">
-                          Find Packages
-                        </dt>
-                        <dd>
-                          <div className="text-sm text-gray-900 mt-2">
-                            Browse packages along your route
-                          </div>
-                        </dd>
-                      </dl>
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    <Link
-                      href="/courier"
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
-                    >
-                      Browse Packages
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-semibold text-surface-900 mb-1">Find Packages</h3>
+                    <p className="text-sm text-surface-500 mb-4">
+                      Browse packages along your route
+                    </p>
+                    <Link href="/courier">
+                      <Button variant="outline" size="sm" className="border-success-600 text-success-600 hover:bg-success-50">
+                        Browse Packages
+                      </Button>
                     </Link>
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
+              </CardBody>
+            </Card>
+          )}
         </div>
       </div>
     </div>

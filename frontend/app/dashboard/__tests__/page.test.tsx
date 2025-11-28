@@ -50,6 +50,28 @@ jest.mock('@/components/RatingModal', () => {
   }
 })
 
+// Mock UI components
+jest.mock('@/components/ui', () => ({
+  Card: ({ children, className, hoverable }: any) => (
+    <div className={`card ${className || ''} ${hoverable ? 'card-hover' : ''}`}>{children}</div>
+  ),
+  CardBody: ({ children, className }: any) => (
+    <div className={`card-body ${className || ''}`}>{children}</div>
+  ),
+  CardHeader: ({ children, className }: any) => (
+    <div className={`card-header ${className || ''}`}>{children}</div>
+  ),
+  Button: ({ children, variant, size, onClick, className, ...props }: any) => (
+    <button onClick={onClick} className={className} {...props}>{children}</button>
+  ),
+  Badge: ({ children, variant, size, className }: any) => (
+    <span className={`badge badge-${variant} badge-${size} ${className || ''}`}>{children}</span>
+  ),
+  Alert: ({ children, variant, className }: any) => (
+    <div role="alert" className={`alert alert-${variant} ${className || ''}`}>{children}</div>
+  ),
+}))
+
 describe('DashboardPage', () => {
   const mockRouter = {
     push: jest.fn(),
@@ -129,7 +151,7 @@ describe('DashboardPage', () => {
       render(<DashboardPage />)
 
       await waitFor(() => {
-        expect(screen.getByText(/welcome, sender user/i)).toBeInTheDocument()
+        expect(screen.getByText(/welcome back, sender user/i)).toBeInTheDocument()
       })
     })
 

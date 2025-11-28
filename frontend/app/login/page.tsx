@@ -5,6 +5,20 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { authAPI } from '@/lib/api'
 import GoogleSignInButton from '@/components/GoogleSignInButton'
+import { Button, Input, Card, CardBody, Alert } from '@/components/ui'
+
+// Icons
+const MailIcon = () => (
+  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+  </svg>
+)
+
+const LockIcon = () => (
+  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+  </svg>
+)
 
 function LoginForm() {
   const router = useRouter()
@@ -84,29 +98,40 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+    <div className="min-h-screen bg-surface-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      {/* Background decoration */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary-100 rounded-full opacity-50 blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary-100 rounded-full opacity-50 blur-3xl" />
+      </div>
+
+      <div className="max-w-md w-full space-y-8 relative z-10">
+        {/* Header */}
+        <div className="text-center">
+          <Link href="/" className="inline-block mb-6">
+            <span className="text-3xl font-bold text-gradient">Chaski</span>
+          </Link>
+          <h1 className="text-2xl font-bold text-surface-900">
             Sign in to your account
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Welcome back to Chaski
+          </h1>
+          <p className="mt-2 text-surface-500">
+            Welcome back! Enter your details to continue.
           </p>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="bg-white p-8 rounded-lg shadow-md space-y-4">
+        <Card className="animate-fade-in-up">
+          <CardBody className="space-y-6">
+            {/* Alerts */}
             {error && (
-              <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+              <Alert variant="error" dismissible onDismiss={() => setError('')}>
                 {error}
-              </div>
+              </Alert>
             )}
 
             {successMessage && (
-              <div className="bg-green-50 border border-green-400 text-green-700 px-4 py-3 rounded relative">
+              <Alert variant="success" dismissible onDismiss={() => setSuccessMessage('')}>
                 {successMessage}
-              </div>
+              </Alert>
             )}
 
             {/* Google Sign In */}
@@ -114,105 +139,104 @@ function LoginForm() {
               <GoogleSignInButton />
               <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300"></div>
+                  <div className="w-full border-t border-surface-200"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">Or continue with email</span>
+                  <span className="px-3 bg-white text-surface-400">Or continue with email</span>
                 </div>
               </div>
             </div>
 
-            {/* Email */}
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Email Address
-              </label>
-              <input
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Email */}
+              <Input
+                label="Email Address"
                 id="email"
                 name="email"
                 type="email"
                 required
                 value={formData.email}
                 onChange={handleChange}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 placeholder="you@example.com"
+                leftIcon={<MailIcon />}
+                autoComplete="email"
               />
-            </div>
 
-            {/* Password */}
-            <div>
-              <div className="flex justify-between">
-                <label
-                  htmlFor="password"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Password
-                </label>
-                <Link
-                  href="/forgot-password"
-                  className="text-sm text-blue-600 hover:text-blue-500"
-                >
-                  Forgot password?
-                </Link>
+              {/* Password */}
+              <div className="form-group">
+                <div className="flex justify-between items-center mb-1.5">
+                  <label htmlFor="password" className="text-sm font-medium text-surface-700">
+                    Password
+                  </label>
+                  <Link
+                    href="/forgot-password"
+                    className="text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
+                <div className="input-group">
+                  <span className="input-group-icon">
+                    <LockIcon />
+                  </span>
+                  <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    required
+                    value={formData.password}
+                    onChange={handleChange}
+                    className="input pl-10"
+                    placeholder="Enter your password"
+                    autoComplete="current-password"
+                  />
+                </div>
               </div>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                value={formData.password}
-                onChange={handleChange}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter your password"
-              />
-            </div>
 
-            {/* Remember Me */}
-            <div className="flex items-center">
-              <input
-                id="rememberMe"
-                name="rememberMe"
-                type="checkbox"
-                checked={formData.rememberMe}
-                onChange={handleChange}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label
-                htmlFor="rememberMe"
-                className="ml-2 block text-sm text-gray-700"
-              >
-                Remember me for 7 days
-              </label>
-            </div>
+              {/* Remember Me */}
+              <div className="flex items-center">
+                <input
+                  id="rememberMe"
+                  name="rememberMe"
+                  type="checkbox"
+                  checked={formData.rememberMe}
+                  onChange={handleChange}
+                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-surface-300 rounded transition-colors"
+                />
+                <label
+                  htmlFor="rememberMe"
+                  className="ml-2 block text-sm text-surface-600"
+                >
+                  Remember me for 7 days
+                </label>
+              </div>
 
-            {/* Submit Button */}
-            <div className="pt-4">
-              <button
+              {/* Submit Button */}
+              <Button
                 type="submit"
-                disabled={loading}
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                variant="primary"
+                size="lg"
+                fullWidth
+                isLoading={loading}
               >
-                {loading ? 'Signing in...' : 'Sign In'}
-              </button>
-            </div>
-          </div>
+                Sign In
+              </Button>
+            </form>
+          </CardBody>
+        </Card>
 
-          {/* Register Link */}
-          <div className="text-center">
-            <p className="text-sm text-gray-600">
-              Don't have an account?{' '}
-              <Link
-                href="/register"
-                className="font-medium text-blue-600 hover:text-blue-500"
-              >
-                Create one now
-              </Link>
-            </p>
-          </div>
-        </form>
+        {/* Register Link */}
+        <div className="text-center">
+          <p className="text-sm text-surface-500">
+            Don&apos;t have an account?{' '}
+            <Link
+              href="/register"
+              className="font-semibold text-primary-600 hover:text-primary-700 transition-colors"
+            >
+              Create one now
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   )
@@ -221,10 +245,10 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center">
+      <div className="min-h-screen bg-surface-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <div className="inline-block animate-spin rounded-full h-10 w-10 border-2 border-surface-200 border-t-primary-600 mb-4"></div>
+          <p className="text-surface-500 text-sm">Loading...</p>
         </div>
       </div>
     }>

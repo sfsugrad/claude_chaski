@@ -28,6 +28,32 @@ jest.mock('@/components/GoogleSignInButton', () => {
   }
 })
 
+// Mock UI components
+jest.mock('@/components/ui', () => ({
+  Button: ({ children, isLoading, fullWidth, ...props }: any) => (
+    <button {...props}>{isLoading ? 'Signing in...' : children}</button>
+  ),
+  Input: ({ label, leftIcon, error, helperText, ...props }: any) => (
+    <div className="form-group w-full">
+      {label && <label htmlFor={props.id} className="label">{label}</label>}
+      <div className="relative input-group">
+        {leftIcon && <span className="input-group-icon">{leftIcon}</span>}
+        <input {...props} className="input pl-10" />
+      </div>
+      {error && <p className="error-text">{error}</p>}
+      {helperText && <p className="helper-text">{helperText}</p>}
+    </div>
+  ),
+  Card: ({ children, className }: any) => <div className={`card ${className || ''}`}>{children}</div>,
+  CardBody: ({ children, className }: any) => <div className={`card-body ${className || ''}`}>{children}</div>,
+  Alert: ({ children, variant, dismissible, onDismiss }: any) => (
+    <div role="alert" className={`alert alert-${variant}`}>
+      {children}
+      {dismissible && <button onClick={onDismiss} aria-label="Dismiss">X</button>}
+    </div>
+  ),
+}))
+
 describe('LoginPage', () => {
   const mockRouter = {
     push: jest.fn(),

@@ -17,10 +17,13 @@
     "test:e2e:report": "playwright show-report"
   },
   "dependencies": {
+    "@react-google-maps/api": "^2.20.7",
     "axios": "^1.6.0",
+    "clsx": "^2.1.1",
     "next": "^14.0.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "recharts": "^3.5.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",

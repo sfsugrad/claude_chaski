@@ -6,6 +6,32 @@ import Link from 'next/link'
 import { authAPI } from '@/lib/api'
 import GoogleSignInButton from '@/components/GoogleSignInButton'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
+import { Button, Input, Card, CardBody, Alert } from '@/components/ui'
+
+// Icons
+const UserIcon = () => (
+  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+  </svg>
+)
+
+const MailIcon = () => (
+  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+  </svg>
+)
+
+const LockIcon = () => (
+  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+  </svg>
+)
+
+const PhoneIcon = () => (
+  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+  </svg>
+)
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -111,23 +137,34 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+    <div className="min-h-screen bg-surface-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      {/* Background decoration */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary-100 rounded-full opacity-50 blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary-100 rounded-full opacity-50 blur-3xl" />
+      </div>
+
+      <div className="max-w-md w-full space-y-8 relative z-10">
+        {/* Header */}
+        <div className="text-center">
+          <Link href="/" className="inline-block mb-6">
+            <span className="text-3xl font-bold text-gradient">Chaski</span>
+          </Link>
+          <h1 className="text-2xl font-bold text-surface-900">
             Create your account
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          </h1>
+          <p className="mt-2 text-surface-500">
             Join Chaski and start sending or delivering packages
           </p>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="bg-white p-8 rounded-lg shadow-md space-y-4">
+        <Card className="animate-fade-in-up">
+          <CardBody className="space-y-6">
+            {/* Error Alert */}
             {error && (
-              <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+              <Alert variant="error" dismissible onDismiss={() => setError('')}>
                 {error}
-              </div>
+              </Alert>
             )}
 
             {/* Google Sign In */}
@@ -135,207 +172,171 @@ export default function RegisterPage() {
               <GoogleSignInButton />
               <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300"></div>
+                  <div className="w-full border-t border-surface-200"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">Or register with email</span>
+                  <span className="px-3 bg-white text-surface-400">Or register with email</span>
                 </div>
               </div>
             </div>
 
-            {/* Full Name */}
-            <div>
-              <label
-                htmlFor="full_name"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Full Name *
-              </label>
-              <input
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Full Name */}
+              <Input
+                label="Full Name"
                 id="full_name"
                 name="full_name"
                 type="text"
                 required
                 value={formData.full_name}
                 onChange={handleChange}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 placeholder="John Doe"
+                leftIcon={<UserIcon />}
+                autoComplete="name"
               />
-            </div>
 
-            {/* Email */}
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Email Address *
-              </label>
-              <input
+              {/* Email */}
+              <Input
+                label="Email Address"
                 id="email"
                 name="email"
                 type="email"
                 required
                 value={formData.email}
                 onChange={handleChange}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 placeholder="you@example.com"
+                leftIcon={<MailIcon />}
+                autoComplete="email"
               />
-            </div>
 
-            {/* Password */}
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Password *
-              </label>
-              <input
+              {/* Password */}
+              <Input
+                label="Password"
                 id="password"
                 name="password"
                 type="password"
                 required
                 value={formData.password}
                 onChange={handleChange}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 placeholder="Minimum 8 characters"
+                leftIcon={<LockIcon />}
+                helperText="Must be at least 8 characters"
+                autoComplete="new-password"
               />
-            </div>
 
-            {/* Confirm Password */}
-            <div>
-              <label
-                htmlFor="confirmPassword"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Confirm Password *
-              </label>
-              <input
+              {/* Confirm Password */}
+              <Input
+                label="Confirm Password"
                 id="confirmPassword"
                 name="confirmPassword"
                 type="password"
                 required
                 value={formData.confirmPassword}
                 onChange={handleChange}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 placeholder="Re-enter your password"
+                leftIcon={<LockIcon />}
+                autoComplete="new-password"
               />
-            </div>
 
-            {/* Role */}
-            <div>
-              <label
-                htmlFor="role"
-                className="block text-sm font-medium text-gray-700"
-              >
-                I want to *
-              </label>
-              <select
-                id="role"
-                name="role"
-                value={formData.role}
-                onChange={handleChange}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="sender">Send packages</option>
-                <option value="courier">Deliver packages</option>
-                <option value="both">Both send and deliver</option>
-              </select>
-            </div>
+              {/* Role */}
+              <div className="form-group">
+                <label htmlFor="role" className="label">
+                  I want to
+                </label>
+                <select
+                  id="role"
+                  name="role"
+                  value={formData.role}
+                  onChange={handleChange}
+                  className="select"
+                >
+                  <option value="sender">Send packages</option>
+                  <option value="courier">Deliver packages</option>
+                  <option value="both">Both send and deliver</option>
+                </select>
+              </div>
 
-            {/* Phone Number */}
-            <div>
-              <label
-                htmlFor="phone_number"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Phone Number (Optional)
-              </label>
-              <input
+              {/* Phone Number */}
+              <Input
+                label="Phone Number"
                 id="phone_number"
                 name="phone_number"
                 type="tel"
                 value={formData.phone_number}
                 onChange={handleChange}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 placeholder="+1234567890"
+                leftIcon={<PhoneIcon />}
+                helperText="Optional - for delivery updates"
               />
-            </div>
 
-            {/* Default Address (for senders) */}
-            {(formData.role === 'sender' || formData.role === 'both') && (
-              <div>
-                <label
-                  htmlFor="default_address"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Default Pickup Address (Optional)
-                </label>
-                <AddressAutocomplete
-                  id="default_address"
-                  name="default_address"
-                  value={formData.default_address}
-                  onChange={handleAddressChange}
-                  placeholder="Start typing to search for your address..."
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                />
-                <p className="mt-1 text-xs text-gray-500">
-                  This will be pre-filled when you create new packages
-                </p>
-              </div>
-            )}
+              {/* Default Address (for senders) */}
+              {(formData.role === 'sender' || formData.role === 'both') && (
+                <div className="form-group">
+                  <label htmlFor="default_address" className="label">
+                    Default Pickup Address
+                  </label>
+                  <AddressAutocomplete
+                    id="default_address"
+                    name="default_address"
+                    value={formData.default_address}
+                    onChange={handleAddressChange}
+                    placeholder="Start typing to search..."
+                    className="input"
+                  />
+                  <p className="helper-text">
+                    Optional - This will be pre-filled when you create new packages
+                  </p>
+                </div>
+              )}
 
-            {/* Max Deviation (only for couriers) */}
-            {(formData.role === 'courier' || formData.role === 'both') && (
-              <div>
-                <label
-                  htmlFor="max_deviation_km"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Maximum Route Deviation (km) *
-                </label>
-                <input
-                  id="max_deviation_km"
-                  name="max_deviation_km"
-                  type="number"
-                  min="1"
-                  max="50"
-                  value={formData.max_deviation_km}
-                  onChange={handleChange}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                />
-                <p className="mt-1 text-xs text-gray-500">
-                  How far you're willing to deviate from your route (1-50 km)
-                </p>
-              </div>
-            )}
+              {/* Max Deviation (only for couriers) */}
+              {(formData.role === 'courier' || formData.role === 'both') && (
+                <div className="form-group">
+                  <label htmlFor="max_deviation_km" className="label">
+                    Maximum Route Deviation (km)
+                  </label>
+                  <input
+                    id="max_deviation_km"
+                    name="max_deviation_km"
+                    type="number"
+                    min="1"
+                    max="50"
+                    value={formData.max_deviation_km}
+                    onChange={handleChange}
+                    className="input"
+                  />
+                  <p className="helper-text">
+                    How far you&apos;re willing to deviate from your route (1-50 km)
+                  </p>
+                </div>
+              )}
 
-            {/* Submit Button */}
-            <div className="pt-4">
-              <button
+              {/* Submit Button */}
+              <Button
                 type="submit"
-                disabled={loading}
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                variant="primary"
+                size="lg"
+                fullWidth
+                isLoading={loading}
               >
-                {loading ? 'Creating account...' : 'Create Account'}
-              </button>
-            </div>
-          </div>
+                Create Account
+              </Button>
+            </form>
+          </CardBody>
+        </Card>
 
-          {/* Login Link */}
-          <div className="text-center">
-            <p className="text-sm text-gray-600">
-              Already have an account?{' '}
-              <Link
-                href="/login"
-                className="font-medium text-blue-600 hover:text-blue-500"
-              >
-                Sign in
-              </Link>
-            </p>
-          </div>
-        </form>
+        {/* Login Link */}
+        <div className="text-center">
+          <p className="text-sm text-surface-500">
+            Already have an account?{' '}
+            <Link
+              href="/login"
+              className="font-semibold text-primary-600 hover:text-primary-700 transition-colors"
+            >
+              Sign in
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   )

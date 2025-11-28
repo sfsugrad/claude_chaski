@@ -4,14 +4,18 @@ import Home from '../page'
 
 describe('Home Page', () => {
   describe('Rendering', () => {
-    it('renders the welcome heading', () => {
+    it('renders the main heading with Senders and Couriers', () => {
       render(<Home />)
-      expect(screen.getByText('Welcome to Chaski')).toBeInTheDocument()
+      expect(screen.getByText(/connect/i)).toBeInTheDocument()
+      // "Senders" and "Couriers" appear multiple times, so check the h1 specifically
+      const heading = screen.getByRole('heading', { level: 1 })
+      expect(heading).toHaveTextContent(/senders/i)
+      expect(heading).toHaveTextContent(/couriers/i)
     })
 
     it('renders the tagline', () => {
       render(<Home />)
-      expect(screen.getByText(/smart courier matching platform/i)).toBeInTheDocument()
+      expect(screen.getByText(/smart logistics platform/i)).toBeInTheDocument()
     })
 
     it('renders sender card', () => {
@@ -33,14 +37,16 @@ describe('Home Page', () => {
 
     it('has send package link', () => {
       render(<Home />)
-      const sendLink = screen.getByRole('link', { name: /send package/i })
+      const sendLink = screen.getByRole('link', { name: /send a package/i })
       expect(sendLink).toBeInTheDocument()
       expect(sendLink).toHaveAttribute('href', '/sender')
     })
 
-    it('displays package emoji', () => {
+    it('displays package icon', () => {
       render(<Home />)
-      expect(screen.getByText('📦')).toBeInTheDocument()
+      // Check for SVG with package/box path
+      const svgs = document.querySelectorAll('svg')
+      expect(svgs.length).toBeGreaterThan(0)
     })
   })
 
@@ -56,34 +62,29 @@ describe('Home Page', () => {
       expect(courierLink).toBeInTheDocument()
       expect(courierLink).toHaveAttribute('href', '/courier')
     })
-
-    it('displays car emoji', () => {
-      render(<Home />)
-      expect(screen.getByText('🚗')).toBeInTheDocument()
-    })
   })
 
   describe('Navigation Links', () => {
     it('has login link', () => {
       render(<Home />)
-      const loginLink = screen.getByRole('link', { name: /login/i })
-      expect(loginLink).toBeInTheDocument()
-      expect(loginLink).toHaveAttribute('href', '/login')
+      const loginLinks = screen.getAllByRole('link', { name: /sign in/i })
+      expect(loginLinks.length).toBeGreaterThan(0)
+      expect(loginLinks[0]).toHaveAttribute('href', '/login')
     })
 
     it('has register link', () => {
       render(<Home />)
-      const registerLink = screen.getByRole('link', { name: /register/i })
-      expect(registerLink).toBeInTheDocument()
-      expect(registerLink).toHaveAttribute('href', '/register')
+      const registerLinks = screen.getAllByRole('link', { name: /register|get started/i })
+      expect(registerLinks.length).toBeGreaterThan(0)
+      expect(registerLinks[0]).toHaveAttribute('href', '/register')
     })
   })
 
   describe('Styling', () => {
-    it('has gradient background', () => {
+    it('has surface background', () => {
       render(<Home />)
       const main = screen.getByRole('main')
-      expect(main).toHaveClass('bg-gradient-to-b')
+      expect(main).toHaveClass('bg-surface-50')
     })
 
     it('has minimum screen height', () => {
@@ -101,10 +102,14 @@ describe('Home Page', () => {
       expect(screen.getByText("I'm a Courier")).toBeInTheDocument()
     })
 
-    it('centers content', () => {
+    it('has features section', () => {
       render(<Home />)
-      const heading = screen.getByText('Welcome to Chaski')
-      expect(heading.closest('.text-center')).toBeInTheDocument()
+      expect(screen.getByText(/why choose chaski/i)).toBeInTheDocument()
+    })
+
+    it('has CTA section', () => {
+      render(<Home />)
+      expect(screen.getByText(/ready to get started/i)).toBeInTheDocument()
     })
   })
 })
