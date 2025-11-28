@@ -71,6 +71,11 @@ npm run lint
   - `rating.py` - Rating model
   - `message.py` - Message model
   - `audit_log.py` - AuditLog model with AuditAction enum (28 action types)
+  - `bid.py` - CourierBid model for bidding system
+  - `delivery_proof.py` - Delivery proof images and verification
+  - `payment.py` - Stripe payment intent tracking
+  - `tracking.py` - Real-time location tracking for deliveries
+  - `analytics.py` - Platform metrics and statistics
 - `app/routes/` - API endpoints organized by domain:
   - `auth.py` - Registration, login, email verification, password reset, OAuth
   - `packages.py` - Package CRUD for senders
@@ -81,6 +86,12 @@ npm run lint
   - `ratings.py` - Rating and review system
   - `messages.py` - In-app messaging between sender and courier
   - `ws.py` - WebSocket endpoint for real-time updates
+  - `bids.py` - Bidding system for courier price proposals
+  - `payments.py` - Stripe payment intent creation and confirmation
+  - `payouts.py` - Courier payout requests via Stripe Connect
+  - `delivery_proof.py` - Delivery proof image upload (AWS S3)
+  - `tracking.py` - Real-time location tracking for deliveries
+  - `analytics.py` - Platform statistics and metrics
 - `app/utils/` - Shared utilities:
   - `dependencies.py` - FastAPI dependencies (`get_current_user`, `get_current_admin_user`)
   - `auth.py` - JWT token and password hashing
@@ -92,6 +103,13 @@ npm run lint
   - `matching_job.py` - Background job for automatic package-route matching (can run as standalone script)
   - `route_optimizer.py` - Route optimization algorithms
   - `audit_service.py` - Audit logging service for sensitive operations
+  - `redis_client.py` - Redis connection manager for pub/sub and caching
+  - `stripe_service.py` - Stripe payment and payout operations
+  - `file_storage.py` - AWS S3 file upload/download for delivery proofs
+  - `tracking_service.py` - Live location update handling with Redis cache
+  - `package_status.py` - Complex package state transitions
+  - `bid_deadline_job.py` - Background job for bid deadline monitoring
+  - `route_cleanup_job.py` - Periodic cleanup of expired/completed routes
 - `test_data/` - JSON fixtures and loader script for seeding the database
 
 ### Frontend Structure
@@ -99,7 +117,7 @@ npm run lint
 - `lib/api.ts` - Centralized API client with:
   - Axios instance with auth interceptor and `withCredentials: true`
   - TypeScript interfaces for all API types
-  - Organized API modules: `authAPI`, `packagesAPI`, `couriersAPI`, `matchingAPI`, `notificationsAPI`, `ratingsAPI`, `messagesAPI`, `adminAPI`, `verificationAPI`
+  - Organized API modules: `authAPI`, `packagesAPI`, `couriersAPI`, `matchingAPI`, `notificationsAPI`, `ratingsAPI`, `messagesAPI`, `adminAPI`, `verificationAPI`, `bidsAPI`, `paymentsAPI`, `payoutsAPI`, `trackingAPI`, `proofAPI`, `analyticsAPI`
   - All API calls should go through these modules (no direct axios calls in components)
 - `hooks/` - Custom React hooks:
   - `useWebSocket.ts` - WebSocket connection hook with auto-reconnect
@@ -145,6 +163,14 @@ npm run lint
 
 **Frontend:** Jest with React Testing Library. Test files colocated in `__tests__/` directories.
 
+**E2E Testing:** Playwright for full user flow testing:
+```bash
+npm run test:e2e           # Run all E2E tests
+npm run test:e2e:ui        # Run with interactive UI
+npm run test:e2e:headed    # Run in headed browser mode
+npm run test:e2e:debug     # Run in debug mode
+```
+
 ## Role System
 
 Users have one role: `sender`, `courier`, `both`, or `admin`
@@ -156,10 +182,16 @@ Users have one role: `sender`, `courier`, `both`, or `admin`
 ## Current Features
 
 - **Authentication**: Email/password, JWT tokens (httpOnly cookies), email verification, password reset, Google OAuth
-- **Package Management**: Full CRUD, status tracking (pending/matched/picked_up/in_transit/delivered/cancelled), soft delete
+- **Package Management**: Full CRUD, status tracking (pending/bidding/bid_selected/pending_pickup/picked_up/in_transit/delivered/cancelled), soft delete
 - **Courier Routes**: Create/update/delete routes, one active route per courier
 - **Matching Algorithm**: Geospatial matching using haversine/cross-track distance
+- **Bidding System**: Couriers submit price proposals, senders select winning bid, deadline with extensions (max 2)
+- **Payments**: Stripe payment intents for senders, escrow until delivery confirmed
+- **Payouts**: Stripe Connect for courier accounts, minimum threshold for payout requests
+- **Delivery Proof**: Image upload to AWS S3, verification workflow, proof required flag
+- **Real-time Tracking**: Live location updates from couriers, Redis cache, location history
 - **Admin Dashboard**: User management, package management, platform statistics, audit logs
+- **Analytics**: Platform metrics, visualizations (Recharts), admin-only dashboard
 - **Notification System**: Backend API, email notifications, real-time WebSocket updates, frontend dropdown with unread badge
 - **Rating & Review System**: Post-delivery ratings, user average ratings, reviews page at /profile/reviews
 - **In-App Messaging**: Package-based conversations between sender and courier, real-time via WebSocket
