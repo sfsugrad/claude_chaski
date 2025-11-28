@@ -926,12 +926,14 @@ export default function AdminPage() {
                     className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
                     <option value="all">All Statuses</option>
-                    <option value="pending">Pending</option>
-                    <option value="matched">Matched</option>
-                    <option value="picked_up">Picked Up</option>
+                    <option value="new">New</option>
+                    <option value="open_for_bids">Open for Bids</option>
+                    <option value="bid_selected">Bid Selected</option>
+                    <option value="pending_pickup">Pending Pickup</option>
                     <option value="in_transit">In Transit</option>
                     <option value="delivered">Delivered</option>
-                    <option value="cancelled">Cancelled</option>
+                    <option value="canceled">Canceled</option>
+                    <option value="failed">Failed</option>
                   </select>
                 </div>
 
@@ -1049,7 +1051,7 @@ export default function AdminPage() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
                             {pkg.is_active ? (
-                              pkg.status.toLowerCase() === 'pending' ? (
+                              ['new', 'open_for_bids'].includes(pkg.status.toLowerCase()) ? (
                                 <button
                                   onClick={() => handleTogglePackageActive(pkg.id, pkg.is_active)}
                                   className="text-red-600 hover:text-red-900 font-medium"
@@ -1057,7 +1059,7 @@ export default function AdminPage() {
                                   Deactivate
                                 </button>
                               ) : (
-                                <span className="text-gray-400 text-xs" title="Only pending packages can be deactivated">
+                                <span className="text-gray-400 text-xs" title="Only new or open for bids packages can be deactivated">
                                   Cannot deactivate
                                 </span>
                               )

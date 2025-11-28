@@ -182,7 +182,7 @@ Users have one role: `sender`, `courier`, `both`, or `admin`
 ## Current Features
 
 - **Authentication**: Email/password, JWT tokens (httpOnly cookies), email verification, password reset, Google OAuth
-- **Package Management**: Full CRUD, status tracking (pending/bidding/bid_selected/pending_pickup/picked_up/in_transit/delivered/cancelled), soft delete
+- **Package Management**: Full CRUD, status state machine (see below), soft delete
 - **Courier Routes**: Create/update/delete routes, one active route per courier
 - **Matching Algorithm**: Geospatial matching using haversine/cross-track distance
 - **Bidding System**: Couriers submit price proposals, senders select winning bid, deadline with extensions (max 2)
@@ -196,3 +196,41 @@ Users have one role: `sender`, `courier`, `both`, or `admin`
 - **Rating & Review System**: Post-delivery ratings, user average ratings, reviews page at /profile/reviews
 - **In-App Messaging**: Package-based conversations between sender and courier, real-time via WebSocket
 - **Audit Logging**: Tracks authentication, admin actions, package operations, courier routes with IP/user agent
+
+## Package Status State Machine
+
+Package status transitions are strictly enforced in `app/services/package_status.py`:
+
+```
+NEW → OPEN_FOR_BIDS → BID_SELECTED → PENDING_PICKUP → IN_TRANSIT → DELIVERED
+                          ↓                ↓              ↓
+                    OPEN_FOR_BIDS*       FAILED         FAILED
+
+CANCELED can occur from any non-terminal state (except IN_TRANSIT and FAILED)
+FAILED → OPEN_FOR_BIDS (admin only retry)
+```
+
+**Status meanings:**
+- `NEW`: Just created, auto-transitions to OPEN_FOR_BIDS
+- `OPEN_FOR_BIDS`: Shown to couriers, accepting price proposals
+- `BID_SELECTED`: Sender chose a courier from bids
+- `PENDING_PICKUP`: Courier confirmed, awaiting pickup
+- `IN_TRANSIT`: Courier confirmed pickup
+- `DELIVERED`: Package delivered (terminal)
+- `CANCELED`: Sender canceled (terminal)
+- `FAILED`: Pickup/delivery failed (admin can retry)
+
+**Important:** Always use `validate_transition()` or `transition_package()` from `package_status.py` - never update status directly.
+
+## Environment Setup
+
+**Required services:**
+- PostgreSQL with PostGIS extension
+- Redis (for WebSocket pub/sub and caching)
+- SMTP server (for email verification)
+- Stripe account (for payments)
+- AWS S3 bucket (for delivery proof images)
+
+**Backend `.env` file:** Copy from `.env.example` - includes database URL, JWT secret, email config, Stripe keys, AWS credentials.
+
+**Frontend `.env.local` file:** Copy from `.env.example` - includes API URL and Google Places API key.
