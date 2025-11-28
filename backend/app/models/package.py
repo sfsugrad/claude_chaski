@@ -5,14 +5,14 @@ from app.models.base import Base
 import enum
 
 class PackageStatus(str, enum.Enum):
-    NEW = "new"                      # Just created, auto-transitions to OPEN_FOR_BIDS
-    OPEN_FOR_BIDS = "open_for_bids"  # Shown to couriers, accepting offers
-    BID_SELECTED = "bid_selected"    # Sender chose a courier from bids
-    PENDING_PICKUP = "pending_pickup"  # Courier confirmed, awaiting pickup
-    IN_TRANSIT = "in_transit"        # Courier confirmed pickup, package in transit
-    DELIVERED = "delivered"          # Package delivered (terminal)
-    CANCELED = "canceled"            # Sender canceled or expired (terminal)
-    FAILED = "failed"                # Pickup/delivery failed (admin can retry)
+    NEW = "NEW"                      # Just created, auto-transitions to OPEN_FOR_BIDS
+    OPEN_FOR_BIDS = "OPEN_FOR_BIDS"  # Shown to couriers, accepting offers
+    BID_SELECTED = "BID_SELECTED"    # Sender chose a courier from bids
+    PENDING_PICKUP = "PENDING_PICKUP"  # Courier confirmed, awaiting pickup
+    IN_TRANSIT = "IN_TRANSIT"        # Courier confirmed pickup, package in transit
+    DELIVERED = "DELIVERED"          # Package delivered (terminal)
+    CANCELED = "CANCELED"            # Sender canceled or expired (terminal)
+    FAILED = "FAILED"                # Pickup/delivery failed (admin can retry)
 
 class PackageSize(str, enum.Enum):
     SMALL = "small"      # < 5kg, fits in a bag

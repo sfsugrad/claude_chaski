@@ -132,23 +132,28 @@ export default function SenderDashboard() {
 
   const getFilteredPackages = () => {
     if (statusFilter === 'all') return packages
-    return packages.filter((pkg) => pkg.status === statusFilter)
+    // Normalize status to lowercase for comparison (backend returns uppercase)
+    return packages.filter((pkg) => pkg.status.toLowerCase() === statusFilter)
   }
 
   const getStatusCounts = () => {
     const counts: Record<string, number> = { all: packages.length }
     packages.forEach((pkg) => {
-      counts[pkg.status] = (counts[pkg.status] || 0) + 1
+      // Normalize status to lowercase for counting
+      const normalizedStatus = pkg.status.toLowerCase()
+      counts[normalizedStatus] = (counts[normalizedStatus] || 0) + 1
     })
     return counts
   }
 
   const canCancel = (status: string) => {
-    return ['new', 'open_for_bids', 'bid_selected', 'pending_pickup'].includes(status)
+    // Normalize status to lowercase
+    return ['new', 'open_for_bids', 'bid_selected', 'pending_pickup'].includes(status.toLowerCase())
   }
 
   const getStatusStep = (status: string) => {
-    const index = STATUS_ORDER.indexOf(status)
+    // Normalize status to lowercase
+    const index = STATUS_ORDER.indexOf(status.toLowerCase())
     return index === -1 ? -1 : index
   }
 
@@ -234,28 +239,43 @@ export default function SenderDashboard() {
           </SlideIn>
         )}
 
-        {/* Stats Overview */}
+        {/* Status Filter */}
         <SlideIn direction="up" delay={100} duration={400}>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
-            {['all', 'open_for_bids', 'bid_selected', 'in_transit', 'delivered', 'canceled'].map((status, index) => (
-              <button
-                key={status}
-                onClick={() => setStatusFilter(status as StatusFilter)}
-                className={`p-4 rounded-xl border-2 transition-all duration-200 transform-gpu hover:-translate-y-0.5 ${
-                  statusFilter === status
-                    ? 'border-primary-500 bg-primary-50 shadow-sm'
-                    : 'border-surface-200 bg-white hover:border-surface-300 hover:shadow-sm'
-                }`}
-              >
-                <div className="text-2xl font-bold text-surface-900">
-                  {statusCounts[status] || 0}
-                </div>
-                <div className="text-sm text-surface-600 capitalize">
-                  {status === 'all' ? 'All' : STATUS_CONFIG[status]?.label || status}
-                </div>
-              </button>
-            ))}
-          </div>
+          <Card className="mb-6">
+            <CardBody>
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
+                  {['all', 'open_for_bids', 'bid_selected', 'pending_pickup', 'in_transit', 'delivered', 'canceled', 'failed'].map((status) => {
+                    const count = statusCounts[status] || 0
+                    const isActive = statusFilter === status
+                    const config = STATUS_CONFIG[status]
+
+                    return (
+                      <button
+                        key={status}
+                        onClick={() => setStatusFilter(status as StatusFilter)}
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 ${
+                          isActive
+                            ? 'bg-primary-600 text-white shadow-sm'
+                            : 'bg-surface-100 text-surface-700 hover:bg-surface-200'
+                        }`}
+                      >
+                        {status !== 'all' && config && (
+                          <span className={isActive ? '' : ''}>{config.icon}</span>
+                        )}
+                        <span>{status === 'all' ? 'All' : config?.label || status}</span>
+                        <span className={`px-1.5 py-0.5 rounded-full text-xs ${
+                          isActive
+                            ? 'bg-white/20 text-white'
+                            : 'bg-surface-200 text-surface-600'
+                        }`}>
+                          {count}
+                        </span>
+                      </button>
+                    )
+                  })}
+              </div>
+            </CardBody>
+          </Card>
         </SlideIn>
 
         {/* Package List */}
@@ -302,15 +322,17 @@ interface PackageCardProps {
 }
 
 function PackageCard({ pkg, onCancel, cancelling, canCancel }: PackageCardProps) {
-  const statusConfig = STATUS_CONFIG[pkg.status] || {
+  // Normalize status to lowercase (backend returns uppercase)
+  const normalizedStatus = pkg.status.toLowerCase()
+  const statusConfig = STATUS_CONFIG[normalizedStatus] || {
     label: pkg.status,
     color: 'text-gray-800',
     bgColor: 'bg-gray-100',
     icon: '📦',
   }
 
-  const currentStep = STATUS_ORDER.indexOf(pkg.status)
-  const isCanceled = pkg.status === 'canceled' || pkg.status === 'failed'
+  const currentStep = STATUS_ORDER.indexOf(normalizedStatus)
+  const isCanceled = normalizedStatus === 'canceled' || normalizedStatus === 'failed'
 
   return (
     <Card className="overflow-hidden">
@@ -368,6 +390,19 @@ function PackageCard({ pkg, onCancel, cancelling, canCancel }: PackageCardProps)
               >
                 {statusConfig.icon} {statusConfig.label}
               </span>
+              {/* Bid count indicator for open_for_bids status */}
+              {normalizedStatus === 'open_for_bids' && (
+                <span className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
+                  pkg.bid_count > 0
+                    ? 'bg-blue-100 text-blue-800'
+                    : 'bg-gray-100 text-gray-600'
+                }`}>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  {pkg.bid_count} {pkg.bid_count === 1 ? 'bid' : 'bids'}
+                </span>
+              )}
               <span className="text-sm text-gray-500">
                 Package #{pkg.id}
               </span>
@@ -434,7 +469,7 @@ function PackageCard({ pkg, onCancel, cancelling, canCancel }: PackageCardProps)
             </div>
 
             {/* Courier Info (when assigned) */}
-            {pkg.courier_id && !['new', 'open_for_bids'].includes(pkg.status) && (
+            {pkg.courier_id && !['new', 'open_for_bids'].includes(normalizedStatus) && (
               <div className="mt-4 p-3 bg-primary-50 rounded-lg">
                 <p className="text-sm text-primary-800">
                   <span className="font-medium">Courier assigned</span> - Your package is being handled by {pkg.courier_name || `courier #${pkg.courier_id}`}

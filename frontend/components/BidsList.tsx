@@ -126,17 +126,20 @@ export default function BidsList({
     )
   }
 
+  // Helper to normalize status for comparison (backend returns uppercase)
+  const getStatus = (bid: BidResponse) => bid.status?.toLowerCase() || ''
+
   // Sort bids: pending first (by price), then others
   const sortedBids = [...bidsData.bids].sort((a, b) => {
-    if (a.status === 'selected') return -1
-    if (b.status === 'selected') return 1
-    if (a.status === 'pending' && b.status !== 'pending') return -1
-    if (b.status === 'pending' && a.status !== 'pending') return 1
+    if (getStatus(a) === 'selected') return -1
+    if (getStatus(b) === 'selected') return 1
+    if (getStatus(a) === 'pending' && getStatus(b) !== 'pending') return -1
+    if (getStatus(b) === 'pending' && getStatus(a) !== 'pending') return 1
     return a.proposed_price - b.proposed_price
   })
 
-  const pendingBids = sortedBids.filter((b) => b.status === 'pending')
-  const selectedBid = sortedBids.find((b) => b.status === 'selected')
+  const pendingBids = sortedBids.filter((b) => getStatus(b) === 'pending')
+  const selectedBid = sortedBids.find((b) => getStatus(b) === 'selected')
 
   return (
     <div className="space-y-4">
@@ -205,15 +208,15 @@ export default function BidsList({
 
       {/* Other bids (rejected, withdrawn, expired) */}
       {sortedBids.filter(
-        (b) => !['pending', 'selected'].includes(b.status)
+        (b) => !['pending', 'selected'].includes(getStatus(b))
       ).length > 0 && (
         <details className="mt-4">
           <summary className="text-sm text-gray-500 cursor-pointer hover:text-gray-700">
-            Show other bids ({sortedBids.filter((b) => !['pending', 'selected'].includes(b.status)).length})
+            Show other bids ({sortedBids.filter((b) => !['pending', 'selected'].includes(getStatus(b))).length})
           </summary>
           <div className="mt-3 space-y-3">
             {sortedBids
-              .filter((b) => !['pending', 'selected'].includes(b.status))
+              .filter((b) => !['pending', 'selected'].includes(getStatus(b)))
               .map((bid) => (
                 <BidCard key={bid.id} bid={bid} isSender={isSender} />
               ))}

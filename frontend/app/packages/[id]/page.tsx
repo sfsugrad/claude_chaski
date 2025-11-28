@@ -8,6 +8,7 @@ import StarRating from '@/components/StarRating'
 import RatingModal from '@/components/RatingModal'
 import ChatWindow from '@/components/ChatWindow'
 import BidsList from '@/components/BidsList'
+import BidOptionsModal from '@/components/BidOptionsModal'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { RouteMap } from '@/components/map'
 import { Card, Button, Badge, Alert, FadeIn, SlideIn, PackageDetailSkeleton } from '@/components/ui'
@@ -79,6 +80,7 @@ export default function PackageDetailPage() {
   const [unreadMessageCount, setUnreadMessageCount] = useState(0)
   const [otherUserName, setOtherUserName] = useState<string>('')
   const [acceptingPackage, setAcceptingPackage] = useState(false)
+  const [showBidOptionsModal, setShowBidOptionsModal] = useState(false)
 
   // Handle incoming WebSocket messages
   const handleMessageReceived = useCallback((message: MessageResponse) => {
@@ -361,11 +363,9 @@ export default function PackageDetailPage() {
                 {canAcceptPackage() && (
                   <Button
                     variant="success"
-                    onClick={handleAcceptPackage}
-                    disabled={acceptingPackage}
-                    loading={acceptingPackage}
+                    onClick={() => setShowBidOptionsModal(true)}
                   >
-                    {acceptingPackage ? 'Accepting...' : 'Accept Package'}
+                    Bid on Package
                   </Button>
                 )}
                 {canEdit() && !isEditing && (
@@ -867,6 +867,21 @@ export default function PackageDetailPage() {
           onClose={() => setShowRatingModal(false)}
           pendingRating={pendingRating}
           onRatingSubmitted={handleRatingSubmitted}
+        />
+      )}
+
+      {/* Bid Options Modal */}
+      {pkg && (
+        <BidOptionsModal
+          isOpen={showBidOptionsModal}
+          onClose={() => setShowBidOptionsModal(false)}
+          packageId={pkg.id}
+          packageDescription={pkg.description}
+          senderPrice={pkg.price}
+          onBidPlaced={() => {
+            setShowBidOptionsModal(false)
+            loadPackageData()
+          }}
         />
       )}
     </div>

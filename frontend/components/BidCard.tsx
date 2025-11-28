@@ -24,8 +24,11 @@ export default function BidCard({
     return new Date(dateString).toLocaleString()
   }
 
+  // Normalize status for comparison (backend returns uppercase)
+  const status = bid.status?.toLowerCase() || ''
+
   const getStatusBadge = () => {
-    switch (bid.status) {
+    switch (status) {
       case 'pending':
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
@@ -64,9 +67,9 @@ export default function BidCard({
   return (
     <div
       className={`bg-white rounded-lg border p-4 ${
-        bid.status === 'selected'
+        status === 'selected'
           ? 'border-green-500 ring-2 ring-green-200'
-          : bid.status === 'pending'
+          : status === 'pending'
           ? 'border-gray-200 hover:border-gray-300'
           : 'border-gray-200 opacity-75'
       }`}
@@ -136,7 +139,7 @@ export default function BidCard({
       </div>
 
       {/* Actions */}
-      {bid.status === 'pending' && (
+      {status === 'pending' && (
         <div className="mt-3 pt-3 border-t flex gap-2">
           {isSender && onSelect && (
             <button

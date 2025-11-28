@@ -6,53 +6,53 @@ import enum
 
 class AuditAction(str, enum.Enum):
     # Authentication
-    LOGIN_SUCCESS = "login_success"
-    LOGIN_FAILED = "login_failed"
-    LOGOUT = "logout"
-    REGISTER = "register"
-    PASSWORD_RESET_REQUEST = "password_reset_request"
-    PASSWORD_RESET_COMPLETE = "password_reset_complete"
-    EMAIL_VERIFICATION = "email_verification"
-    OAUTH_LOGIN = "oauth_login"
+    LOGIN_SUCCESS = "LOGIN_SUCCESS"
+    LOGIN_FAILED = "LOGIN_FAILED"
+    LOGOUT = "LOGOUT"
+    REGISTER = "REGISTER"
+    PASSWORD_RESET_REQUEST = "PASSWORD_RESET_REQUEST"
+    PASSWORD_RESET_COMPLETE = "PASSWORD_RESET_COMPLETE"
+    EMAIL_VERIFICATION = "EMAIL_VERIFICATION"
+    OAUTH_LOGIN = "OAUTH_LOGIN"
 
     # User Management (Admin)
-    USER_CREATE = "user_create"
-    USER_UPDATE = "user_update"
-    USER_ROLE_CHANGE = "user_role_change"
-    USER_DEACTIVATE = "user_deactivate"
-    USER_ACTIVATE = "user_activate"
-    USER_VERIFY = "user_verify"
-    USER_UNVERIFY = "user_unverify"
-    USER_DELETE = "user_delete"
+    USER_CREATE = "USER_CREATE"
+    USER_UPDATE = "USER_UPDATE"
+    USER_ROLE_CHANGE = "USER_ROLE_CHANGE"
+    USER_DEACTIVATE = "USER_DEACTIVATE"
+    USER_ACTIVATE = "USER_ACTIVATE"
+    USER_VERIFY = "USER_VERIFY"
+    USER_UNVERIFY = "USER_UNVERIFY"
+    USER_DELETE = "USER_DELETE"
 
     # Package Operations
-    PACKAGE_CREATE = "package_create"
-    PACKAGE_UPDATE = "package_update"
-    PACKAGE_STATUS_CHANGE = "package_status_change"
-    PACKAGE_CANCEL = "package_cancel"
-    PACKAGE_DELETE = "package_delete"
-    PACKAGE_DEACTIVATE = "package_deactivate"
+    PACKAGE_CREATE = "PACKAGE_CREATE"
+    PACKAGE_UPDATE = "PACKAGE_UPDATE"
+    PACKAGE_STATUS_CHANGE = "PACKAGE_STATUS_CHANGE"
+    PACKAGE_CANCEL = "PACKAGE_CANCEL"
+    PACKAGE_DELETE = "PACKAGE_DELETE"
+    PACKAGE_DEACTIVATE = "PACKAGE_DEACTIVATE"
 
     # Courier Operations
-    ROUTE_CREATE = "route_create"
-    ROUTE_UPDATE = "route_update"
-    ROUTE_DELETE = "route_delete"
-    PACKAGE_ACCEPT = "package_accept"
-    PACKAGE_REJECT = "package_reject"
+    ROUTE_CREATE = "ROUTE_CREATE"
+    ROUTE_UPDATE = "ROUTE_UPDATE"
+    ROUTE_DELETE = "ROUTE_DELETE"
+    PACKAGE_ACCEPT = "PACKAGE_ACCEPT"
+    PACKAGE_REJECT = "PACKAGE_REJECT"
 
     # Matching
-    MATCHING_JOB_RUN = "matching_job_run"
+    MATCHING_JOB_RUN = "MATCHING_JOB_RUN"
 
     # Admin Actions
-    ADMIN_STATS_ACCESS = "admin_stats_access"
+    ADMIN_STATS_ACCESS = "ADMIN_STATS_ACCESS"
 
     # Rating
-    RATING_CREATE = "rating_create"
+    RATING_CREATE = "RATING_CREATE"
 
     # Bidding
-    BID_CREATED = "bid_created"
-    BID_WITHDRAWN = "bid_withdrawn"
-    BID_SELECTED = "bid_selected"
+    BID_CREATED = "BID_CREATED"
+    BID_WITHDRAWN = "BID_WITHDRAWN"
+    BID_SELECTED = "BID_SELECTED"
 
 
 class AuditLog(Base):

@@ -113,6 +113,11 @@ export interface PackageResponse {
   courier_accepted_at: string | null
   // Allowed next statuses for UI
   allowed_next_statuses: string[]
+  // Bidding fields
+  bid_deadline: string | null
+  bid_count: number
+  selected_bid_id: number | null
+  deadline_extensions: number
 }
 
 export interface AcceptanceStatus {

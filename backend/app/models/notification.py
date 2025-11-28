@@ -6,31 +6,31 @@ import enum
 
 
 class NotificationType(str, enum.Enum):
-    PACKAGE_MATCHED = "package_matched"
-    PACKAGE_ACCEPTED = "package_accepted"
-    PACKAGE_DECLINED = "package_declined"
-    PACKAGE_PICKED_UP = "package_picked_up"
-    PACKAGE_IN_TRANSIT = "package_in_transit"
-    PACKAGE_DELIVERED = "package_delivered"
-    PACKAGE_CANCELLED = "package_cancelled"
-    ROUTE_MATCH_FOUND = "route_match_found"
-    PACKAGE_MATCH_FOUND = "package_match_found"  # Notify courier about a package matching their route
-    NEW_RATING = "new_rating"  # Notify user about receiving a new rating
-    DELIVERY_PROOF_SUBMITTED = "delivery_proof_submitted"  # Notify sender that proof was submitted
-    PAYMENT_RECEIVED = "payment_received"  # Payment processed successfully
-    PAYMENT_FAILED = "payment_failed"  # Payment processing failed
-    PAYOUT_SENT = "payout_sent"  # Courier payout initiated
-    PAYOUT_FAILED = "payout_failed"  # Courier payout failed
-    PACKAGE_REMINDER = "package_reminder"  # Reminder for stale MATCHED packages
+    PACKAGE_MATCHED = "PACKAGE_MATCHED"
+    PACKAGE_ACCEPTED = "PACKAGE_ACCEPTED"
+    PACKAGE_DECLINED = "PACKAGE_DECLINED"
+    PACKAGE_PICKED_UP = "PACKAGE_PICKED_UP"
+    PACKAGE_IN_TRANSIT = "PACKAGE_IN_TRANSIT"
+    PACKAGE_DELIVERED = "PACKAGE_DELIVERED"
+    PACKAGE_CANCELLED = "PACKAGE_CANCELLED"
+    ROUTE_MATCH_FOUND = "ROUTE_MATCH_FOUND"
+    PACKAGE_MATCH_FOUND = "PACKAGE_MATCH_FOUND"  # Notify courier about a package matching their route
+    NEW_RATING = "NEW_RATING"  # Notify user about receiving a new rating
+    DELIVERY_PROOF_SUBMITTED = "DELIVERY_PROOF_SUBMITTED"  # Notify sender that proof was submitted
+    PAYMENT_RECEIVED = "PAYMENT_RECEIVED"  # Payment processed successfully
+    PAYMENT_FAILED = "PAYMENT_FAILED"  # Payment processing failed
+    PAYOUT_SENT = "PAYOUT_SENT"  # Courier payout initiated
+    PAYOUT_FAILED = "PAYOUT_FAILED"  # Courier payout failed
+    PACKAGE_REMINDER = "PACKAGE_REMINDER"  # Reminder for stale MATCHED packages
     # Bidding notifications
-    NEW_BID_RECEIVED = "new_bid_received"  # Sender: new bid on their package
-    BID_SELECTED = "bid_selected"  # Courier: their bid was selected
-    BID_REJECTED = "bid_rejected"  # Courier: another bid was selected
-    BID_WITHDRAWN = "bid_withdrawn"  # Sender: courier withdrew their bid
-    BID_DEADLINE_WARNING = "bid_deadline_warning"  # Sender: 6 hours left to select a bid
-    BID_DEADLINE_EXTENDED = "bid_deadline_extended"  # Sender: deadline extended by 12 hours
-    BID_DEADLINE_EXPIRED = "bid_deadline_expired"  # All parties: bidding period ended
-    SYSTEM = "system"
+    NEW_BID_RECEIVED = "NEW_BID_RECEIVED"  # Sender: new bid on their package
+    BID_SELECTED = "BID_SELECTED"  # Courier: their bid was selected
+    BID_REJECTED = "BID_REJECTED"  # Courier: another bid was selected
+    BID_WITHDRAWN = "BID_WITHDRAWN"  # Sender: courier withdrew their bid
+    BID_DEADLINE_WARNING = "BID_DEADLINE_WARNING"  # Sender: 6 hours left to select a bid
+    BID_DEADLINE_EXTENDED = "BID_DEADLINE_EXTENDED"  # Sender: deadline extended by 12 hours
+    BID_DEADLINE_EXPIRED = "BID_DEADLINE_EXPIRED"  # All parties: bidding period ended
+    SYSTEM = "SYSTEM"
 
 
 class Notification(Base):

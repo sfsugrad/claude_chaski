@@ -6,11 +6,11 @@ import enum
 
 
 class BidStatus(str, enum.Enum):
-    PENDING = "pending"      # Awaiting sender decision
-    SELECTED = "selected"    # Sender chose this bid
-    REJECTED = "rejected"    # Another bid was selected
-    WITHDRAWN = "withdrawn"  # Courier withdrew
-    EXPIRED = "expired"      # Deadline passed
+    PENDING = "PENDING"      # Awaiting sender decision
+    SELECTED = "SELECTED"    # Sender chose this bid
+    REJECTED = "REJECTED"    # Another bid was selected
+    WITHDRAWN = "WITHDRAWN"  # Courier withdrew
+    EXPIRED = "EXPIRED"      # Deadline passed
 
 
 class CourierBid(Base):

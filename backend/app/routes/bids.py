@@ -497,8 +497,8 @@ async def confirm_pickup(
     db: Session = Depends(get_db)
 ):
     """
-    Courier confirms they are ready for pickup.
-    Transitions package from BID_SELECTED to PENDING_PICKUP.
+    Courier confirms they have picked up the package.
+    Transitions package from BID_SELECTED to IN_TRANSIT.
     """
     bid = db.query(CourierBid).filter(CourierBid.id == bid_id).first()
 
@@ -528,8 +528,9 @@ async def confirm_pickup(
             detail="Package is not in the correct state for pickup confirmation"
         )
 
-    # Transition to PENDING_PICKUP
-    package.status = PackageStatus.PENDING_PICKUP
+    # Transition directly to IN_TRANSIT (courier has picked up the package)
+    package.status = PackageStatus.IN_TRANSIT
+    package.in_transit_at = datetime.utcnow()
 
     db.commit()
 
@@ -538,12 +539,12 @@ async def confirm_pickup(
         db=db,
         user_id=package.sender_id,
         notification_type=NotificationType.PACKAGE_ACCEPTED,
-        message=f"Your courier is ready for pickup! Please prepare your package.",
+        message=f"Your package has been picked up and is now in transit!",
         package_id=package.id
     )
 
     return {
-        "message": "Pickup confirmed",
+        "message": "Pickup confirmed - package is now in transit",
         "package_id": package.id,
         "status": package.status.value
     }

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { couriersAPI, authAPI, ratingsAPI, packagesAPI, RouteResponse, UserResponse, PendingRating, PackageResponse } from '@/lib/api'
+import { couriersAPI, authAPI, ratingsAPI, packagesAPI, bidsAPI, RouteResponse, UserResponse, PendingRating, PackageResponse } from '@/lib/api'
 import Navbar from '@/components/Navbar'
 import RatingModal from '@/components/RatingModal'
 import {
@@ -29,6 +29,8 @@ export default function CourierDashboard() {
   const [showRatingModal, setShowRatingModal] = useState(false)
   const [currentRatingIndex, setCurrentRatingIndex] = useState(0)
   const [assignedPackages, setAssignedPackages] = useState<PackageResponse[]>([])
+  const [confirmingPickupId, setConfirmingPickupId] = useState<number | null>(null)
+  const [markingDeliveredId, setMarkingDeliveredId] = useState<number | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -63,10 +65,11 @@ export default function CourierDashboard() {
       const response = await packagesAPI.getAll()
       // Filter to only show packages where user is the courier (not sender)
       // and exclude delivered/canceled/failed packages
+      // Note: backend returns uppercase status values
       const courierPackages = response.data.filter(
         (pkg: PackageResponse) =>
           pkg.courier_id !== null &&
-          !['delivered', 'canceled', 'failed'].includes(pkg.status)
+          !['delivered', 'canceled', 'failed'].includes(pkg.status.toLowerCase())
       )
       setAssignedPackages(courierPackages)
     } catch (err) {
@@ -115,6 +118,39 @@ export default function CourierDashboard() {
     } catch (err) {
       console.error('Failed to load routes:', err)
       setError('Failed to load routes')
+    }
+  }
+
+  const handleConfirmPickup = async (packageId: number, bidId: number | null) => {
+    if (!bidId) {
+      alert('No bid selected for this package')
+      return
+    }
+
+    setConfirmingPickupId(packageId)
+    try {
+      await bidsAPI.confirmPickup(bidId)
+      await loadAssignedPackages()
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.detail || 'Failed to confirm pickup'
+      alert(errorMessage)
+    } finally {
+      setConfirmingPickupId(null)
+    }
+  }
+
+  const handleMarkDelivered = async (packageId: number) => {
+    if (!confirm('Mark this package as delivered?')) return
+
+    setMarkingDeliveredId(packageId)
+    try {
+      await packagesAPI.updateStatus(packageId, 'DELIVERED')
+      await loadAssignedPackages()
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.detail || 'Failed to mark as delivered'
+      alert(errorMessage)
+    } finally {
+      setMarkingDeliveredId(null)
     }
   }
 
@@ -314,8 +350,28 @@ export default function CourierDashboard() {
                           </div>
                         </div>
                         <div className="flex flex-col gap-2 ml-4">
+                          {pkg.status.toLowerCase() === 'bid_selected' && pkg.selected_bid_id && (
+                            <Button
+                              variant="success"
+                              size="sm"
+                              onClick={() => handleConfirmPickup(pkg.id, pkg.selected_bid_id)}
+                              disabled={confirmingPickupId === pkg.id}
+                            >
+                              {confirmingPickupId === pkg.id ? 'Confirming...' : 'Confirm Pickup'}
+                            </Button>
+                          )}
+                          {pkg.status.toLowerCase() === 'in_transit' && (
+                            <Button
+                              variant="success"
+                              size="sm"
+                              onClick={() => handleMarkDelivered(pkg.id)}
+                              disabled={markingDeliveredId === pkg.id}
+                            >
+                              {markingDeliveredId === pkg.id ? 'Marking...' : 'Mark Delivered'}
+                            </Button>
+                          )}
                           <Link href={`/packages/${pkg.id}`}>
-                            <Button variant="success" size="sm">
+                            <Button variant="secondary" size="sm">
                               View Details
                             </Button>
                           </Link>

@@ -84,6 +84,10 @@ class PackageResponse(BaseModel):
     pending_pickup_at: datetime | None = None
     in_transit_at: datetime | None = None
     failed_at: datetime | None = None
+    # Bidding fields
+    selected_bid_id: int | None = None
+    bid_count: int = 0
+    bid_deadline: datetime | None = None
     # Allowed next statuses for UI
     allowed_next_statuses: List[str] = []
 
@@ -127,6 +131,9 @@ def package_to_response(package: Package, db: Session, is_admin: bool = False) -
         pending_pickup_at=package.pending_pickup_at,
         in_transit_at=package.in_transit_at,
         failed_at=package.failed_at,
+        selected_bid_id=package.selected_bid_id,
+        bid_count=package.bid_count or 0,
+        bid_deadline=package.bid_deadline,
         allowed_next_statuses=get_allowed_next_statuses(package.status, is_admin),
     )
 

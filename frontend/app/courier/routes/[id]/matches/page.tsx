@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { matchingAPI, MatchedPackage, bidsAPI, BidResponse } from '@/lib/api'
-import BidModal from '@/components/BidModal'
+import BidOptionsModal from '@/components/BidOptionsModal'
 
 export default function RouteMatchesPage() {
   const params = useParams()
@@ -48,6 +48,11 @@ export default function RouteMatchesPage() {
 
   const getExistingBid = (packageId: number) => {
     return myBids.find((bid) => bid.package_id === packageId)
+  }
+
+  // Normalize bid status for comparison (backend returns uppercase)
+  const getBidStatus = (bid: BidResponse | undefined) => {
+    return bid?.status?.toLowerCase() || ''
   }
 
   if (loading) {
@@ -121,19 +126,19 @@ export default function RouteMatchesPage() {
                         <h3 className="text-lg font-semibold">{pkg.description}</h3>
                         {existingBid && (
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            existingBid.status === 'pending'
+                            getBidStatus(existingBid) === 'pending'
                               ? 'bg-yellow-100 text-yellow-800'
-                              : existingBid.status === 'selected'
+                              : getBidStatus(existingBid) === 'selected'
                               ? 'bg-green-100 text-green-800'
-                              : existingBid.status === 'rejected'
+                              : getBidStatus(existingBid) === 'rejected'
                               ? 'bg-red-100 text-red-800'
                               : 'bg-gray-100 text-gray-800'
                           }`}>
-                            {existingBid.status === 'pending' && 'Bid Placed'}
-                            {existingBid.status === 'selected' && 'Bid Won!'}
-                            {existingBid.status === 'rejected' && 'Not Selected'}
-                            {existingBid.status === 'withdrawn' && 'Withdrawn'}
-                            {existingBid.status === 'expired' && 'Expired'}
+                            {getBidStatus(existingBid) === 'pending' && 'Bid Placed'}
+                            {getBidStatus(existingBid) === 'selected' && 'Bid Won!'}
+                            {getBidStatus(existingBid) === 'rejected' && 'Not Selected'}
+                            {getBidStatus(existingBid) === 'withdrawn' && 'Withdrawn'}
+                            {getBidStatus(existingBid) === 'expired' && 'Expired'}
                           </span>
                         )}
                       </div>
@@ -180,7 +185,7 @@ export default function RouteMatchesPage() {
                             </p>
                           </div>
                         )}
-                        {existingBid && existingBid.status === 'pending' && (
+                        {existingBid && getBidStatus(existingBid) === 'pending' && (
                           <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
                             <p className="text-blue-800 font-medium">
                               Your bid: ${existingBid.proposed_price.toFixed(2)}
@@ -191,21 +196,21 @@ export default function RouteMatchesPage() {
                     </div>
 
                     <div className="ml-4 flex flex-col gap-2">
-                      {!existingBid || existingBid.status === 'rejected' || existingBid.status === 'expired' ? (
+                      {!existingBid || getBidStatus(existingBid) === 'rejected' || getBidStatus(existingBid) === 'expired' ? (
                         <button
                           onClick={() => handlePlaceBid(pkg)}
                           className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium whitespace-nowrap"
                         >
                           Place Bid
                         </button>
-                      ) : existingBid.status === 'pending' ? (
+                      ) : getBidStatus(existingBid) === 'pending' ? (
                         <button
                           disabled
                           className="bg-gray-400 text-white px-6 py-3 rounded-lg font-medium whitespace-nowrap cursor-not-allowed"
                         >
                           Bid Pending
                         </button>
-                      ) : existingBid.status === 'selected' ? (
+                      ) : getBidStatus(existingBid) === 'selected' ? (
                         <Link
                           href={`/packages/${pkg.package_id}`}
                           className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium whitespace-nowrap text-center"
@@ -231,9 +236,9 @@ export default function RouteMatchesPage() {
         )}
       </div>
 
-      {/* Bid Modal */}
+      {/* Bid Options Modal */}
       {selectedPackage && (
-        <BidModal
+        <BidOptionsModal
           isOpen={showBidModal}
           onClose={() => {
             setShowBidModal(false)
@@ -241,7 +246,7 @@ export default function RouteMatchesPage() {
           }}
           packageId={selectedPackage.package_id}
           packageDescription={selectedPackage.description}
-          suggestedPrice={selectedPackage.price}
+          senderPrice={selectedPackage.price}
           routeId={routeId}
           onBidPlaced={handleBidPlaced}
         />
