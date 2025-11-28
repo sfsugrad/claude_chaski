@@ -81,12 +81,12 @@ jobs:
           from app.database import engine
           from app.models.base import Base
           from app.models.user import User
-          from app.models.package import Package
+          from app.models.package import Package, CourierRoute
           from app.models.notification import Notification
-          from app.models.courier_route import CourierRoute
           from app.models.rating import Rating
           from app.models.message import Message
           from app.models.audit_log import AuditLog
+          from app.models.bid import CourierBid
           Base.metadata.create_all(bind=engine)
           "
 
