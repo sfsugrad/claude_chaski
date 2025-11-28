@@ -616,3 +616,56 @@ def log_rating_create(
         },
         request=request,
     )
+
+
+def log_audit(
+    db: Session,
+    user_id: int,
+    action: str,
+    resource_type: str,
+    resource_id: int,
+    details: Optional[dict] = None,
+    success: bool = True,
+    request: Optional[Request] = None,
+) -> Optional[AuditLog]:
+    """
+    Generic audit logging function that accepts string action names.
+
+    Maps string action names to AuditAction enum values.
+    If the action string doesn't match an enum value, logs a warning and skips.
+
+    Args:
+        db: Database session
+        user_id: ID of the user performing the action
+        action: String name of the action (e.g., "bid_created")
+        resource_type: Type of resource (e.g., "bid", "package")
+        resource_id: ID of the resource
+        details: Additional details dict
+        success: Whether the action succeeded
+        request: Optional FastAPI request for IP/user agent
+
+    Returns:
+        AuditLog if created, None if action not found
+    """
+    # Map string action to enum
+    action_map = {
+        "bid_created": AuditAction.BID_CREATED,
+        "bid_withdrawn": AuditAction.BID_WITHDRAWN,
+        "bid_selected": AuditAction.BID_SELECTED,
+    }
+
+    audit_action = action_map.get(action)
+    if not audit_action:
+        logger.warning(f"Unknown audit action: {action}, skipping audit log")
+        return None
+
+    return create_audit_log(
+        db=db,
+        action=audit_action,
+        user_id=user_id,
+        resource_type=resource_type,
+        resource_id=resource_id,
+        details=details,
+        request=request,
+        success="success" if success else "failed",
+    )

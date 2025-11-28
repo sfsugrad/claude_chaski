@@ -22,6 +22,14 @@ class NotificationType(str, enum.Enum):
     PAYOUT_SENT = "payout_sent"  # Courier payout initiated
     PAYOUT_FAILED = "payout_failed"  # Courier payout failed
     PACKAGE_REMINDER = "package_reminder"  # Reminder for stale MATCHED packages
+    # Bidding notifications
+    NEW_BID_RECEIVED = "new_bid_received"  # Sender: new bid on their package
+    BID_SELECTED = "bid_selected"  # Courier: their bid was selected
+    BID_REJECTED = "bid_rejected"  # Courier: another bid was selected
+    BID_WITHDRAWN = "bid_withdrawn"  # Sender: courier withdrew their bid
+    BID_DEADLINE_WARNING = "bid_deadline_warning"  # Sender: 6 hours left to select a bid
+    BID_DEADLINE_EXTENDED = "bid_deadline_extended"  # Sender: deadline extended by 12 hours
+    BID_DEADLINE_EXPIRED = "bid_deadline_expired"  # All parties: bidding period ended
     SYSTEM = "system"
 
 

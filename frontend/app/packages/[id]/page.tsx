@@ -3,10 +3,11 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
-import { authAPI, adminAPI, packagesAPI, ratingsAPI, RatingResponse, messagesAPI, MessageResponse, matchingAPI } from '@/lib/api'
+import { authAPI, adminAPI, packagesAPI, ratingsAPI, RatingResponse, messagesAPI, MessageResponse, matchingAPI, bidsAPI } from '@/lib/api'
 import StarRating from '@/components/StarRating'
 import RatingModal from '@/components/RatingModal'
 import ChatWindow from '@/components/ChatWindow'
+import BidsList from '@/components/BidsList'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { RouteMap } from '@/components/map'
 import { Card, Button, Badge, Alert, FadeIn, SlideIn, PackageDetailSkeleton } from '@/components/ui'
@@ -33,6 +34,11 @@ interface Package {
   dropoff_contact_phone: string | null
   price: number | null
   created_at: string
+  // Bidding fields
+  bid_deadline: string | null
+  bid_count: number
+  selected_bid_id: number | null
+  deadline_extensions: number
 }
 
 interface User {
@@ -199,6 +205,12 @@ export default function PackageDetailPage() {
     switch (statusLower) {
       case 'pending':
         return 'warning'
+      case 'bidding':
+        return 'info'
+      case 'bid_selected':
+        return 'primary'
+      case 'pending_pickup':
+        return 'info'
       case 'accepted':
         return 'info'
       case 'picked_up':
@@ -649,6 +661,58 @@ export default function PackageDetailPage() {
             </Card>
           </SlideIn>
         </div>
+
+        {/* Bids Section - Show for packages in bidding phase */}
+        {currentUser && pkg && ['bidding', 'bid_selected'].includes(pkg.status.toLowerCase()) && (
+          <SlideIn direction="up" delay={275}>
+            <Card className="mt-6 p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <svg className="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                <h2 className="text-xl font-bold text-surface-900">
+                  Courier Bids
+                </h2>
+                {pkg.bid_count > 0 && (
+                  <Badge variant="info" size="sm">{pkg.bid_count}</Badge>
+                )}
+              </div>
+
+              {pkg.status.toLowerCase() === 'bidding' && currentUser.id === pkg.sender_id ? (
+                <>
+                  <p className="text-surface-600 mb-4">
+                    Review bids from couriers and select your preferred one.
+                  </p>
+                  <BidsList
+                    packageId={pkg.id}
+                    isSender={true}
+                    onBidSelected={loadPackageData}
+                  />
+                </>
+              ) : pkg.status.toLowerCase() === 'bid_selected' ? (
+                <div className="bg-success-50 border border-success-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <svg className="w-5 h-5 text-success-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    <span className="font-medium text-success-800">
+                      Courier Selected
+                    </span>
+                  </div>
+                  <p className="text-success-700">
+                    A courier has been selected for this package. Waiting for pickup confirmation.
+                  </p>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-surface-500">
+                    Bids are being collected for this package.
+                  </p>
+                </div>
+              )}
+            </Card>
+          </SlideIn>
+        )}
 
         {/* Map View */}
         <SlideIn direction="up" delay={300}>

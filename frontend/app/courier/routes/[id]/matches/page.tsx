@@ -1,42 +1,53 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { matchingAPI, MatchedPackage } from '@/lib/api'
+import { matchingAPI, MatchedPackage, bidsAPI, BidResponse } from '@/lib/api'
+import BidModal from '@/components/BidModal'
 
 export default function RouteMatchesPage() {
   const params = useParams()
-  const router = useRouter()
   const routeId = parseInt(params.id as string)
 
   const [matches, setMatches] = useState<MatchedPackage[]>([])
+  const [myBids, setMyBids] = useState<BidResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [selectedPackage, setSelectedPackage] = useState<MatchedPackage | null>(null)
+  const [showBidModal, setShowBidModal] = useState(false)
 
   useEffect(() => {
-    loadMatches()
+    loadData()
   }, [routeId])
 
-  const loadMatches = async () => {
+  const loadData = async () => {
     try {
-      const response = await matchingAPI.getPackagesAlongRoute(routeId)
-      setMatches(response.data)
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load matching packages')
+      const [matchesRes, bidsRes] = await Promise.all([
+        matchingAPI.getPackagesAlongRoute(routeId),
+        bidsAPI.getMyBids(),
+      ])
+      setMatches(matchesRes.data)
+      setMyBids(bidsRes.data)
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { detail?: string } } }
+      setError(error.response?.data?.detail || 'Failed to load matching packages')
     } finally {
       setLoading(false)
     }
   }
 
-  const acceptPackage = async (packageId: number) => {
-    try {
-      await matchingAPI.acceptPackage(packageId)
-      alert('Package accepted! The sender will be notified.')
-      await loadMatches()
-    } catch (err: any) {
-      alert(err.response?.data?.detail || 'Failed to accept package')
-    }
+  const handlePlaceBid = (pkg: MatchedPackage) => {
+    setSelectedPackage(pkg)
+    setShowBidModal(true)
+  }
+
+  const handleBidPlaced = () => {
+    loadData()
+  }
+
+  const getExistingBid = (packageId: number) => {
+    return myBids.find((bid) => bid.package_id === packageId)
   }
 
   if (loading) {
@@ -58,7 +69,7 @@ export default function RouteMatchesPage() {
             &larr; Back to Dashboard
           </Link>
           <h1 className="text-3xl font-bold">Matching Packages</h1>
-          <p className="text-gray-600">Packages along your route, sorted by shortest detour</p>
+          <p className="text-gray-600">Place bids on packages along your route</p>
         </div>
 
         {error && (
@@ -75,7 +86,7 @@ export default function RouteMatchesPage() {
               No packages match your route at the moment.
             </p>
             <p className="text-sm text-gray-500 mt-2">
-              Check back later or try adjusting your route's maximum deviation.
+              Check back later or try adjusting your route&apos;s maximum deviation.
             </p>
             <Link
               href="/courier"
@@ -88,88 +99,153 @@ export default function RouteMatchesPage() {
           <div className="space-y-4">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
               <p className="text-blue-800">
-                Found <strong>{matches.length}</strong> package{matches.length !== 1 ? 's' : ''} matching your route
+                Found <strong>{matches.length}</strong> package{matches.length !== 1 ? 's' : ''} matching your route.
+                Place bids to compete for deliveries!
               </p>
             </div>
 
-            {matches.map((pkg) => (
-              <div key={pkg.package_id} className="bg-white rounded-lg shadow p-6">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold mb-3">{pkg.description}</h3>
+            {matches.map((pkg) => {
+              const existingBid = getExistingBid(pkg.package_id)
 
-                    <div className="grid md:grid-cols-2 gap-6 mb-4">
-                      {/* Package Details */}
-                      <div>
-                        <h4 className="font-semibold text-gray-700 mb-2">Package Details</h4>
-                        <div className="space-y-1 text-sm">
-                          <p className="text-gray-600">📦 Size: <span className="font-medium">{pkg.size}</span></p>
-                          <p className="text-gray-600">⚖️ Weight: <span className="font-medium">{pkg.weight_kg} kg</span></p>
-                          <p className="text-gray-600">📍 Distance from route: <span className="font-medium">{pkg.distance_from_route_km} km</span></p>
-                          <p className="text-gray-600">🛣️ Estimated detour: <span className="font-medium">{pkg.estimated_detour_km} km</span></p>
+              return (
+                <div
+                  key={pkg.package_id}
+                  className={`bg-white rounded-lg shadow p-6 ${
+                    existingBid ? 'border-2 border-blue-300' : ''
+                  }`}
+                  data-testid="match-card"
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-3">
+                        <h3 className="text-lg font-semibold">{pkg.description}</h3>
+                        {existingBid && (
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            existingBid.status === 'pending'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : existingBid.status === 'selected'
+                              ? 'bg-green-100 text-green-800'
+                              : existingBid.status === 'rejected'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {existingBid.status === 'pending' && 'Bid Placed'}
+                            {existingBid.status === 'selected' && 'Bid Won!'}
+                            {existingBid.status === 'rejected' && 'Not Selected'}
+                            {existingBid.status === 'withdrawn' && 'Withdrawn'}
+                            {existingBid.status === 'expired' && 'Expired'}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="grid md:grid-cols-2 gap-6 mb-4">
+                        {/* Package Details */}
+                        <div>
+                          <h4 className="font-semibold text-gray-700 mb-2">Package Details</h4>
+                          <div className="space-y-1 text-sm">
+                            <p className="text-gray-600">Size: <span className="font-medium">{pkg.size}</span></p>
+                            <p className="text-gray-600">Weight: <span className="font-medium">{pkg.weight_kg} kg</span></p>
+                            <p className="text-gray-600">Distance from route: <span className="font-medium">{pkg.distance_from_route_km} km</span></p>
+                            <p className="text-gray-600">Estimated detour: <span className="font-medium">{pkg.estimated_detour_km} km</span></p>
+                          </div>
+                        </div>
+
+                        {/* Pickup & Dropoff */}
+                        <div>
+                          <h4 className="font-semibold text-gray-700 mb-2">Locations</h4>
+                          <div className="space-y-3 text-sm">
+                            <div>
+                              <p className="font-medium text-green-600">Pickup:</p>
+                              <p className="text-gray-600">{pkg.pickup_address}</p>
+                              {pkg.pickup_contact_name && (
+                                <p className="text-gray-500 text-xs">Contact: {pkg.pickup_contact_name}</p>
+                              )}
+                            </div>
+                            <div>
+                              <p className="font-medium text-blue-600">Dropoff:</p>
+                              <p className="text-gray-600">{pkg.dropoff_address}</p>
+                              {pkg.dropoff_contact_name && (
+                                <p className="text-gray-500 text-xs">Contact: {pkg.dropoff_contact_name}</p>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
 
-                      {/* Pickup & Dropoff */}
-                      <div>
-                        <h4 className="font-semibold text-gray-700 mb-2">Locations</h4>
-                        <div className="space-y-3 text-sm">
-                          <div>
-                            <p className="font-medium text-green-600">📍 Pickup:</p>
-                            <p className="text-gray-600">{pkg.pickup_address}</p>
-                            {pkg.pickup_contact_name && (
-                              <p className="text-gray-500 text-xs">Contact: {pkg.pickup_contact_name}</p>
-                            )}
-                            {pkg.pickup_contact_phone && (
-                              <p className="text-gray-500 text-xs">Phone: {pkg.pickup_contact_phone}</p>
-                            )}
+                      <div className="flex items-center gap-4">
+                        {pkg.price && (
+                          <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                            <p className="text-green-800 font-bold">
+                              Budget: ${pkg.price.toFixed(2)}
+                            </p>
                           </div>
-                          <div>
-                            <p className="font-medium text-blue-600">📍 Dropoff:</p>
-                            <p className="text-gray-600">{pkg.dropoff_address}</p>
-                            {pkg.dropoff_contact_name && (
-                              <p className="text-gray-500 text-xs">Contact: {pkg.dropoff_contact_name}</p>
-                            )}
-                            {pkg.dropoff_contact_phone && (
-                              <p className="text-gray-500 text-xs">Phone: {pkg.dropoff_contact_phone}</p>
-                            )}
+                        )}
+                        {existingBid && existingBid.status === 'pending' && (
+                          <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                            <p className="text-blue-800 font-medium">
+                              Your bid: ${existingBid.proposed_price.toFixed(2)}
+                            </p>
                           </div>
-                        </div>
+                        )}
                       </div>
                     </div>
 
-                    {pkg.price && (
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-3 inline-block">
-                        <p className="text-green-800 font-bold text-lg">
-                          Offered Price: ${pkg.price.toFixed(2)}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="ml-4 flex flex-col gap-2">
-                    <button
-                      onClick={() => acceptPackage(pkg.package_id)}
-                      className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium whitespace-nowrap"
-                    >
-                      Accept Package
-                    </button>
-                    <Link
-                      href={`/messages?package=${pkg.package_id}`}
-                      className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium whitespace-nowrap text-center flex items-center justify-center gap-2"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                      </svg>
-                      Chat with Sender
-                    </Link>
+                    <div className="ml-4 flex flex-col gap-2">
+                      {!existingBid || existingBid.status === 'rejected' || existingBid.status === 'expired' ? (
+                        <button
+                          onClick={() => handlePlaceBid(pkg)}
+                          className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium whitespace-nowrap"
+                        >
+                          Place Bid
+                        </button>
+                      ) : existingBid.status === 'pending' ? (
+                        <button
+                          disabled
+                          className="bg-gray-400 text-white px-6 py-3 rounded-lg font-medium whitespace-nowrap cursor-not-allowed"
+                        >
+                          Bid Pending
+                        </button>
+                      ) : existingBid.status === 'selected' ? (
+                        <Link
+                          href={`/packages/${pkg.package_id}`}
+                          className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium whitespace-nowrap text-center"
+                        >
+                          View Package
+                        </Link>
+                      ) : null}
+                      <Link
+                        href={`/messages?package=${pkg.package_id}`}
+                        className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium whitespace-nowrap text-center flex items-center justify-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
+                        Chat
+                      </Link>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
+
+      {/* Bid Modal */}
+      {selectedPackage && (
+        <BidModal
+          isOpen={showBidModal}
+          onClose={() => {
+            setShowBidModal(false)
+            setSelectedPackage(null)
+          }}
+          packageId={selectedPackage.package_id}
+          packageDescription={selectedPackage.description}
+          suggestedPrice={selectedPackage.price}
+          routeId={routeId}
+          onBidPlaced={handleBidPlaced}
+        />
+      )}
     </div>
   )
 }

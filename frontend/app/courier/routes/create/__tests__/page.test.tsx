@@ -374,13 +374,13 @@ describe('CreateRoutePage', () => {
     })
   })
 
-  describe('Departure Time Field', () => {
-    it('is optional', async () => {
+  describe('Trip Date and Departure Time Fields', () => {
+    it('trip date and departure time are optional', async () => {
       mockCreateRoute.mockResolvedValue({ data: { id: 1 } })
 
       render(<CreateRoutePage />)
 
-      // Select addresses but don't set departure time
+      // Select addresses but don't set trip date or departure time
       fireEvent.click(screen.getByTestId('start_address-select'))
       fireEvent.click(screen.getByTestId('end_address-select'))
 
@@ -390,6 +390,32 @@ describe('CreateRoutePage', () => {
 
       await waitFor(() => {
         expect(mockCreateRoute).toHaveBeenCalled()
+      })
+    })
+
+    it('includes trip_date when set', async () => {
+      mockCreateRoute.mockResolvedValue({ data: { id: 1 } })
+
+      render(<CreateRoutePage />)
+
+      // Select addresses
+      fireEvent.click(screen.getByTestId('start_address-select'))
+      fireEvent.click(screen.getByTestId('end_address-select'))
+
+      // Set trip date
+      const tripDateInput = document.querySelector('input[type="date"]')!
+      fireEvent.change(tripDateInput, { target: { value: '2025-01-15' } })
+
+      // Submit form
+      const form = screen.getByRole('button', { name: /create route/i }).closest('form')!
+      fireEvent.submit(form)
+
+      await waitFor(() => {
+        expect(mockCreateRoute).toHaveBeenCalledWith(
+          expect.objectContaining({
+            trip_date: '2025-01-15',
+          })
+        )
       })
     })
 
@@ -403,8 +429,8 @@ describe('CreateRoutePage', () => {
       fireEvent.click(screen.getByTestId('end_address-select'))
 
       // Set departure time
-      const departureInput = document.querySelector('input[type="datetime-local"]')!
-      fireEvent.change(departureInput, { target: { value: '2025-01-15T10:00' } })
+      const departureInput = document.querySelector('input[type="time"]')!
+      fireEvent.change(departureInput, { target: { value: '10:00' } })
 
       // Submit form
       const form = screen.getByRole('button', { name: /create route/i }).closest('form')!
@@ -413,7 +439,7 @@ describe('CreateRoutePage', () => {
       await waitFor(() => {
         expect(mockCreateRoute).toHaveBeenCalledWith(
           expect.objectContaining({
-            departure_time: '2025-01-15T10:00',
+            departure_time: '10:00',
           })
         )
       })

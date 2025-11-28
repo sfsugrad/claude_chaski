@@ -24,6 +24,8 @@ from app.services.package_status import (
     transition_package,
     can_mark_delivered,
     get_status_progress,
+    accept_package_match,
+    get_acceptance_status,
 )
 from pydantic import BaseModel, Field
 from typing import List
@@ -81,8 +83,14 @@ class PackageResponse(BaseModel):
     # Status transition timestamps
     status_changed_at: datetime | None = None
     matched_at: datetime | None = None
+    accepted_at: datetime | None = None
     picked_up_at: datetime | None = None
     in_transit_at: datetime | None = None
+    # Acceptance tracking
+    sender_accepted: bool = False
+    courier_accepted: bool = False
+    sender_accepted_at: datetime | None = None
+    courier_accepted_at: datetime | None = None
     # Allowed next statuses for UI
     allowed_next_statuses: List[str] = []
 
@@ -123,8 +131,13 @@ def package_to_response(package: Package, db: Session) -> PackageResponse:
         updated_at=package.updated_at,
         status_changed_at=package.status_changed_at,
         matched_at=package.matched_at,
+        accepted_at=package.accepted_at,
         picked_up_at=package.picked_up_at,
         in_transit_at=package.in_transit_at,
+        sender_accepted=package.sender_accepted if package.sender_accepted is not None else False,
+        courier_accepted=package.courier_accepted if package.courier_accepted is not None else False,
+        sender_accepted_at=package.sender_accepted_at,
+        courier_accepted_at=package.courier_accepted_at,
         allowed_next_statuses=get_allowed_next_statuses(package.status),
     )
 
@@ -408,7 +421,10 @@ async def update_package_status(
     Update package status with strict transition validation.
 
     Only the assigned courier can update status.
-    Status must follow strict progression: MATCHED → PICKED_UP → IN_TRANSIT → DELIVERED
+    Status must follow strict progression: ACCEPTED → PICKED_UP → IN_TRANSIT → DELIVERED
+
+    Note: To move from MATCHED to ACCEPTED, both sender and courier must accept
+    using the /packages/{id}/accept endpoint.
     """
     package = db.query(Package).filter(Package.id == package_id).first()
 
@@ -573,11 +589,11 @@ async def cancel_package(
             detail="You don't have permission to cancel this package"
         )
 
-    # Only allow cancelling pending or matched packages
-    if package.status not in [PackageStatus.PENDING, PackageStatus.MATCHED]:
+    # Only allow cancelling pending, matched, or accepted packages
+    if package.status not in [PackageStatus.PENDING, PackageStatus.MATCHED, PackageStatus.ACCEPTED]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot cancel package with status '{package.status.value}'. Only pending or matched packages can be cancelled."
+            detail=f"Cannot cancel package with status '{package.status.value}'. Only pending, matched, or accepted packages can be cancelled."
         )
 
     # Store courier_id before cancelling (for notification)
@@ -623,3 +639,131 @@ async def cancel_package(
     )
 
     return package
+
+
+@router.post("/{package_id}/accept", response_model=PackageResponse)
+async def accept_package_for_delivery(
+    request: Request,
+    package_id: int,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Accept a matched package for delivery.
+
+    Both the sender and courier must accept for the package to move to ACCEPTED status.
+    - Sender accepts to confirm they're ready for pickup
+    - Courier accepts to confirm they'll deliver the package
+
+    When both have accepted, the package automatically transitions to ACCEPTED status.
+    """
+    package = db.query(Package).filter(Package.id == package_id).first()
+
+    if not package:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Package not found"
+        )
+
+    # Determine if current user is sender or courier
+    is_sender = package.sender_id == current_user.id
+    is_courier = package.courier_id == current_user.id
+
+    if not is_sender and not is_courier:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the sender or assigned courier can accept this package"
+        )
+
+    # Call the acceptance service
+    package, error = accept_package_match(db, package, current_user.id, is_sender)
+    if error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error
+        )
+
+    # Send notifications
+    if is_sender and package.courier_id:
+        # Notify courier that sender has accepted
+        courier = db.query(User).filter(User.id == package.courier_id).first()
+        if courier:
+            await create_notification_with_broadcast(
+                db=db,
+                user_id=package.courier_id,
+                notification_type=NotificationType.PACKAGE_MATCHED,
+                message=f"Sender has accepted the match for package '{package.description[:50]}'. Waiting for your acceptance.",
+                package_id=package.id
+            )
+    elif is_courier:
+        # Notify sender that courier has accepted
+        await create_notification_with_broadcast(
+            db=db,
+            user_id=package.sender_id,
+            notification_type=NotificationType.PACKAGE_MATCHED,
+            message=f"Courier {current_user.full_name} has accepted the match for your package '{package.description[:50]}'. Waiting for your acceptance.",
+            package_id=package.id
+        )
+
+    # If both accepted, notify both parties
+    if package.status == PackageStatus.ACCEPTED:
+        sender = db.query(User).filter(User.id == package.sender_id).first()
+        courier = db.query(User).filter(User.id == package.courier_id).first()
+
+        # Notify sender
+        await create_notification_with_broadcast(
+            db=db,
+            user_id=package.sender_id,
+            notification_type=NotificationType.PACKAGE_ACCEPTED,
+            message=f"Both parties have accepted! Courier {courier.full_name if courier else 'Unknown'} will pick up your package soon.",
+            package_id=package.id
+        )
+
+        # Notify courier
+        await create_notification_with_broadcast(
+            db=db,
+            user_id=package.courier_id,
+            notification_type=NotificationType.PACKAGE_ACCEPTED,
+            message=f"Both parties have accepted! You can now pick up the package from {sender.full_name if sender else 'the sender'}.",
+            package_id=package.id
+        )
+
+    return package_to_response(package, db)
+
+
+@router.get("/{package_id}/acceptance-status")
+async def get_package_acceptance_status(
+    package_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get the acceptance status for a matched package.
+
+    Shows whether sender and courier have accepted.
+    """
+    package = db.query(Package).filter(Package.id == package_id).first()
+
+    if not package:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Package not found"
+        )
+
+    # Check access
+    is_sender = package.sender_id == current_user.id
+    is_courier = package.courier_id == current_user.id
+    is_admin = current_user.role.value == 'admin'
+
+    if not (is_sender or is_courier or is_admin):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this package"
+        )
+
+    return {
+        "package_id": package.id,
+        "status": package.status.value,
+        **get_acceptance_status(package)
+    }

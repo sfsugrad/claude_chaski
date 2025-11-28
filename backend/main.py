@@ -8,7 +8,7 @@ from slowapi.errors import RateLimitExceeded
 from app.config import settings
 from app.database import engine
 from app.models import base
-from app.routes import auth, packages, couriers, matching, admin, notifications, ratings, ws, messages, delivery_proof, payments, payouts, tracking, analytics
+from app.routes import auth, packages, couriers, matching, admin, notifications, ratings, ws, messages, delivery_proof, payments, payouts, tracking, analytics, bids
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -128,6 +128,7 @@ app.include_router(payments.router, prefix="/api/payments", tags=["Payments"])
 app.include_router(payouts.router, prefix="/api/payouts", tags=["Payouts"])
 app.include_router(tracking.router, prefix="/api/tracking", tags=["Tracking"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
+app.include_router(bids.router, prefix="/api/bids", tags=["Bids"])
 app.include_router(ws.router, prefix="/api", tags=["WebSocket"])
 
 @app.get("/")

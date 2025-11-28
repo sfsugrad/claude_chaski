@@ -103,10 +103,26 @@ export interface PackageResponse {
   // Status transition timestamps
   status_changed_at: string | null
   matched_at: string | null
+  accepted_at: string | null
   picked_up_at: string | null
   in_transit_at: string | null
+  // Acceptance tracking - both parties must accept for MATCHED → ACCEPTED
+  sender_accepted: boolean
+  courier_accepted: boolean
+  sender_accepted_at: string | null
+  courier_accepted_at: string | null
   // Allowed next statuses for UI
   allowed_next_statuses: string[]
+}
+
+export interface AcceptanceStatus {
+  sender_accepted: boolean
+  courier_accepted: boolean
+  sender_accepted_at: string | null
+  courier_accepted_at: string | null
+  both_accepted: boolean
+  awaiting_sender: boolean
+  awaiting_courier: boolean
 }
 
 export interface ForgotPasswordData {
@@ -152,6 +168,9 @@ export const packagesAPI = {
   updateStatus: (id: number, status: string) =>
     api.put(`/packages/${id}/status`, { status }),
   cancel: (id: number) => api.put<PackageResponse>(`/packages/${id}/cancel`),
+  // Acceptance for matched packages - both sender and courier must accept
+  accept: (id: number) => api.post<PackageResponse>(`/packages/${id}/accept`),
+  getAcceptanceStatus: (id: number) => api.get<AcceptanceStatus>(`/packages/${id}/acceptance-status`),
 }
 
 // Route Types
@@ -164,6 +183,7 @@ export interface RouteCreate {
   end_lng: number
   max_deviation_km: number
   departure_time?: string
+  trip_date?: string
 }
 
 export interface RouteResponse {
@@ -177,6 +197,7 @@ export interface RouteResponse {
   end_lng: number
   max_deviation_km: number
   departure_time: string | null
+  trip_date: string | null
   is_active: boolean
   created_at: string
 }
@@ -226,6 +247,7 @@ export const matchingAPI = {
 // Notification Types
 export type NotificationType =
   | 'package_matched'
+  | 'package_accepted'
   | 'package_picked_up'
   | 'package_in_transit'
   | 'package_delivered'
@@ -234,6 +256,14 @@ export type NotificationType =
   | 'route_match_found'
   | 'new_rating'
   | 'package_match_found'
+  // Bidding notifications
+  | 'new_bid_received'
+  | 'bid_selected'
+  | 'bid_rejected'
+  | 'bid_withdrawn'
+  | 'bid_deadline_warning'
+  | 'bid_deadline_extended'
+  | 'bid_deadline_expired'
   | 'system'
 
 export interface NotificationResponse {
@@ -915,4 +945,65 @@ export const analyticsAPI = {
 
   getCourierLeaderboard: (metric: 'deliveries' | 'rating' | 'earnings' = 'deliveries', limit: number = 10) =>
     api.get<CourierPerformance[]>(`/analytics/courier-leaderboard?metric=${metric}&limit=${limit}`),
+}
+
+// Bid Types
+export type BidStatus = 'pending' | 'selected' | 'rejected' | 'withdrawn' | 'expired'
+
+export interface BidCreate {
+  package_id: number
+  proposed_price: number
+  estimated_delivery_hours?: number
+  estimated_pickup_time?: string
+  message?: string
+  route_id?: number
+}
+
+export interface BidResponse {
+  id: number
+  package_id: number
+  courier_id: number
+  courier_name: string
+  courier_rating: number | null
+  courier_total_ratings: number
+  proposed_price: number
+  estimated_delivery_hours: number | null
+  estimated_pickup_time: string | null
+  message: string | null
+  status: BidStatus
+  created_at: string
+  selected_at: string | null
+}
+
+export interface PackageBidsResponse {
+  bids: BidResponse[]
+  bid_deadline: string | null
+  bid_count: number
+}
+
+// Bids API
+export const bidsAPI = {
+  // Create a bid on a package
+  create: (data: BidCreate) =>
+    api.post<BidResponse>('/bids', data),
+
+  // Withdraw a pending bid
+  withdraw: (bidId: number) =>
+    api.delete(`/bids/${bidId}`),
+
+  // Select a bid (sender only)
+  select: (bidId: number) =>
+    api.post<BidResponse>(`/bids/${bidId}/select`),
+
+  // Get courier's bids with optional status filter
+  getMyBids: (status?: BidStatus) =>
+    api.get<BidResponse[]>(`/bids/my-bids${status ? `?status_filter=${status}` : ''}`),
+
+  // Get all bids for a package
+  getPackageBids: (packageId: number) =>
+    api.get<PackageBidsResponse>(`/bids/package/${packageId}`),
+
+  // Courier confirms pickup (transitions package to PENDING_PICKUP)
+  confirmPickup: (bidId: number) =>
+    api.post(`/bids/${bidId}/confirm-pickup`),
 }

@@ -6,11 +6,16 @@ import enum
 
 class PackageStatus(str, enum.Enum):
     PENDING = "pending"          # Package created, waiting for courier
-    MATCHED = "matched"          # Matched with a courier
+    BIDDING = "bidding"          # Open for courier bids (first bid received)
+    BID_SELECTED = "bid_selected"  # Sender chose a courier from bids
+    PENDING_PICKUP = "pending_pickup"  # Courier confirmed, awaiting pickup
     PICKED_UP = "picked_up"      # Courier picked up the package
     IN_TRANSIT = "in_transit"    # Package in transit
     DELIVERED = "delivered"      # Package delivered
     CANCELLED = "cancelled"      # Package delivery cancelled
+    # Legacy statuses (keep for existing data compatibility)
+    MATCHED = "matched"          # Matched with a courier, awaiting acceptance from both parties
+    ACCEPTED = "accepted"        # Both sender and courier have accepted the match
 
 class PackageSize(str, enum.Enum):
     SMALL = "small"      # < 5kg, fits in a bag
@@ -61,8 +66,22 @@ class Package(Base):
     # Status transition timestamps
     status_changed_at = Column(DateTime(timezone=True), nullable=True)
     matched_at = Column(DateTime(timezone=True), nullable=True)
+    accepted_at = Column(DateTime(timezone=True), nullable=True)
     picked_up_at = Column(DateTime(timezone=True), nullable=True)
     in_transit_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Acceptance tracking - both parties must accept for MATCHED → ACCEPTED
+    sender_accepted = Column(Boolean, default=False, nullable=False)
+    courier_accepted = Column(Boolean, default=False, nullable=False)
+    sender_accepted_at = Column(DateTime(timezone=True), nullable=True)
+    courier_accepted_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Bidding fields
+    bid_deadline = Column(DateTime(timezone=True), nullable=True)
+    selected_bid_id = Column(Integer, ForeignKey("courier_bids.id", ondelete="SET NULL", use_alter=True), nullable=True)
+    bid_count = Column(Integer, default=0, nullable=False)
+    deadline_extensions = Column(Integer, default=0, nullable=False)  # Track extensions (max 2)
+    deadline_warning_sent = Column(Boolean, default=False, nullable=False)  # Track if 6-hour warning sent
 
     # Relationships
     # sender = relationship("User", foreign_keys=[sender_id])
@@ -91,6 +110,7 @@ class CourierRoute(Base):
     # Route preferences
     max_deviation_km = Column(Integer, default=5)
     departure_time = Column(DateTime(timezone=True))
+    trip_date = Column(DateTime(timezone=True), nullable=True)  # Date of the trip
 
     # Status
     is_active = Column(Boolean, default=True)

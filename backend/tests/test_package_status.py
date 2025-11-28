@@ -13,6 +13,8 @@ from app.services.package_status import (
     can_mark_delivered,
     transition_package,
     get_status_progress,
+    accept_package_match,
+    get_acceptance_status,
     ALLOWED_TRANSITIONS,
 )
 
@@ -32,9 +34,9 @@ class TestValidateTransition:
         assert is_valid is True
         assert error == ""
 
-    def test_valid_transition_matched_to_picked_up(self):
-        """MATCHED -> PICKED_UP should be valid."""
-        is_valid, error = validate_transition(PackageStatus.MATCHED, PackageStatus.PICKED_UP)
+    def test_valid_transition_matched_to_accepted(self):
+        """MATCHED -> ACCEPTED should be valid."""
+        is_valid, error = validate_transition(PackageStatus.MATCHED, PackageStatus.ACCEPTED)
         assert is_valid is True
         assert error == ""
 
@@ -47,6 +49,18 @@ class TestValidateTransition:
     def test_valid_transition_matched_to_cancelled(self):
         """MATCHED -> CANCELLED should be valid."""
         is_valid, error = validate_transition(PackageStatus.MATCHED, PackageStatus.CANCELLED)
+        assert is_valid is True
+        assert error == ""
+
+    def test_valid_transition_accepted_to_picked_up(self):
+        """ACCEPTED -> PICKED_UP should be valid."""
+        is_valid, error = validate_transition(PackageStatus.ACCEPTED, PackageStatus.PICKED_UP)
+        assert is_valid is True
+        assert error == ""
+
+    def test_valid_transition_accepted_to_cancelled(self):
+        """ACCEPTED -> CANCELLED should be valid."""
+        is_valid, error = validate_transition(PackageStatus.ACCEPTED, PackageStatus.CANCELLED)
         assert is_valid is True
         assert error == ""
 
@@ -81,8 +95,14 @@ class TestValidateTransition:
         assert is_valid is False
         assert "Invalid status transition" in error
 
+    def test_invalid_transition_matched_to_picked_up(self):
+        """MATCHED -> PICKED_UP (skipping ACCEPTED) should be invalid."""
+        is_valid, error = validate_transition(PackageStatus.MATCHED, PackageStatus.PICKED_UP)
+        assert is_valid is False
+        assert "Invalid status transition" in error
+
     def test_invalid_transition_matched_to_in_transit(self):
-        """MATCHED -> IN_TRANSIT (skipping PICKED_UP) should be invalid."""
+        """MATCHED -> IN_TRANSIT (skipping ACCEPTED and PICKED_UP) should be invalid."""
         is_valid, error = validate_transition(PackageStatus.MATCHED, PackageStatus.IN_TRANSIT)
         assert is_valid is False
         assert "Invalid status transition" in error
@@ -90,6 +110,18 @@ class TestValidateTransition:
     def test_invalid_transition_matched_to_delivered(self):
         """MATCHED -> DELIVERED (skipping steps) should be invalid."""
         is_valid, error = validate_transition(PackageStatus.MATCHED, PackageStatus.DELIVERED)
+        assert is_valid is False
+        assert "Invalid status transition" in error
+
+    def test_invalid_transition_accepted_to_in_transit(self):
+        """ACCEPTED -> IN_TRANSIT (skipping PICKED_UP) should be invalid."""
+        is_valid, error = validate_transition(PackageStatus.ACCEPTED, PackageStatus.IN_TRANSIT)
+        assert is_valid is False
+        assert "Invalid status transition" in error
+
+    def test_invalid_transition_accepted_to_delivered(self):
+        """ACCEPTED -> DELIVERED (skipping steps) should be invalid."""
+        is_valid, error = validate_transition(PackageStatus.ACCEPTED, PackageStatus.DELIVERED)
         assert is_valid is False
         assert "Invalid status transition" in error
 
@@ -128,13 +160,20 @@ class TestGetAllowedNextStatuses:
         assert "cancelled" in allowed
         assert len(allowed) == 2
 
-    def test_matched_allows_picked_up_pending_cancelled(self):
-        """MATCHED allows PICKED_UP, PENDING, and CANCELLED."""
+    def test_matched_allows_accepted_pending_cancelled(self):
+        """MATCHED allows ACCEPTED, PENDING, and CANCELLED."""
         allowed = get_allowed_next_statuses(PackageStatus.MATCHED)
-        assert "picked_up" in allowed
+        assert "accepted" in allowed
         assert "pending" in allowed
         assert "cancelled" in allowed
         assert len(allowed) == 3
+
+    def test_accepted_allows_picked_up_cancelled(self):
+        """ACCEPTED allows PICKED_UP and CANCELLED."""
+        allowed = get_allowed_next_statuses(PackageStatus.ACCEPTED)
+        assert "picked_up" in allowed
+        assert "cancelled" in allowed
+        assert len(allowed) == 2
 
     def test_picked_up_allows_only_in_transit(self):
         """PICKED_UP only allows IN_TRANSIT."""
@@ -304,11 +343,11 @@ class TestTransitionPackage:
         assert updated_package.matched_at is not None
         assert updated_package.status_changed_at is not None
 
-    def test_transition_matched_to_picked_up(self, db_session):
-        """Test transitioning from MATCHED to PICKED_UP."""
+    def test_transition_matched_to_accepted(self, db_session):
+        """Test transitioning from MATCHED to ACCEPTED."""
         # Create users
         sender = User(
-            email="sender_pickup@test.com",
+            email="sender_accept@test.com",
             hashed_password=get_password_hash("password"),
             full_name="Sender",
             role=UserRole.SENDER,
@@ -319,7 +358,7 @@ class TestTransitionPackage:
         db_session.add(sender)
 
         courier = User(
-            email="courier_pickup@test.com",
+            email="courier_accept@test.com",
             hashed_password=get_password_hash("password"),
             full_name="Courier",
             role=UserRole.COURIER,
@@ -344,6 +383,58 @@ class TestTransitionPackage:
             dropoff_lat=0,
             dropoff_lng=0,
             status=PackageStatus.MATCHED,
+            requires_proof=True
+        )
+        db_session.add(package)
+        db_session.commit()
+
+        # Transition to ACCEPTED
+        updated_package, error = transition_package(db_session, package, PackageStatus.ACCEPTED, courier.id)
+
+        assert error == ""
+        assert updated_package.status == PackageStatus.ACCEPTED
+        assert updated_package.accepted_at is not None
+
+    def test_transition_accepted_to_picked_up(self, db_session):
+        """Test transitioning from ACCEPTED to PICKED_UP."""
+        # Create users
+        sender = User(
+            email="sender_pickup@test.com",
+            hashed_password=get_password_hash("password"),
+            full_name="Sender",
+            role=UserRole.SENDER,
+            is_active=True,
+            is_verified=True,
+            max_deviation_km=5
+        )
+        db_session.add(sender)
+
+        courier = User(
+            email="courier_pickup@test.com",
+            hashed_password=get_password_hash("password"),
+            full_name="Courier",
+            role=UserRole.COURIER,
+            is_active=True,
+            is_verified=True,
+            max_deviation_km=5
+        )
+        db_session.add(courier)
+        db_session.commit()
+
+        # Create package in ACCEPTED status
+        package = Package(
+            sender_id=sender.id,
+            courier_id=courier.id,
+            description="Test",
+            size="small",
+            weight_kg=1.0,
+            pickup_address="A",
+            pickup_lat=0,
+            pickup_lng=0,
+            dropoff_address="B",
+            dropoff_lat=0,
+            dropoff_lng=0,
+            status=PackageStatus.ACCEPTED,
             requires_proof=True
         )
         db_session.add(package)
@@ -555,7 +646,33 @@ class TestGetStatusProgress:
 
         assert progress["current_step"] == 1
         assert progress["is_terminal"] is False
-        assert progress["progress_percent"] == 25
+        assert progress["progress_percent"] == 20  # 1/5 = 20%
+
+    def test_progress_accepted(self, db_session):
+        """Test progress calculation for ACCEPTED status."""
+        package = Package(
+            sender_id=1,
+            description="Test",
+            size="small",
+            weight_kg=1.0,
+            pickup_address="A",
+            pickup_lat=0,
+            pickup_lng=0,
+            dropoff_address="B",
+            dropoff_lat=0,
+            dropoff_lng=0,
+            status=PackageStatus.ACCEPTED,
+            requires_proof=True,
+            created_at=datetime.utcnow(),
+            matched_at=datetime.utcnow(),
+            accepted_at=datetime.utcnow()
+        )
+
+        progress = get_status_progress(package)
+
+        assert progress["current_step"] == 2
+        assert progress["is_terminal"] is False
+        assert progress["progress_percent"] == 40  # 2/5 = 40%
 
     def test_progress_delivered(self, db_session):
         """Test progress calculation for DELIVERED status."""
@@ -578,7 +695,7 @@ class TestGetStatusProgress:
 
         progress = get_status_progress(package)
 
-        assert progress["current_step"] == 4
+        assert progress["current_step"] == 5  # Now 5 steps with ACCEPTED
         assert progress["is_terminal"] is True
         assert progress["progress_percent"] == 100
 
@@ -615,21 +732,32 @@ class TestAllowedTransitionsComplete:
         # PENDING transitions
         (PackageStatus.PENDING, PackageStatus.MATCHED, True),
         (PackageStatus.PENDING, PackageStatus.CANCELLED, True),
+        (PackageStatus.PENDING, PackageStatus.ACCEPTED, False),
         (PackageStatus.PENDING, PackageStatus.PICKED_UP, False),
         (PackageStatus.PENDING, PackageStatus.IN_TRANSIT, False),
         (PackageStatus.PENDING, PackageStatus.DELIVERED, False),
 
         # MATCHED transitions
-        (PackageStatus.MATCHED, PackageStatus.PICKED_UP, True),
+        (PackageStatus.MATCHED, PackageStatus.ACCEPTED, True),
         (PackageStatus.MATCHED, PackageStatus.PENDING, True),
         (PackageStatus.MATCHED, PackageStatus.CANCELLED, True),
+        (PackageStatus.MATCHED, PackageStatus.PICKED_UP, False),  # Must go through ACCEPTED
         (PackageStatus.MATCHED, PackageStatus.IN_TRANSIT, False),
         (PackageStatus.MATCHED, PackageStatus.DELIVERED, False),
+
+        # ACCEPTED transitions
+        (PackageStatus.ACCEPTED, PackageStatus.PICKED_UP, True),
+        (PackageStatus.ACCEPTED, PackageStatus.CANCELLED, True),
+        (PackageStatus.ACCEPTED, PackageStatus.PENDING, False),
+        (PackageStatus.ACCEPTED, PackageStatus.MATCHED, False),
+        (PackageStatus.ACCEPTED, PackageStatus.IN_TRANSIT, False),
+        (PackageStatus.ACCEPTED, PackageStatus.DELIVERED, False),
 
         # PICKED_UP transitions
         (PackageStatus.PICKED_UP, PackageStatus.IN_TRANSIT, True),
         (PackageStatus.PICKED_UP, PackageStatus.PENDING, False),
         (PackageStatus.PICKED_UP, PackageStatus.MATCHED, False),
+        (PackageStatus.PICKED_UP, PackageStatus.ACCEPTED, False),
         (PackageStatus.PICKED_UP, PackageStatus.DELIVERED, False),
         (PackageStatus.PICKED_UP, PackageStatus.CANCELLED, False),
 
@@ -637,12 +765,14 @@ class TestAllowedTransitionsComplete:
         (PackageStatus.IN_TRANSIT, PackageStatus.DELIVERED, True),
         (PackageStatus.IN_TRANSIT, PackageStatus.PENDING, False),
         (PackageStatus.IN_TRANSIT, PackageStatus.MATCHED, False),
+        (PackageStatus.IN_TRANSIT, PackageStatus.ACCEPTED, False),
         (PackageStatus.IN_TRANSIT, PackageStatus.PICKED_UP, False),
         (PackageStatus.IN_TRANSIT, PackageStatus.CANCELLED, False),
 
         # DELIVERED transitions (terminal)
         (PackageStatus.DELIVERED, PackageStatus.PENDING, False),
         (PackageStatus.DELIVERED, PackageStatus.MATCHED, False),
+        (PackageStatus.DELIVERED, PackageStatus.ACCEPTED, False),
         (PackageStatus.DELIVERED, PackageStatus.PICKED_UP, False),
         (PackageStatus.DELIVERED, PackageStatus.IN_TRANSIT, False),
         (PackageStatus.DELIVERED, PackageStatus.CANCELLED, False),
@@ -650,6 +780,7 @@ class TestAllowedTransitionsComplete:
         # CANCELLED transitions (terminal)
         (PackageStatus.CANCELLED, PackageStatus.PENDING, False),
         (PackageStatus.CANCELLED, PackageStatus.MATCHED, False),
+        (PackageStatus.CANCELLED, PackageStatus.ACCEPTED, False),
         (PackageStatus.CANCELLED, PackageStatus.PICKED_UP, False),
         (PackageStatus.CANCELLED, PackageStatus.IN_TRANSIT, False),
         (PackageStatus.CANCELLED, PackageStatus.DELIVERED, False),
@@ -658,3 +789,253 @@ class TestAllowedTransitionsComplete:
         """Parameterized test for all status transitions."""
         is_valid, _ = validate_transition(from_status, to_status)
         assert is_valid == expected_valid, f"Expected {from_status.value} -> {to_status.value} to be {'valid' if expected_valid else 'invalid'}"
+
+
+class TestAcceptPackageMatch:
+    """Tests for accept_package_match function."""
+
+    def test_sender_accepts_first(self, db_session):
+        """Test sender accepting first."""
+        sender = User(
+            email="sender_accept_test1@test.com",
+            hashed_password=get_password_hash("password"),
+            full_name="Sender",
+            role=UserRole.SENDER,
+            is_active=True,
+            is_verified=True,
+            max_deviation_km=5
+        )
+        db_session.add(sender)
+
+        courier = User(
+            email="courier_accept_test1@test.com",
+            hashed_password=get_password_hash("password"),
+            full_name="Courier",
+            role=UserRole.COURIER,
+            is_active=True,
+            is_verified=True,
+            max_deviation_km=5
+        )
+        db_session.add(courier)
+        db_session.commit()
+
+        package = Package(
+            sender_id=sender.id,
+            courier_id=courier.id,
+            description="Test",
+            size="small",
+            weight_kg=1.0,
+            pickup_address="A",
+            pickup_lat=0,
+            pickup_lng=0,
+            dropoff_address="B",
+            dropoff_lat=0,
+            dropoff_lng=0,
+            status=PackageStatus.MATCHED,
+            requires_proof=True
+        )
+        db_session.add(package)
+        db_session.commit()
+
+        # Sender accepts
+        updated_package, error = accept_package_match(db_session, package, sender.id, is_sender=True)
+
+        assert error == ""
+        assert updated_package.sender_accepted is True
+        assert updated_package.courier_accepted is False
+        assert updated_package.status == PackageStatus.MATCHED  # Still matched, waiting for courier
+
+    def test_courier_accepts_first(self, db_session):
+        """Test courier accepting first."""
+        sender = User(
+            email="sender_accept_test2@test.com",
+            hashed_password=get_password_hash("password"),
+            full_name="Sender",
+            role=UserRole.SENDER,
+            is_active=True,
+            is_verified=True,
+            max_deviation_km=5
+        )
+        db_session.add(sender)
+
+        courier = User(
+            email="courier_accept_test2@test.com",
+            hashed_password=get_password_hash("password"),
+            full_name="Courier",
+            role=UserRole.COURIER,
+            is_active=True,
+            is_verified=True,
+            max_deviation_km=5
+        )
+        db_session.add(courier)
+        db_session.commit()
+
+        package = Package(
+            sender_id=sender.id,
+            courier_id=courier.id,
+            description="Test",
+            size="small",
+            weight_kg=1.0,
+            pickup_address="A",
+            pickup_lat=0,
+            pickup_lng=0,
+            dropoff_address="B",
+            dropoff_lat=0,
+            dropoff_lng=0,
+            status=PackageStatus.MATCHED,
+            requires_proof=True
+        )
+        db_session.add(package)
+        db_session.commit()
+
+        # Courier accepts
+        updated_package, error = accept_package_match(db_session, package, courier.id, is_sender=False)
+
+        assert error == ""
+        assert updated_package.sender_accepted is False
+        assert updated_package.courier_accepted is True
+        assert updated_package.status == PackageStatus.MATCHED  # Still matched, waiting for sender
+
+    def test_both_accept_transitions_to_accepted(self, db_session):
+        """Test that when both accept, status transitions to ACCEPTED."""
+        sender = User(
+            email="sender_accept_test3@test.com",
+            hashed_password=get_password_hash("password"),
+            full_name="Sender",
+            role=UserRole.SENDER,
+            is_active=True,
+            is_verified=True,
+            max_deviation_km=5
+        )
+        db_session.add(sender)
+
+        courier = User(
+            email="courier_accept_test3@test.com",
+            hashed_password=get_password_hash("password"),
+            full_name="Courier",
+            role=UserRole.COURIER,
+            is_active=True,
+            is_verified=True,
+            max_deviation_km=5
+        )
+        db_session.add(courier)
+        db_session.commit()
+
+        package = Package(
+            sender_id=sender.id,
+            courier_id=courier.id,
+            description="Test",
+            size="small",
+            weight_kg=1.0,
+            pickup_address="A",
+            pickup_lat=0,
+            pickup_lng=0,
+            dropoff_address="B",
+            dropoff_lat=0,
+            dropoff_lng=0,
+            status=PackageStatus.MATCHED,
+            requires_proof=True
+        )
+        db_session.add(package)
+        db_session.commit()
+
+        # Sender accepts first
+        package, _ = accept_package_match(db_session, package, sender.id, is_sender=True)
+        assert package.status == PackageStatus.MATCHED
+
+        # Courier accepts second - should transition to ACCEPTED
+        package, error = accept_package_match(db_session, package, courier.id, is_sender=False)
+
+        assert error == ""
+        assert package.sender_accepted is True
+        assert package.courier_accepted is True
+        assert package.status == PackageStatus.ACCEPTED
+        assert package.accepted_at is not None
+
+    def test_cannot_accept_non_matched_package(self, db_session):
+        """Test that only MATCHED packages can be accepted."""
+        sender = User(
+            email="sender_accept_test4@test.com",
+            hashed_password=get_password_hash("password"),
+            full_name="Sender",
+            role=UserRole.SENDER,
+            is_active=True,
+            is_verified=True,
+            max_deviation_km=5
+        )
+        db_session.add(sender)
+        db_session.commit()
+
+        package = Package(
+            sender_id=sender.id,
+            description="Test",
+            size="small",
+            weight_kg=1.0,
+            pickup_address="A",
+            pickup_lat=0,
+            pickup_lng=0,
+            dropoff_address="B",
+            dropoff_lat=0,
+            dropoff_lng=0,
+            status=PackageStatus.PENDING,
+            requires_proof=True
+        )
+        db_session.add(package)
+        db_session.commit()
+
+        package, error = accept_package_match(db_session, package, sender.id, is_sender=True)
+
+        assert error != ""
+        assert "Matched status" in error
+
+    def test_double_acceptance_rejected(self, db_session):
+        """Test that double acceptance by same party is rejected."""
+        sender = User(
+            email="sender_accept_test5@test.com",
+            hashed_password=get_password_hash("password"),
+            full_name="Sender",
+            role=UserRole.SENDER,
+            is_active=True,
+            is_verified=True,
+            max_deviation_km=5
+        )
+        db_session.add(sender)
+
+        courier = User(
+            email="courier_accept_test5@test.com",
+            hashed_password=get_password_hash("password"),
+            full_name="Courier",
+            role=UserRole.COURIER,
+            is_active=True,
+            is_verified=True,
+            max_deviation_km=5
+        )
+        db_session.add(courier)
+        db_session.commit()
+
+        package = Package(
+            sender_id=sender.id,
+            courier_id=courier.id,
+            description="Test",
+            size="small",
+            weight_kg=1.0,
+            pickup_address="A",
+            pickup_lat=0,
+            pickup_lng=0,
+            dropoff_address="B",
+            dropoff_lat=0,
+            dropoff_lng=0,
+            status=PackageStatus.MATCHED,
+            requires_proof=True
+        )
+        db_session.add(package)
+        db_session.commit()
+
+        # Sender accepts
+        package, _ = accept_package_match(db_session, package, sender.id, is_sender=True)
+
+        # Sender tries to accept again
+        package, error = accept_package_match(db_session, package, sender.id, is_sender=True)
+
+        assert error != ""
+        assert "already accepted" in error.lower()

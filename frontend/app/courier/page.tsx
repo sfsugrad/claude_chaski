@@ -230,9 +230,12 @@ export default function CourierDashboard() {
                     <div className="space-y-2 text-surface-700">
                       <p><strong className="text-surface-900">From:</strong> {activeRoute.start_address}</p>
                       <p><strong className="text-surface-900">To:</strong> {activeRoute.end_address}</p>
+                      {activeRoute.trip_date && (
+                        <p><strong className="text-surface-900">Trip Date:</strong> {new Date(activeRoute.trip_date).toLocaleDateString()}</p>
+                      )}
                       <p><strong className="text-surface-900">Max Deviation:</strong> {activeRoute.max_deviation_km} km</p>
                       {activeRoute.departure_time && (
-                        <p><strong className="text-surface-900">Departure:</strong> {new Date(activeRoute.departure_time).toLocaleString()}</p>
+                        <p><strong className="text-surface-900">Departure Time:</strong> {activeRoute.departure_time}</p>
                       )}
                       <p className="text-sm text-surface-500">Created: {new Date(activeRoute.created_at).toLocaleString()}</p>
                     </div>
@@ -373,6 +376,11 @@ export default function CourierDashboard() {
                         <div>
                           <p className="font-semibold text-surface-900">{route.start_address} → {route.end_address}</p>
                           <div className="mt-1 space-y-0.5">
+                            {route.trip_date && (
+                              <p className="text-sm text-primary-600 font-medium">
+                                Trip Date: {new Date(route.trip_date).toLocaleDateString()}
+                              </p>
+                            )}
                             <p className="text-sm text-surface-500">
                               Created: {new Date(route.created_at).toLocaleDateString()}
                             </p>

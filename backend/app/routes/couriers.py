@@ -28,6 +28,7 @@ class RouteCreate(BaseModel):
     end_lng: float = Field(..., ge=-180, le=180)
     max_deviation_km: int = Field(default=5, ge=1, le=50)
     departure_time: datetime | None = None
+    trip_date: datetime | None = None
 
 class RouteUpdate(BaseModel):
     end_address: str | None = Field(None, min_length=1)
@@ -35,6 +36,7 @@ class RouteUpdate(BaseModel):
     end_lng: float | None = Field(None, ge=-180, le=180)
     max_deviation_km: int | None = Field(None, ge=1, le=50)
     departure_time: datetime | None = None
+    trip_date: datetime | None = None
 
 class RouteResponse(BaseModel):
     id: int
@@ -47,6 +49,7 @@ class RouteResponse(BaseModel):
     end_lng: float
     max_deviation_km: int
     departure_time: datetime | None
+    trip_date: datetime | None
     is_active: bool
     created_at: datetime
 
@@ -138,6 +141,7 @@ async def create_route(
         end_lng=route.end_lng,
         max_deviation_km=route.max_deviation_km,
         departure_time=route.departure_time,
+        trip_date=route.trip_date,
         is_active=True
     )
 
@@ -271,6 +275,9 @@ async def update_route(
     if route_update.departure_time is not None:
         changes["departure_time"] = {"old": str(route.departure_time), "new": str(route_update.departure_time)}
         route.departure_time = route_update.departure_time
+    if route_update.trip_date is not None:
+        changes["trip_date"] = {"old": str(route.trip_date), "new": str(route_update.trip_date)}
+        route.trip_date = route_update.trip_date
 
     db.commit()
     db.refresh(route)

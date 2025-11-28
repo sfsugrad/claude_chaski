@@ -49,6 +49,11 @@ class AuditAction(str, enum.Enum):
     # Rating
     RATING_CREATE = "rating_create"
 
+    # Bidding
+    BID_CREATED = "bid_created"
+    BID_WITHDRAWN = "bid_withdrawn"
+    BID_SELECTED = "bid_selected"
+
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"

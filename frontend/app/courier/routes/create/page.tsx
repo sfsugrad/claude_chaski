@@ -27,6 +27,7 @@ export default function CreateRoutePage() {
     end_lng: 0,
     max_deviation_km: 5,
     departure_time: '',
+    trip_date: '',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -69,6 +70,7 @@ export default function CreateRoutePage() {
       const submitData = {
         ...formData,
         departure_time: formData.departure_time || undefined,
+        trip_date: formData.trip_date || undefined,
       };
       const response = await couriersAPI.createRoute(submitData);
       if (response.data) {
@@ -298,19 +300,39 @@ export default function CreateRoutePage() {
             <CardBody className="p-6">
               <h3 className="text-lg font-semibold text-surface-900 mb-2">When are you traveling?</h3>
               <p className="text-sm text-surface-500 mb-4">
-                Optional: Set a departure time to help coordinate with senders
+                Set your trip date to help match with packages
               </p>
 
-              <div>
-                <input
-                  type="datetime-local"
-                  value={formData.departure_time}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, departure_time: e.target.value }))}
-                  className="w-full px-4 py-2.5 border border-surface-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
-                <p className="text-xs text-surface-500 mt-2">
-                  Leave empty if your schedule is flexible
-                </p>
+              <div className="space-y-4">
+                {/* Trip Date */}
+                <div>
+                  <label className="block text-sm font-medium text-surface-700 mb-1">
+                    Trip Date <span className="text-error-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.trip_date}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, trip_date: e.target.value }))}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="w-full px-4 py-2.5 border border-surface-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
+
+                {/* Departure Time (optional) */}
+                <div>
+                  <label className="block text-sm font-medium text-surface-700 mb-1">
+                    Departure Time <span className="text-surface-400">(optional)</span>
+                  </label>
+                  <input
+                    type="time"
+                    value={formData.departure_time}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, departure_time: e.target.value }))}
+                    className="w-full px-4 py-2.5 border border-surface-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  />
+                  <p className="text-xs text-surface-500 mt-2">
+                    Leave empty if your schedule is flexible
+                  </p>
+                </div>
               </div>
             </CardBody>
           </Card>

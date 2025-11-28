@@ -21,7 +21,7 @@ from app.services.audit_service import (
     log_admin_stats_access,
     log_matching_job_run,
 )
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from typing import List
 
 router = APIRouter()
@@ -952,4 +952,60 @@ async def get_audit_log_by_id(
         success=log.success,
         error_message=log.error_message,
         created_at=log.created_at
+    )
+
+
+# Route Cleanup Job Schemas
+class RouteCleanupJobRequest(BaseModel):
+    dry_run: bool = Field(default=False, description="If true, don't make changes")
+
+
+class DeactivatedRouteDetail(BaseModel):
+    route_id: int
+    courier_id: int
+    trip_date: str | None
+    start_address: str | None
+    end_address: str | None
+
+
+class RouteCleanupJobResult(BaseModel):
+    started_at: str
+    completed_at: str
+    dry_run: bool
+    routes_deactivated: int
+    deactivated_routes: List[DeactivatedRouteDetail]
+
+
+@router.post("/jobs/run-route-cleanup", response_model=RouteCleanupJobResult)
+async def run_route_cleanup_job_endpoint(
+    http_request: Request,
+    request: RouteCleanupJobRequest,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Manually trigger the route cleanup job (admin only).
+
+    This job deactivates courier routes whose trip_date has passed,
+    as they are no longer relevant for package matching.
+
+    Args:
+        request: Job configuration options
+        admin: Current admin user
+
+    Returns:
+        Job execution results
+    """
+    from app.services.route_cleanup_job import run_route_cleanup_job
+
+    results = run_route_cleanup_job(dry_run=request.dry_run, db=db)
+
+    return RouteCleanupJobResult(
+        started_at=results['started_at'],
+        completed_at=results['completed_at'],
+        dry_run=results['dry_run'],
+        routes_deactivated=results['routes_deactivated'],
+        deactivated_routes=[
+            DeactivatedRouteDetail(**route) for route in results['deactivated_routes']
+        ]
     )
