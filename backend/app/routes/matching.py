@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from app.database import get_db
@@ -9,15 +9,8 @@ from shapely.ops import nearest_points
 
 from app.models.package import Package, PackageStatus, CourierRoute
 from app.models.user import User, UserRole
-from app.models.notification import NotificationType
 from app.utils.dependencies import get_current_user
 from app.utils.geo import haversine_distance
-from app.routes.notifications import create_notification, create_notification_with_broadcast
-from app.utils.email import (
-    send_package_matched_email,
-    send_package_accepted_email,
-    send_package_declined_email,
-)
 
 router = APIRouter()
 
@@ -115,10 +108,10 @@ async def get_packages_along_route(
         (route.end_lng, route.end_lat)
     ])
 
-    # Get all pending packages
+    # Get all packages open for bids
     pending_packages = db.query(Package).filter(
         and_(
-            Package.status == PackageStatus.PENDING,
+            Package.status == PackageStatus.OPEN_FOR_BIDS,
             Package.is_active == True
         )
     ).all()
@@ -175,156 +168,6 @@ async def get_packages_along_route(
     return matched_packages
 
 
-@router.post("/accept-package/{package_id}")
-async def accept_package(
-    package_id: int,
-    background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Courier accepts a package for delivery"""
-    # Verify courier role
-    if current_user.role not in [UserRole.COURIER, UserRole.BOTH]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only couriers can accept packages"
-        )
-
-    # Get package
-    package = db.query(Package).filter(
-        and_(
-            Package.id == package_id,
-            Package.is_active == True
-        )
-    ).first()
-
-    if not package:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Package not found"
-        )
-
-    # Check if already assigned
-    if package.status != PackageStatus.PENDING:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Package is already {package.status.value}"
-        )
-
-    # Get sender info for notifications
-    sender = db.query(User).filter(User.id == package.sender_id).first()
-
-    # Assign courier and update status
-    package.courier_id = current_user.id
-    package.status = PackageStatus.MATCHED
-
-    db.commit()
-    db.refresh(package)
-
-    # Create in-app notification for sender with WebSocket broadcast
-    await create_notification_with_broadcast(
-        db=db,
-        user_id=package.sender_id,
-        notification_type=NotificationType.PACKAGE_MATCHED,
-        message=f"Your package '{package.description[:50]}' has been matched with courier {current_user.full_name}",
-        package_id=package.id
-    )
-
-    # Send email notification in background
-    if sender:
-        background_tasks.add_task(
-            send_package_accepted_email,
-            sender_email=sender.email,
-            sender_name=sender.full_name,
-            courier_name=current_user.full_name,
-            courier_phone=current_user.phone_number,
-            package_description=package.description,
-            package_id=package.id
-        )
-
-    return {
-        "message": "Package accepted successfully",
-        "package_id": package.id,
-        "status": package.status.value
-    }
-
-
-@router.post("/decline-package/{package_id}")
-async def decline_package(
-    package_id: int,
-    background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Courier declines a matched package, returning it to pending status.
-    """
-    # Verify courier role
-    if current_user.role not in [UserRole.COURIER, UserRole.BOTH]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only couriers can decline packages"
-        )
-
-    # Get package
-    package = db.query(Package).filter(Package.id == package_id).first()
-
-    if not package:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Package not found"
-        )
-
-    # Verify package is matched to this courier
-    if package.courier_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only decline packages assigned to you"
-        )
-
-    # Verify package is in matched status
-    if package.status != PackageStatus.MATCHED:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Package cannot be declined. Current status: {package.status.value}"
-        )
-
-    # Get sender info for notifications
-    sender = db.query(User).filter(User.id == package.sender_id).first()
-
-    # Return package to pending status
-    package.courier_id = None
-    package.status = PackageStatus.PENDING
-
-    db.commit()
-    db.refresh(package)
-
-    # Create in-app notification for sender with WebSocket broadcast
-    await create_notification_with_broadcast(
-        db=db,
-        user_id=package.sender_id,
-        notification_type=NotificationType.PACKAGE_DECLINED,
-        message=f"The courier has declined your package '{package.description[:50]}'. We're finding another courier for you.",
-        package_id=package.id
-    )
-
-    # Send email notification in background
-    if sender:
-        background_tasks.add_task(
-            send_package_declined_email,
-            sender_email=sender.email,
-            sender_name=sender.full_name,
-            package_description=package.description,
-            package_id=package.id
-        )
-
-    return {
-        "message": "Package declined successfully",
-        "package_id": package.id,
-        "status": package.status.value
-    }
-
-
 @router.get("/optimized-route/{route_id}")
 async def get_optimized_route(
     route_id: int,
@@ -357,11 +200,11 @@ async def get_optimized_route(
             detail="Route not found"
         )
 
-    # Get accepted packages for this courier
+    # Get accepted packages for this courier (pending pickup or in transit)
     packages = db.query(Package).filter(
         and_(
             Package.courier_id == current_user.id,
-            Package.status.in_([PackageStatus.MATCHED, PackageStatus.PICKED_UP]),
+            Package.status.in_([PackageStatus.PENDING_PICKUP, PackageStatus.IN_TRANSIT]),
             Package.is_active == True
         )
     ).all()

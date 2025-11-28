@@ -33,14 +33,14 @@ class TestDeliveryProofSubmission:
         # Get courier
         courier = db_session.query(User).filter(User.email == "courier@example.com").first()
 
-        # Create package in PICKED_UP status (not IN_TRANSIT)
+        # Create package in PENDING_PICKUP status (not IN_TRANSIT)
         package = Package(
             sender_id=sender.id,
             courier_id=courier.id,
             description="Test package",
             size="small",
             weight_kg=1.0,
-            status=PackageStatus.PICKED_UP,
+            status=PackageStatus.PENDING_PICKUP,  # Not IN_TRANSIT - should fail proof submission
             pickup_address="A",
             pickup_lat=0,
             pickup_lng=0,
@@ -54,7 +54,7 @@ class TestDeliveryProofSubmission:
         db_session.add(package)
         db_session.commit()
 
-        # Try to submit proof
+        # Try to submit proof - should fail because package is not IN_TRANSIT
         proof_data = {
             "signature_data": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
             "recipient_name": "John Doe",
@@ -63,6 +63,7 @@ class TestDeliveryProofSubmission:
 
         with patch("app.routes.delivery_proof.get_file_storage") as mock_storage:
             mock_storage.return_value.upload_file = AsyncMock(return_value="signatures/test.png")
+            mock_storage.return_value.generate_presigned_download_url = AsyncMock(return_value="https://example.com/test.png")
 
             response = client.post(
                 f"/api/proof/{package.id}",
@@ -681,22 +682,14 @@ class TestCompleteDeliveryFlow:
         package_id = create_response.json()["id"]
         assert create_response.json()["requires_proof"] is True
 
-        # Step 2: Simulate matching
+        # Step 2: Simulate matching and bid selection
         package = db_session.query(Package).filter(Package.id == package_id).first()
         courier = db_session.query(User).filter(User.email == "courier@example.com").first()
         package.courier_id = courier.id
-        package.status = PackageStatus.MATCHED
+        package.status = PackageStatus.PENDING_PICKUP  # After bid selected and courier confirms pickup
         db_session.commit()
 
-        # Step 3: Courier picks up
-        pickup_response = client.put(
-            f"/api/packages/{package_id}/status",
-            json={"status": "picked_up"},
-            headers={"Authorization": f"Bearer {authenticated_courier}"}
-        )
-        assert pickup_response.status_code == status.HTTP_200_OK
-
-        # Step 4: Courier marks in transit
+        # Step 3: Courier marks in transit (PENDING_PICKUP -> IN_TRANSIT)
         transit_response = client.put(
             f"/api/packages/{package_id}/status",
             json={"status": "in_transit"},

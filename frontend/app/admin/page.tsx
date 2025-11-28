@@ -76,12 +76,14 @@ export default function AdminPage() {
     })
 
     const statusColors: Record<string, string> = {
-      pending: '#F59E0B',
-      matched: '#3B82F6',
-      picked_up: '#8B5CF6',
+      new: '#9CA3AF',
+      open_for_bids: '#F59E0B',
+      bid_selected: '#3B82F6',
+      pending_pickup: '#8B5CF6',
       in_transit: '#06B6D4',
       delivered: '#10B981',
-      cancelled: '#EF4444',
+      canceled: '#EF4444',
+      failed: '#F97316',
     }
 
     return Object.entries(statusCounts).map(([name, value]) => ({

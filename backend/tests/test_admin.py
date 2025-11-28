@@ -1140,7 +1140,7 @@ class TestAdminPackageToggleActive:
         # Change package status to matched
         from app.models.package import Package, PackageStatus
         package = db_session.query(Package).filter(Package.id == package_id).first()
-        package.status = PackageStatus.MATCHED
+        package.status = PackageStatus.BID_SELECTED
         db_session.commit()
 
         # Try to deactivate it
@@ -1151,7 +1151,7 @@ class TestAdminPackageToggleActive:
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "only pending packages can be deactivated" in response.json()["detail"].lower()
+        assert "only new or open for bids packages can be deactivated" in response.json()["detail"].lower()
 
     def test_can_reactivate_non_pending_package(self, client, db_session, authenticated_admin, authenticated_sender, test_package_data):
         """Test that non-pending packages CAN be reactivated (only deactivation is restricted)"""

@@ -112,10 +112,9 @@ async def create_bid(
 
     Requirements:
     - User must be a courier
-    - Package must be in PENDING or BIDDING status
+    - Package must be in OPEN_FOR_BIDS status
     - Courier cannot bid on own package
     - One bid per courier per package
-    - If first bid, sets package to BIDDING and starts 24h deadline
     """
     # Verify courier role
     if current_user.role not in [UserRole.COURIER, UserRole.BOTH]:
@@ -139,10 +138,10 @@ async def create_bid(
         )
 
     # Verify package status allows bidding
-    if package.status not in [PackageStatus.PENDING, PackageStatus.BIDDING]:
+    if package.status != PackageStatus.OPEN_FOR_BIDS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot bid on package with status: {package.status.value}"
+            detail=f"Cannot bid on package with status: {package.status.value}. Package must be open for bids."
         )
 
     # Cannot bid on own package
@@ -180,10 +179,8 @@ async def create_bid(
 
     db.add(bid)
 
-    # Update package if this is the first bid
-    is_first_bid = package.status == PackageStatus.PENDING
-    if is_first_bid:
-        package.status = PackageStatus.BIDDING
+    # Set bid deadline if not already set (first bid)
+    if not package.bid_deadline:
         package.bid_deadline = datetime.now(timezone.utc) + timedelta(hours=24)
 
     package.bid_count = (package.bid_count or 0) + 1
@@ -297,7 +294,7 @@ async def select_bid(
     Requirements:
     - Must be the package sender
     - Bid must be in PENDING status
-    - Package must be in BIDDING status
+    - Package must be in OPEN_FOR_BIDS status
     """
     bid = db.query(CourierBid).filter(CourierBid.id == bid_id).first()
 
@@ -330,7 +327,7 @@ async def select_bid(
         )
 
     # Verify package status
-    if package.status != PackageStatus.BIDDING:
+    if package.status != PackageStatus.OPEN_FOR_BIDS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Cannot select bid for package with status: {package.status.value}"

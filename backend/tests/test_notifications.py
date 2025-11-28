@@ -636,7 +636,7 @@ class TestNotificationWithPackage:
             dropoff_lat=test_package_data["dropoff_lat"],
             dropoff_lng=test_package_data["dropoff_lng"],
             price=test_package_data["price"],
-            status=PackageStatus.PENDING
+            status=PackageStatus.OPEN_FOR_BIDS
         )
         db_session.add(package)
         db_session.commit()
@@ -700,7 +700,7 @@ class TestCreateNotificationUtility:
             dropoff_lat=test_package_data["dropoff_lat"],
             dropoff_lng=test_package_data["dropoff_lng"],
             price=test_package_data["price"],
-            status=PackageStatus.PENDING
+            status=PackageStatus.OPEN_FOR_BIDS
         )
         db_session.add(package)
         db_session.commit()

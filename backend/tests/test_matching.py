@@ -79,7 +79,7 @@ class TestMatchingAlgorithm:
             dropoff_address="Mountain View, CA",
             dropoff_lat=37.3861,
             dropoff_lng=-122.0839,
-            status=PackageStatus.PENDING,
+            status=PackageStatus.OPEN_FOR_BIDS,
             price=25.0,
             is_active=True
         )
@@ -102,7 +102,7 @@ class TestMatchingAlgorithm:
             dropoff_address="Davis, CA",
             dropoff_lat=38.5449,
             dropoff_lng=-121.7405,
-            status=PackageStatus.PENDING,
+            status=PackageStatus.OPEN_FOR_BIDS,
             price=30.0,
             is_active=True
         )
@@ -188,6 +188,7 @@ class TestMatchingAlgorithm:
         assert response.status_code == 404
         assert "not found" in response.json()["detail"].lower()
 
+    @pytest.mark.skip(reason="accept-package endpoint removed; replaced by bidding system - see test_bids.py")
     def test_accept_package_success(
         self, client, courier_token, package_along_route, db_session
     ):
@@ -201,13 +202,14 @@ class TestMatchingAlgorithm:
         data = response.json()
         assert data["message"] == "Package accepted successfully"
         assert data["package_id"] == package_along_route.id
-        assert data["status"] == "matched"
+        assert data["status"] == "bid_selected"
 
         # Verify database was updated
         db_session.refresh(package_along_route)
-        assert package_along_route.status == PackageStatus.MATCHED
+        assert package_along_route.status == PackageStatus.BID_SELECTED
         assert package_along_route.courier_id is not None
 
+    @pytest.mark.skip(reason="accept-package endpoint removed; replaced by bidding system - see test_bids.py")
     def test_accept_package_sender_forbidden(
         self, client, sender_token, package_along_route
     ):
@@ -220,6 +222,7 @@ class TestMatchingAlgorithm:
         assert response.status_code == 403
         assert "Only couriers" in response.json()["detail"]
 
+    @pytest.mark.skip(reason="accept-package endpoint removed; replaced by bidding system - see test_bids.py")
     def test_accept_package_not_found(self, client, courier_token):
         """Test accepting non-existent package"""
         response = client.post(
@@ -229,6 +232,7 @@ class TestMatchingAlgorithm:
 
         assert response.status_code == 404
 
+    @pytest.mark.skip(reason="accept-package endpoint removed; replaced by bidding system - see test_bids.py")
     def test_accept_package_already_matched(
         self, client, courier_token, package_along_route, db_session
     ):
@@ -261,13 +265,14 @@ class TestMatchingAlgorithm:
         assert response.status_code == 400
         assert "already matched" in response.json()["detail"].lower()
 
+    @pytest.mark.skip(reason="decline-package endpoint removed; replaced by bidding system - see test_bids.py")
     def test_decline_package_success(
         self, client, courier_token, package_along_route, courier_user, db_session
     ):
         """Test courier declining a matched package"""
         # First accept the package
         package_along_route.courier_id = courier_user.id
-        package_along_route.status = PackageStatus.MATCHED
+        package_along_route.status = PackageStatus.BID_SELECTED
         db_session.commit()
 
         response = client.post(
@@ -278,13 +283,14 @@ class TestMatchingAlgorithm:
         assert response.status_code == 200
         data = response.json()
         assert data["message"] == "Package declined successfully"
-        assert data["status"] == "pending"
+        assert data["status"] == "open_for_bids"
 
         # Verify database was updated
         db_session.refresh(package_along_route)
-        assert package_along_route.status == PackageStatus.PENDING
+        assert package_along_route.status == PackageStatus.OPEN_FOR_BIDS
         assert package_along_route.courier_id is None
 
+    @pytest.mark.skip(reason="decline-package endpoint removed; replaced by bidding system - see test_bids.py")
     def test_decline_package_not_assigned(
         self, client, courier_token, package_along_route, db_session
     ):
@@ -302,7 +308,7 @@ class TestMatchingAlgorithm:
         db_session.commit()
 
         package_along_route.courier_id = other_courier.id
-        package_along_route.status = PackageStatus.MATCHED
+        package_along_route.status = PackageStatus.BID_SELECTED
         db_session.commit()
 
         response = client.post(
@@ -313,13 +319,14 @@ class TestMatchingAlgorithm:
         assert response.status_code == 403
         assert "assigned to you" in response.json()["detail"]
 
+    @pytest.mark.skip(reason="decline-package endpoint removed; replaced by bidding system - see test_bids.py")
     def test_decline_package_wrong_status(
         self, client, courier_token, package_along_route, courier_user, db_session
     ):
         """Test declining package that is not in matched status"""
         # Set package to picked up status
         package_along_route.courier_id = courier_user.id
-        package_along_route.status = PackageStatus.PICKED_UP
+        package_along_route.status = PackageStatus.IN_TRANSIT
         db_session.commit()
 
         response = client.post(
@@ -347,7 +354,7 @@ class TestMatchingAlgorithm:
             dropoff_address="Burlingame, CA",
             dropoff_lat=37.5847,
             dropoff_lng=-122.3660,
-            status=PackageStatus.PENDING,
+            status=PackageStatus.OPEN_FOR_BIDS,
             price=15.0,
             is_active=True
         )
@@ -364,7 +371,7 @@ class TestMatchingAlgorithm:
             dropoff_address="Mountain View, CA",
             dropoff_lat=37.3861,
             dropoff_lng=-122.0839,
-            status=PackageStatus.PENDING,
+            status=PackageStatus.OPEN_FOR_BIDS,
             price=20.0,
             is_active=True
         )
@@ -400,7 +407,7 @@ class TestMatchingAlgorithm:
             dropoff_address="Mountain View, CA",
             dropoff_lat=37.3861,
             dropoff_lng=-122.0839,
-            status=PackageStatus.PENDING,
+            status=PackageStatus.OPEN_FOR_BIDS,
             price=20.0,
             is_active=False  # Inactive
         )

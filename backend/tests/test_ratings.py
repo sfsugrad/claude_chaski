@@ -123,7 +123,7 @@ class TestCreateRating:
             description=test_package_data["description"],
             size=test_package_data["size"],
             weight_kg=test_package_data["weight_kg"],
-            status=PackageStatus.PENDING,
+            status=PackageStatus.OPEN_FOR_BIDS,
             pickup_address=test_package_data["pickup_address"],
             pickup_lat=test_package_data["pickup_lat"],
             pickup_lng=test_package_data["pickup_lng"],

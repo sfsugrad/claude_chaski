@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Marker, InfoWindow } from '@react-google-maps/api';
 import { clsx } from 'clsx';
 
-export type PackageStatus = 'pending' | 'matched' | 'picked_up' | 'in_transit' | 'delivered' | 'cancelled';
+export type PackageStatus = 'new' | 'open_for_bids' | 'bid_selected' | 'pending_pickup' | 'in_transit' | 'delivered' | 'canceled' | 'failed';
 
 export interface PackageMarkerData {
   id: number;
@@ -34,12 +34,14 @@ export interface PackageMarkerProps {
 
 // Status colors
 const statusColors: Record<PackageStatus, string> = {
-  pending: '#F59E0B',    // warning/amber
-  matched: '#3B82F6',    // primary/blue
-  picked_up: '#8B5CF6',  // violet
-  in_transit: '#06B6D4', // cyan
-  delivered: '#10B981',  // success/green
-  cancelled: '#EF4444',  // error/red
+  new: '#9CA3AF',          // gray
+  open_for_bids: '#F59E0B', // warning/amber
+  bid_selected: '#3B82F6',  // primary/blue
+  pending_pickup: '#8B5CF6', // violet
+  in_transit: '#06B6D4',    // cyan
+  delivered: '#10B981',     // success/green
+  canceled: '#EF4444',      // error/red
+  failed: '#F97316',        // orange
 };
 
 // Create custom marker SVG
@@ -73,12 +75,14 @@ export function PackageMarker({
   const icon = createPackageIcon(pkg.status, type);
 
   const statusLabels: Record<PackageStatus, string> = {
-    pending: 'Pending',
-    matched: 'Matched',
-    picked_up: 'Picked Up',
+    new: 'New',
+    open_for_bids: 'Open for Bids',
+    bid_selected: 'Bid Selected',
+    pending_pickup: 'Pending Pickup',
     in_transit: 'In Transit',
     delivered: 'Delivered',
-    cancelled: 'Cancelled',
+    canceled: 'Canceled',
+    failed: 'Failed',
   };
 
   return (

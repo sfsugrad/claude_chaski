@@ -73,15 +73,15 @@ def count_matching_packages(db: Session, route: CourierRoute) -> int:
         (route.end_lng, route.end_lat)
     ])
 
-    pending_packages = db.query(Package).filter(
+    available_packages = db.query(Package).filter(
         and_(
-            Package.status == PackageStatus.PENDING,
+            Package.status == PackageStatus.OPEN_FOR_BIDS,
             Package.is_active == True
         )
     ).all()
 
     count = 0
-    for package in pending_packages:
+    for package in available_packages:
         pickup_point = Point(package.pickup_lng, package.pickup_lat)
         dropoff_point = Point(package.dropoff_lng, package.dropoff_lat)
 

@@ -106,7 +106,7 @@ def pending_package(db_session, sender_user):
         dropoff_lat=40.7580,
         dropoff_lng=-73.9855,
         price=25.0,
-        status=PackageStatus.PENDING,
+        status=PackageStatus.OPEN_FOR_BIDS,
         is_active=True
     )
     db_session.add(package)
@@ -130,7 +130,7 @@ def bidding_package(db_session, sender_user):
         dropoff_lat=40.7580,
         dropoff_lng=-73.9855,
         price=15.0,
-        status=PackageStatus.BIDDING,
+        status=PackageStatus.OPEN_FOR_BIDS,
         bid_deadline=datetime.now(timezone.utc) + timedelta(hours=24),
         bid_count=1,
         is_active=True
@@ -170,12 +170,12 @@ class TestCreateBid:
         assert data["proposed_price"] == 20.0
         assert data["estimated_delivery_hours"] == 12
         assert data["message"] == "I can deliver this quickly!"
-        assert data["status"] == "pending"
+        assert data["status"] == "pending"  # Bid status is "pending" for new bid
         assert data["courier_name"] == courier_user.full_name
 
-        # Verify package status changed to BIDDING
+        # Verify package remains in OPEN_FOR_BIDS status
         db_session.refresh(pending_package)
-        assert pending_package.status == PackageStatus.BIDDING
+        assert pending_package.status == PackageStatus.OPEN_FOR_BIDS
         assert pending_package.bid_deadline is not None
         assert pending_package.bid_count == 1
 
@@ -237,7 +237,7 @@ class TestCreateBid:
             dropoff_address="456 End",
             dropoff_lat=40.7580,
             dropoff_lng=-73.9855,
-            status=PackageStatus.PENDING,
+            status=PackageStatus.OPEN_FOR_BIDS,
             is_active=True
         )
         db_session.add(package)
@@ -515,10 +515,10 @@ class TestSelectBid:
         assert "Cannot select bid with status" in response.json()["detail"]
 
     def test_select_bid_package_not_bidding(self, client, db_session, sender_user, courier_user):
-        """Cannot select bid if package is not in bidding status."""
+        """Cannot select bid if package is not open for bids."""
         package = Package(
             sender_id=sender_user.id,
-            description="Pending package",
+            description="Package with bid already selected",
             size="small",
             weight_kg=1.0,
             pickup_address="123 Start",
@@ -527,7 +527,7 @@ class TestSelectBid:
             dropoff_address="456 End",
             dropoff_lat=40.7580,
             dropoff_lng=-73.9855,
-            status=PackageStatus.PENDING,  # Not BIDDING
+            status=PackageStatus.BID_SELECTED,  # Already has bid selected
             is_active=True
         )
         db_session.add(package)
@@ -596,7 +596,7 @@ class TestGetMyBids:
             dropoff_address="456 End",
             dropoff_lat=40.7580,
             dropoff_lng=-73.9855,
-            status=PackageStatus.BIDDING,
+            status=PackageStatus.OPEN_FOR_BIDS,
             is_active=True
         )
         db_session.add(package2)
@@ -620,7 +620,7 @@ class TestGetMyBids:
         assert response.status_code == 200
         data = response.json()
         assert len(data) == 1
-        assert data[0]["status"] == "pending"
+        assert data[0]["status"] == "pending"  # Bid status, not package status
 
     def test_get_my_bids_sender_forbidden(self, client, sender_user):
         """Sender cannot access my-bids endpoint."""
@@ -783,7 +783,7 @@ class TestConfirmPickup:
             dropoff_address="456 End",
             dropoff_lat=40.7580,
             dropoff_lng=-73.9855,
-            status=PackageStatus.BIDDING,  # Not BID_SELECTED
+            status=PackageStatus.OPEN_FOR_BIDS,  # Not BID_SELECTED
             is_active=True
         )
         db_session.add(package)

@@ -321,7 +321,7 @@ class TestPackageModel:
             dropoff_lng=-122.4010,
             dropoff_contact_name="Jane Smith",
             dropoff_contact_phone="+0987654321",
-            status=PackageStatus.PENDING,
+            status=PackageStatus.OPEN_FOR_BIDS,
             price=25.50
         )
         db_session.add(package)
@@ -332,7 +332,7 @@ class TestPackageModel:
         assert package.description == "Test package"
         assert package.size == PackageSize.MEDIUM
         assert package.weight_kg == 5.5
-        assert package.status == PackageStatus.PENDING
+        assert package.status == PackageStatus.OPEN_FOR_BIDS
         assert package.price == 25.50
         assert package.created_at is not None
 
@@ -354,18 +354,18 @@ class TestPackageModel:
         db_session.commit()
 
         assert package.id is not None
-        assert package.status == PackageStatus.PENDING  # Default status
+        assert package.status == PackageStatus.NEW  # Default status when created directly (API auto-transitions to OPEN_FOR_BIDS)
         assert package.courier_id is None  # No courier assigned yet
 
     def test_package_all_statuses(self, db_session, test_verified_user):
         """Test creating packages with all available statuses"""
         statuses = [
-            PackageStatus.PENDING,
-            PackageStatus.MATCHED,
-            PackageStatus.PICKED_UP,
+            PackageStatus.OPEN_FOR_BIDS,
+            PackageStatus.BID_SELECTED,
+            PackageStatus.IN_TRANSIT,
             PackageStatus.IN_TRANSIT,
             PackageStatus.DELIVERED,
-            PackageStatus.CANCELLED
+            PackageStatus.CANCELED
         ]
 
         for idx, status in enumerate(statuses):
@@ -468,7 +468,7 @@ class TestPackageModel:
             dropoff_address="Dropoff",
             dropoff_lat=37.7897,
             dropoff_lng=-122.4010,
-            status=PackageStatus.MATCHED
+            status=PackageStatus.BID_SELECTED
         )
         db_session.add(package)
         db_session.commit()

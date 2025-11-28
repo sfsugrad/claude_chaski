@@ -5,17 +5,14 @@ from app.models.base import Base
 import enum
 
 class PackageStatus(str, enum.Enum):
-    PENDING = "pending"          # Package created, waiting for courier
-    BIDDING = "bidding"          # Open for courier bids (first bid received)
-    BID_SELECTED = "bid_selected"  # Sender chose a courier from bids
+    NEW = "new"                      # Just created, auto-transitions to OPEN_FOR_BIDS
+    OPEN_FOR_BIDS = "open_for_bids"  # Shown to couriers, accepting offers
+    BID_SELECTED = "bid_selected"    # Sender chose a courier from bids
     PENDING_PICKUP = "pending_pickup"  # Courier confirmed, awaiting pickup
-    PICKED_UP = "picked_up"      # Courier picked up the package
-    IN_TRANSIT = "in_transit"    # Package in transit
-    DELIVERED = "delivered"      # Package delivered
-    CANCELLED = "cancelled"      # Package delivery cancelled
-    # Legacy statuses (keep for existing data compatibility)
-    MATCHED = "matched"          # Matched with a courier, awaiting acceptance from both parties
-    ACCEPTED = "accepted"        # Both sender and courier have accepted the match
+    IN_TRANSIT = "in_transit"        # Courier confirmed pickup, package in transit
+    DELIVERED = "delivered"          # Package delivered (terminal)
+    CANCELED = "canceled"            # Sender canceled or expired (terminal)
+    FAILED = "failed"                # Pickup/delivery failed (admin can retry)
 
 class PackageSize(str, enum.Enum):
     SMALL = "small"      # < 5kg, fits in a bag
@@ -50,7 +47,7 @@ class Package(Base):
     dropoff_contact_phone = Column(String)
 
     # Status and pricing
-    status = Column(SQLEnum(PackageStatus), default=PackageStatus.PENDING)
+    status = Column(SQLEnum(PackageStatus), default=PackageStatus.NEW)
     price = Column(Float)  # Price sender is willing to pay
     is_active = Column(Boolean, default=True)  # Soft delete flag
 
@@ -65,16 +62,10 @@ class Package(Base):
 
     # Status transition timestamps
     status_changed_at = Column(DateTime(timezone=True), nullable=True)
-    matched_at = Column(DateTime(timezone=True), nullable=True)
-    accepted_at = Column(DateTime(timezone=True), nullable=True)
-    picked_up_at = Column(DateTime(timezone=True), nullable=True)
+    bid_selected_at = Column(DateTime(timezone=True), nullable=True)
+    pending_pickup_at = Column(DateTime(timezone=True), nullable=True)
     in_transit_at = Column(DateTime(timezone=True), nullable=True)
-
-    # Acceptance tracking - both parties must accept for MATCHED → ACCEPTED
-    sender_accepted = Column(Boolean, default=False, nullable=False)
-    courier_accepted = Column(Boolean, default=False, nullable=False)
-    sender_accepted_at = Column(DateTime(timezone=True), nullable=True)
-    courier_accepted_at = Column(DateTime(timezone=True), nullable=True)
+    failed_at = Column(DateTime(timezone=True), nullable=True)
 
     # Bidding fields
     bid_deadline = Column(DateTime(timezone=True), nullable=True)

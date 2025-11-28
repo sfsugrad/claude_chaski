@@ -1,8 +1,19 @@
 """
 Tests for package status transition validation service.
+
+New Status Flow:
+NEW → OPEN_FOR_BIDS → BID_SELECTED → PENDING_PICKUP → IN_TRANSIT → DELIVERED
+                                                              ↓           ↓
+                                                           FAILED ←←← FAILED
+                                                              ↓
+                                                        (admin only)
+                                                              ↓
+                                                        OPEN_FOR_BIDS
+
+CANCELED can occur from NEW, OPEN_FOR_BIDS, BID_SELECTED, PENDING_PICKUP (not after)
 """
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from app.models.package import Package, PackageStatus
 from app.models.user import User, UserRole
@@ -13,8 +24,7 @@ from app.services.package_status import (
     can_mark_delivered,
     transition_package,
     get_status_progress,
-    accept_package_match,
-    get_acceptance_status,
+    can_cancel,
     ALLOWED_TRANSITIONS,
 )
 
@@ -22,51 +32,63 @@ from app.services.package_status import (
 class TestValidateTransition:
     """Tests for validate_transition function."""
 
-    def test_valid_transition_pending_to_matched(self):
-        """PENDING -> MATCHED should be valid."""
-        is_valid, error = validate_transition(PackageStatus.PENDING, PackageStatus.MATCHED)
+    def test_valid_transition_new_to_open_for_bids(self):
+        """NEW -> OPEN_FOR_BIDS should be valid."""
+        is_valid, error = validate_transition(PackageStatus.NEW, PackageStatus.OPEN_FOR_BIDS)
         assert is_valid is True
         assert error == ""
 
-    def test_valid_transition_pending_to_cancelled(self):
-        """PENDING -> CANCELLED should be valid."""
-        is_valid, error = validate_transition(PackageStatus.PENDING, PackageStatus.CANCELLED)
+    def test_valid_transition_new_to_canceled(self):
+        """NEW -> CANCELED should be valid."""
+        is_valid, error = validate_transition(PackageStatus.NEW, PackageStatus.CANCELED)
         assert is_valid is True
         assert error == ""
 
-    def test_valid_transition_matched_to_accepted(self):
-        """MATCHED -> ACCEPTED should be valid."""
-        is_valid, error = validate_transition(PackageStatus.MATCHED, PackageStatus.ACCEPTED)
+    def test_valid_transition_open_for_bids_to_bid_selected(self):
+        """OPEN_FOR_BIDS -> BID_SELECTED should be valid."""
+        is_valid, error = validate_transition(PackageStatus.OPEN_FOR_BIDS, PackageStatus.BID_SELECTED)
         assert is_valid is True
         assert error == ""
 
-    def test_valid_transition_matched_to_pending(self):
-        """MATCHED -> PENDING (decline) should be valid."""
-        is_valid, error = validate_transition(PackageStatus.MATCHED, PackageStatus.PENDING)
+    def test_valid_transition_open_for_bids_to_canceled(self):
+        """OPEN_FOR_BIDS -> CANCELED should be valid."""
+        is_valid, error = validate_transition(PackageStatus.OPEN_FOR_BIDS, PackageStatus.CANCELED)
         assert is_valid is True
         assert error == ""
 
-    def test_valid_transition_matched_to_cancelled(self):
-        """MATCHED -> CANCELLED should be valid."""
-        is_valid, error = validate_transition(PackageStatus.MATCHED, PackageStatus.CANCELLED)
+    def test_valid_transition_bid_selected_to_pending_pickup(self):
+        """BID_SELECTED -> PENDING_PICKUP should be valid."""
+        is_valid, error = validate_transition(PackageStatus.BID_SELECTED, PackageStatus.PENDING_PICKUP)
         assert is_valid is True
         assert error == ""
 
-    def test_valid_transition_accepted_to_picked_up(self):
-        """ACCEPTED -> PICKED_UP should be valid."""
-        is_valid, error = validate_transition(PackageStatus.ACCEPTED, PackageStatus.PICKED_UP)
+    def test_valid_transition_bid_selected_to_open_for_bids(self):
+        """BID_SELECTED -> OPEN_FOR_BIDS (courier declined) should be valid."""
+        is_valid, error = validate_transition(PackageStatus.BID_SELECTED, PackageStatus.OPEN_FOR_BIDS)
         assert is_valid is True
         assert error == ""
 
-    def test_valid_transition_accepted_to_cancelled(self):
-        """ACCEPTED -> CANCELLED should be valid."""
-        is_valid, error = validate_transition(PackageStatus.ACCEPTED, PackageStatus.CANCELLED)
+    def test_valid_transition_bid_selected_to_canceled(self):
+        """BID_SELECTED -> CANCELED should be valid."""
+        is_valid, error = validate_transition(PackageStatus.BID_SELECTED, PackageStatus.CANCELED)
         assert is_valid is True
         assert error == ""
 
-    def test_valid_transition_picked_up_to_in_transit(self):
-        """PICKED_UP -> IN_TRANSIT should be valid."""
-        is_valid, error = validate_transition(PackageStatus.PICKED_UP, PackageStatus.IN_TRANSIT)
+    def test_valid_transition_pending_pickup_to_in_transit(self):
+        """PENDING_PICKUP -> IN_TRANSIT should be valid."""
+        is_valid, error = validate_transition(PackageStatus.PENDING_PICKUP, PackageStatus.IN_TRANSIT)
+        assert is_valid is True
+        assert error == ""
+
+    def test_valid_transition_pending_pickup_to_failed(self):
+        """PENDING_PICKUP -> FAILED should be valid."""
+        is_valid, error = validate_transition(PackageStatus.PENDING_PICKUP, PackageStatus.FAILED)
+        assert is_valid is True
+        assert error == ""
+
+    def test_valid_transition_pending_pickup_to_canceled(self):
+        """PENDING_PICKUP -> CANCELED should be valid."""
+        is_valid, error = validate_transition(PackageStatus.PENDING_PICKUP, PackageStatus.CANCELED)
         assert is_valid is True
         assert error == ""
 
@@ -76,76 +98,63 @@ class TestValidateTransition:
         assert is_valid is True
         assert error == ""
 
-    def test_invalid_transition_pending_to_picked_up(self):
-        """PENDING -> PICKED_UP (skipping MATCHED) should be invalid."""
-        is_valid, error = validate_transition(PackageStatus.PENDING, PackageStatus.PICKED_UP)
-        assert is_valid is False
-        assert "Invalid status transition" in error
-        assert "Cannot go from Pending to Picked Up" in error
+    def test_valid_transition_in_transit_to_failed(self):
+        """IN_TRANSIT -> FAILED should be valid."""
+        is_valid, error = validate_transition(PackageStatus.IN_TRANSIT, PackageStatus.FAILED)
+        assert is_valid is True
+        assert error == ""
 
-    def test_invalid_transition_pending_to_in_transit(self):
-        """PENDING -> IN_TRANSIT (skipping steps) should be invalid."""
-        is_valid, error = validate_transition(PackageStatus.PENDING, PackageStatus.IN_TRANSIT)
-        assert is_valid is False
-        assert "Invalid status transition" in error
+    def test_valid_transition_failed_to_open_for_bids_admin(self):
+        """FAILED -> OPEN_FOR_BIDS (admin only) should be valid when is_admin=True."""
+        is_valid, error = validate_transition(PackageStatus.FAILED, PackageStatus.OPEN_FOR_BIDS, is_admin=True)
+        assert is_valid is True
+        assert error == ""
 
-    def test_invalid_transition_pending_to_delivered(self):
-        """PENDING -> DELIVERED (skipping all steps) should be invalid."""
-        is_valid, error = validate_transition(PackageStatus.PENDING, PackageStatus.DELIVERED)
+    def test_invalid_transition_failed_to_open_for_bids_non_admin(self):
+        """FAILED -> OPEN_FOR_BIDS should be invalid for non-admins."""
+        is_valid, error = validate_transition(PackageStatus.FAILED, PackageStatus.OPEN_FOR_BIDS, is_admin=False)
         assert is_valid is False
-        assert "Invalid status transition" in error
+        assert "admin" in error.lower()
 
-    def test_invalid_transition_matched_to_picked_up(self):
-        """MATCHED -> PICKED_UP (skipping ACCEPTED) should be invalid."""
-        is_valid, error = validate_transition(PackageStatus.MATCHED, PackageStatus.PICKED_UP)
-        assert is_valid is False
-        assert "Invalid status transition" in error
-
-    def test_invalid_transition_matched_to_in_transit(self):
-        """MATCHED -> IN_TRANSIT (skipping ACCEPTED and PICKED_UP) should be invalid."""
-        is_valid, error = validate_transition(PackageStatus.MATCHED, PackageStatus.IN_TRANSIT)
+    def test_invalid_transition_new_to_in_transit(self):
+        """NEW -> IN_TRANSIT (skipping steps) should be invalid."""
+        is_valid, error = validate_transition(PackageStatus.NEW, PackageStatus.IN_TRANSIT)
         assert is_valid is False
         assert "Invalid status transition" in error
 
-    def test_invalid_transition_matched_to_delivered(self):
-        """MATCHED -> DELIVERED (skipping steps) should be invalid."""
-        is_valid, error = validate_transition(PackageStatus.MATCHED, PackageStatus.DELIVERED)
+    def test_invalid_transition_open_for_bids_to_in_transit(self):
+        """OPEN_FOR_BIDS -> IN_TRANSIT (skipping BID_SELECTED) should be invalid."""
+        is_valid, error = validate_transition(PackageStatus.OPEN_FOR_BIDS, PackageStatus.IN_TRANSIT)
         assert is_valid is False
         assert "Invalid status transition" in error
 
-    def test_invalid_transition_accepted_to_in_transit(self):
-        """ACCEPTED -> IN_TRANSIT (skipping PICKED_UP) should be invalid."""
-        is_valid, error = validate_transition(PackageStatus.ACCEPTED, PackageStatus.IN_TRANSIT)
+    def test_invalid_transition_open_for_bids_to_delivered(self):
+        """OPEN_FOR_BIDS -> DELIVERED (skipping all steps) should be invalid."""
+        is_valid, error = validate_transition(PackageStatus.OPEN_FOR_BIDS, PackageStatus.DELIVERED)
         assert is_valid is False
         assert "Invalid status transition" in error
 
-    def test_invalid_transition_accepted_to_delivered(self):
-        """ACCEPTED -> DELIVERED (skipping steps) should be invalid."""
-        is_valid, error = validate_transition(PackageStatus.ACCEPTED, PackageStatus.DELIVERED)
-        assert is_valid is False
-        assert "Invalid status transition" in error
-
-    def test_invalid_transition_picked_up_to_delivered(self):
-        """PICKED_UP -> DELIVERED (skipping IN_TRANSIT) should be invalid."""
-        is_valid, error = validate_transition(PackageStatus.PICKED_UP, PackageStatus.DELIVERED)
+    def test_invalid_transition_in_transit_to_canceled(self):
+        """IN_TRANSIT -> CANCELED should be invalid (can only FAIL or DELIVER)."""
+        is_valid, error = validate_transition(PackageStatus.IN_TRANSIT, PackageStatus.CANCELED)
         assert is_valid is False
         assert "Invalid status transition" in error
 
     def test_invalid_transition_from_delivered(self):
         """DELIVERED is terminal - no transitions allowed."""
-        is_valid, error = validate_transition(PackageStatus.DELIVERED, PackageStatus.PENDING)
+        is_valid, error = validate_transition(PackageStatus.DELIVERED, PackageStatus.OPEN_FOR_BIDS)
         assert is_valid is False
         assert "terminal state" in error.lower()
 
-    def test_invalid_transition_from_cancelled(self):
-        """CANCELLED is terminal - no transitions allowed."""
-        is_valid, error = validate_transition(PackageStatus.CANCELLED, PackageStatus.PENDING)
+    def test_invalid_transition_from_canceled(self):
+        """CANCELED is terminal - no transitions allowed."""
+        is_valid, error = validate_transition(PackageStatus.CANCELED, PackageStatus.OPEN_FOR_BIDS)
         assert is_valid is False
         assert "terminal state" in error.lower()
 
     def test_same_status_transition(self):
         """Transitioning to same status should be invalid."""
-        is_valid, error = validate_transition(PackageStatus.PENDING, PackageStatus.PENDING)
+        is_valid, error = validate_transition(PackageStatus.OPEN_FOR_BIDS, PackageStatus.OPEN_FOR_BIDS)
         assert is_valid is False
         assert "already in" in error.lower()
 
@@ -153,46 +162,62 @@ class TestValidateTransition:
 class TestGetAllowedNextStatuses:
     """Tests for get_allowed_next_statuses function."""
 
-    def test_pending_allows_matched_and_cancelled(self):
-        """PENDING allows MATCHED and CANCELLED."""
-        allowed = get_allowed_next_statuses(PackageStatus.PENDING)
-        assert "matched" in allowed
-        assert "cancelled" in allowed
+    def test_new_allows_open_for_bids_and_canceled(self):
+        """NEW allows OPEN_FOR_BIDS and CANCELED."""
+        allowed = get_allowed_next_statuses(PackageStatus.NEW)
+        assert "open_for_bids" in allowed
+        assert "canceled" in allowed
         assert len(allowed) == 2
 
-    def test_matched_allows_accepted_pending_cancelled(self):
-        """MATCHED allows ACCEPTED, PENDING, and CANCELLED."""
-        allowed = get_allowed_next_statuses(PackageStatus.MATCHED)
-        assert "accepted" in allowed
-        assert "pending" in allowed
-        assert "cancelled" in allowed
+    def test_open_for_bids_allows_bid_selected_and_canceled(self):
+        """OPEN_FOR_BIDS allows BID_SELECTED and CANCELED."""
+        allowed = get_allowed_next_statuses(PackageStatus.OPEN_FOR_BIDS)
+        assert "bid_selected" in allowed
+        assert "canceled" in allowed
+        assert len(allowed) == 2
+
+    def test_bid_selected_allows_pending_pickup_open_for_bids_canceled(self):
+        """BID_SELECTED allows PENDING_PICKUP, OPEN_FOR_BIDS, and CANCELED."""
+        allowed = get_allowed_next_statuses(PackageStatus.BID_SELECTED)
+        assert "pending_pickup" in allowed
+        assert "open_for_bids" in allowed
+        assert "canceled" in allowed
         assert len(allowed) == 3
 
-    def test_accepted_allows_picked_up_cancelled(self):
-        """ACCEPTED allows PICKED_UP and CANCELLED."""
-        allowed = get_allowed_next_statuses(PackageStatus.ACCEPTED)
-        assert "picked_up" in allowed
-        assert "cancelled" in allowed
-        assert len(allowed) == 2
+    def test_pending_pickup_allows_in_transit_failed_canceled(self):
+        """PENDING_PICKUP allows IN_TRANSIT, FAILED, and CANCELED."""
+        allowed = get_allowed_next_statuses(PackageStatus.PENDING_PICKUP)
+        assert "in_transit" in allowed
+        assert "failed" in allowed
+        assert "canceled" in allowed
+        assert len(allowed) == 3
 
-    def test_picked_up_allows_only_in_transit(self):
-        """PICKED_UP only allows IN_TRANSIT."""
-        allowed = get_allowed_next_statuses(PackageStatus.PICKED_UP)
-        assert allowed == ["in_transit"]
-
-    def test_in_transit_allows_only_delivered(self):
-        """IN_TRANSIT only allows DELIVERED."""
+    def test_in_transit_allows_delivered_and_failed(self):
+        """IN_TRANSIT allows DELIVERED and FAILED."""
         allowed = get_allowed_next_statuses(PackageStatus.IN_TRANSIT)
-        assert allowed == ["delivered"]
+        assert "delivered" in allowed
+        assert "failed" in allowed
+        assert len(allowed) == 2
 
     def test_delivered_allows_nothing(self):
         """DELIVERED is terminal - no next statuses."""
         allowed = get_allowed_next_statuses(PackageStatus.DELIVERED)
         assert allowed == []
 
-    def test_cancelled_allows_nothing(self):
-        """CANCELLED is terminal - no next statuses."""
-        allowed = get_allowed_next_statuses(PackageStatus.CANCELLED)
+    def test_canceled_allows_nothing(self):
+        """CANCELED is terminal - no next statuses."""
+        allowed = get_allowed_next_statuses(PackageStatus.CANCELED)
+        assert allowed == []
+
+    def test_failed_allows_open_for_bids(self):
+        """FAILED allows OPEN_FOR_BIDS (admin only)."""
+        allowed = get_allowed_next_statuses(PackageStatus.FAILED, is_admin=True)
+        assert "open_for_bids" in allowed
+        assert len(allowed) == 1
+
+    def test_failed_allows_nothing_for_non_admin(self):
+        """FAILED allows nothing for non-admins."""
+        allowed = get_allowed_next_statuses(PackageStatus.FAILED, is_admin=False)
         assert allowed == []
 
 
@@ -201,7 +226,6 @@ class TestCanMarkDelivered:
 
     def test_can_deliver_when_in_transit_no_proof_required(self, db_session):
         """Package in IN_TRANSIT with requires_proof=False can be delivered."""
-        # Create a package
         package = Package(
             sender_id=1,
             description="Test",
@@ -242,8 +266,8 @@ class TestCanMarkDelivered:
         assert can_deliver is True
         assert result == "proof_required"
 
-    def test_cannot_deliver_when_picked_up(self, db_session):
-        """Package in PICKED_UP cannot be directly delivered."""
+    def test_cannot_deliver_when_pending_pickup(self, db_session):
+        """Package in PENDING_PICKUP cannot be directly delivered."""
         package = Package(
             sender_id=1,
             description="Test",
@@ -255,7 +279,7 @@ class TestCanMarkDelivered:
             dropoff_address="B",
             dropoff_lat=0,
             dropoff_lng=0,
-            status=PackageStatus.PICKED_UP,
+            status=PackageStatus.PENDING_PICKUP,
             requires_proof=False
         )
 
@@ -263,8 +287,8 @@ class TestCanMarkDelivered:
         assert can_deliver is False
         assert "must be In Transit" in result
 
-    def test_cannot_deliver_when_matched(self, db_session):
-        """Package in MATCHED cannot be directly delivered."""
+    def test_cannot_deliver_when_open_for_bids(self, db_session):
+        """Package in OPEN_FOR_BIDS cannot be directly delivered."""
         package = Package(
             sender_id=1,
             description="Test",
@@ -276,21 +300,56 @@ class TestCanMarkDelivered:
             dropoff_address="B",
             dropoff_lat=0,
             dropoff_lng=0,
-            status=PackageStatus.MATCHED,
+            status=PackageStatus.OPEN_FOR_BIDS,
             requires_proof=False
         )
 
         can_deliver, result = can_mark_delivered(package)
         assert can_deliver is False
         assert "must be In Transit" in result
+
+
+class TestCanCancel:
+    """Tests for can_cancel function."""
+
+    def test_can_cancel_new(self):
+        """NEW packages can be canceled."""
+        assert can_cancel(PackageStatus.NEW) is True
+
+    def test_can_cancel_open_for_bids(self):
+        """OPEN_FOR_BIDS packages can be canceled."""
+        assert can_cancel(PackageStatus.OPEN_FOR_BIDS) is True
+
+    def test_can_cancel_bid_selected(self):
+        """BID_SELECTED packages can be canceled."""
+        assert can_cancel(PackageStatus.BID_SELECTED) is True
+
+    def test_can_cancel_pending_pickup(self):
+        """PENDING_PICKUP packages can be canceled."""
+        assert can_cancel(PackageStatus.PENDING_PICKUP) is True
+
+    def test_cannot_cancel_in_transit(self):
+        """IN_TRANSIT packages cannot be canceled (can only FAIL or DELIVER)."""
+        assert can_cancel(PackageStatus.IN_TRANSIT) is False
+
+    def test_cannot_cancel_delivered(self):
+        """DELIVERED packages cannot be canceled."""
+        assert can_cancel(PackageStatus.DELIVERED) is False
+
+    def test_cannot_cancel_canceled(self):
+        """Already CANCELED packages cannot be canceled."""
+        assert can_cancel(PackageStatus.CANCELED) is False
+
+    def test_cannot_cancel_failed(self):
+        """FAILED packages cannot be canceled."""
+        assert can_cancel(PackageStatus.FAILED) is False
 
 
 class TestTransitionPackage:
     """Tests for transition_package function."""
 
-    def test_transition_pending_to_matched(self, db_session):
-        """Test transitioning from PENDING to MATCHED."""
-        # Create sender
+    def test_transition_new_to_open_for_bids(self, db_session):
+        """Test transitioning from NEW to OPEN_FOR_BIDS."""
         sender = User(
             email="sender_trans@test.com",
             hashed_password=get_password_hash("password"),
@@ -303,20 +362,6 @@ class TestTransitionPackage:
         db_session.add(sender)
         db_session.commit()
 
-        # Create courier
-        courier = User(
-            email="courier_trans@test.com",
-            hashed_password=get_password_hash("password"),
-            full_name="Courier",
-            role=UserRole.COURIER,
-            is_active=True,
-            is_verified=True,
-            max_deviation_km=5
-        )
-        db_session.add(courier)
-        db_session.commit()
-
-        # Create package
         package = Package(
             sender_id=sender.id,
             description="Test",
@@ -328,76 +373,20 @@ class TestTransitionPackage:
             dropoff_address="B",
             dropoff_lat=0,
             dropoff_lng=0,
-            status=PackageStatus.PENDING,
+            status=PackageStatus.NEW,
             requires_proof=True
         )
         db_session.add(package)
         db_session.commit()
 
-        # Transition to MATCHED
-        updated_package, error = transition_package(db_session, package, PackageStatus.MATCHED, courier.id)
+        updated_package, error = transition_package(db_session, package, PackageStatus.OPEN_FOR_BIDS, actor_id=sender.id)
 
         assert error == ""
-        assert updated_package.status == PackageStatus.MATCHED
-        assert updated_package.courier_id == courier.id
-        assert updated_package.matched_at is not None
+        assert updated_package.status == PackageStatus.OPEN_FOR_BIDS
         assert updated_package.status_changed_at is not None
 
-    def test_transition_matched_to_accepted(self, db_session):
-        """Test transitioning from MATCHED to ACCEPTED."""
-        # Create users
-        sender = User(
-            email="sender_accept@test.com",
-            hashed_password=get_password_hash("password"),
-            full_name="Sender",
-            role=UserRole.SENDER,
-            is_active=True,
-            is_verified=True,
-            max_deviation_km=5
-        )
-        db_session.add(sender)
-
-        courier = User(
-            email="courier_accept@test.com",
-            hashed_password=get_password_hash("password"),
-            full_name="Courier",
-            role=UserRole.COURIER,
-            is_active=True,
-            is_verified=True,
-            max_deviation_km=5
-        )
-        db_session.add(courier)
-        db_session.commit()
-
-        # Create package in MATCHED status
-        package = Package(
-            sender_id=sender.id,
-            courier_id=courier.id,
-            description="Test",
-            size="small",
-            weight_kg=1.0,
-            pickup_address="A",
-            pickup_lat=0,
-            pickup_lng=0,
-            dropoff_address="B",
-            dropoff_lat=0,
-            dropoff_lng=0,
-            status=PackageStatus.MATCHED,
-            requires_proof=True
-        )
-        db_session.add(package)
-        db_session.commit()
-
-        # Transition to ACCEPTED
-        updated_package, error = transition_package(db_session, package, PackageStatus.ACCEPTED, courier.id)
-
-        assert error == ""
-        assert updated_package.status == PackageStatus.ACCEPTED
-        assert updated_package.accepted_at is not None
-
-    def test_transition_accepted_to_picked_up(self, db_session):
-        """Test transitioning from ACCEPTED to PICKED_UP."""
-        # Create users
+    def test_transition_bid_selected_to_pending_pickup(self, db_session):
+        """Test transitioning from BID_SELECTED to PENDING_PICKUP."""
         sender = User(
             email="sender_pickup@test.com",
             hashed_password=get_password_hash("password"),
@@ -421,7 +410,6 @@ class TestTransitionPackage:
         db_session.add(courier)
         db_session.commit()
 
-        # Create package in ACCEPTED status
         package = Package(
             sender_id=sender.id,
             courier_id=courier.id,
@@ -434,23 +422,70 @@ class TestTransitionPackage:
             dropoff_address="B",
             dropoff_lat=0,
             dropoff_lng=0,
-            status=PackageStatus.ACCEPTED,
+            status=PackageStatus.BID_SELECTED,
             requires_proof=True
         )
         db_session.add(package)
         db_session.commit()
 
-        # Transition to PICKED_UP
-        updated_package, error = transition_package(db_session, package, PackageStatus.PICKED_UP, courier.id)
+        updated_package, error = transition_package(db_session, package, PackageStatus.PENDING_PICKUP, courier.id)
 
         assert error == ""
-        assert updated_package.status == PackageStatus.PICKED_UP
-        assert updated_package.picked_up_at is not None
+        assert updated_package.status == PackageStatus.PENDING_PICKUP
+        assert updated_package.pending_pickup_at is not None
+
+    def test_transition_pending_pickup_to_in_transit(self, db_session):
+        """Test transitioning from PENDING_PICKUP to IN_TRANSIT."""
+        sender = User(
+            email="sender_intransit@test.com",
+            hashed_password=get_password_hash("password"),
+            full_name="Sender",
+            role=UserRole.SENDER,
+            is_active=True,
+            is_verified=True,
+            max_deviation_km=5
+        )
+        db_session.add(sender)
+
+        courier = User(
+            email="courier_intransit@test.com",
+            hashed_password=get_password_hash("password"),
+            full_name="Courier",
+            role=UserRole.COURIER,
+            is_active=True,
+            is_verified=True,
+            max_deviation_km=5
+        )
+        db_session.add(courier)
+        db_session.commit()
+
+        package = Package(
+            sender_id=sender.id,
+            courier_id=courier.id,
+            description="Test",
+            size="small",
+            weight_kg=1.0,
+            pickup_address="A",
+            pickup_lat=0,
+            pickup_lng=0,
+            dropoff_address="B",
+            dropoff_lat=0,
+            dropoff_lng=0,
+            status=PackageStatus.PENDING_PICKUP,
+            requires_proof=True
+        )
+        db_session.add(package)
+        db_session.commit()
+
+        updated_package, error = transition_package(db_session, package, PackageStatus.IN_TRANSIT, courier.id)
+
+        assert error == ""
+        assert updated_package.status == PackageStatus.IN_TRANSIT
+        assert updated_package.in_transit_at is not None
         assert updated_package.pickup_time is not None
 
     def test_transition_in_transit_to_delivered(self, db_session):
         """Test transitioning from IN_TRANSIT to DELIVERED."""
-        # Create users
         sender = User(
             email="sender_deliver@test.com",
             hashed_password=get_password_hash("password"),
@@ -474,7 +509,6 @@ class TestTransitionPackage:
         db_session.add(courier)
         db_session.commit()
 
-        # Create package in IN_TRANSIT status
         package = Package(
             sender_id=sender.id,
             courier_id=courier.id,
@@ -493,18 +527,16 @@ class TestTransitionPackage:
         db_session.add(package)
         db_session.commit()
 
-        # Transition to DELIVERED
         updated_package, error = transition_package(db_session, package, PackageStatus.DELIVERED, courier.id)
 
         assert error == ""
         assert updated_package.status == PackageStatus.DELIVERED
         assert updated_package.delivery_time is not None
 
-    def test_transition_matched_to_pending_decline(self, db_session):
-        """Test declining (MATCHED -> PENDING) clears courier."""
-        # Create users
+    def test_transition_to_failed(self, db_session):
+        """Test transitioning from IN_TRANSIT to FAILED."""
         sender = User(
-            email="sender_decline@test.com",
+            email="sender_fail@test.com",
             hashed_password=get_password_hash("password"),
             full_name="Sender",
             role=UserRole.SENDER,
@@ -515,7 +547,7 @@ class TestTransitionPackage:
         db_session.add(sender)
 
         courier = User(
-            email="courier_decline@test.com",
+            email="courier_fail@test.com",
             hashed_password=get_password_hash("password"),
             full_name="Courier",
             role=UserRole.COURIER,
@@ -526,7 +558,6 @@ class TestTransitionPackage:
         db_session.add(courier)
         db_session.commit()
 
-        # Create package in MATCHED status
         package = Package(
             sender_id=sender.id,
             courier_id=courier.id,
@@ -539,24 +570,20 @@ class TestTransitionPackage:
             dropoff_address="B",
             dropoff_lat=0,
             dropoff_lng=0,
-            status=PackageStatus.MATCHED,
-            matched_at=datetime.utcnow(),
-            requires_proof=True
+            status=PackageStatus.IN_TRANSIT,
+            requires_proof=False
         )
         db_session.add(package)
         db_session.commit()
 
-        # Transition back to PENDING (decline)
-        updated_package, error = transition_package(db_session, package, PackageStatus.PENDING, courier.id)
+        updated_package, error = transition_package(db_session, package, PackageStatus.FAILED, courier.id)
 
         assert error == ""
-        assert updated_package.status == PackageStatus.PENDING
-        assert updated_package.courier_id is None
-        assert updated_package.matched_at is None
+        assert updated_package.status == PackageStatus.FAILED
+        assert updated_package.failed_at is not None
 
     def test_invalid_transition_returns_error(self, db_session):
         """Test that invalid transitions return an error."""
-        # Create sender
         sender = User(
             email="sender_invalid@test.com",
             hashed_password=get_password_hash("password"),
@@ -569,7 +596,6 @@ class TestTransitionPackage:
         db_session.add(sender)
         db_session.commit()
 
-        # Create package
         package = Package(
             sender_id=sender.id,
             description="Test",
@@ -581,25 +607,25 @@ class TestTransitionPackage:
             dropoff_address="B",
             dropoff_lat=0,
             dropoff_lng=0,
-            status=PackageStatus.PENDING,
+            status=PackageStatus.OPEN_FOR_BIDS,
             requires_proof=True
         )
         db_session.add(package)
         db_session.commit()
 
-        # Try invalid transition (PENDING -> DELIVERED)
+        # Try invalid transition (OPEN_FOR_BIDS -> DELIVERED)
         updated_package, error = transition_package(db_session, package, PackageStatus.DELIVERED, 1)
 
         assert error != ""
         assert "Invalid status transition" in error
-        assert package.status == PackageStatus.PENDING  # Unchanged
+        assert package.status == PackageStatus.OPEN_FOR_BIDS  # Unchanged
 
 
 class TestGetStatusProgress:
     """Tests for get_status_progress function."""
 
-    def test_progress_pending(self, db_session):
-        """Test progress calculation for PENDING status."""
+    def test_progress_new(self, db_session):
+        """Test progress calculation for NEW status."""
         package = Package(
             sender_id=1,
             description="Test",
@@ -611,7 +637,7 @@ class TestGetStatusProgress:
             dropoff_address="B",
             dropoff_lat=0,
             dropoff_lng=0,
-            status=PackageStatus.PENDING,
+            status=PackageStatus.NEW,
             requires_proof=True,
             created_at=datetime.utcnow()
         )
@@ -620,11 +646,10 @@ class TestGetStatusProgress:
 
         assert progress["current_step"] == 0
         assert progress["is_terminal"] is False
-        assert progress["is_cancelled"] is False
-        assert progress["progress_percent"] == 0
+        assert progress["is_canceled"] is False
 
-    def test_progress_matched(self, db_session):
-        """Test progress calculation for MATCHED status."""
+    def test_progress_open_for_bids(self, db_session):
+        """Test progress calculation for OPEN_FOR_BIDS status."""
         package = Package(
             sender_id=1,
             description="Test",
@@ -636,43 +661,15 @@ class TestGetStatusProgress:
             dropoff_address="B",
             dropoff_lat=0,
             dropoff_lng=0,
-            status=PackageStatus.MATCHED,
+            status=PackageStatus.OPEN_FOR_BIDS,
             requires_proof=True,
-            created_at=datetime.utcnow(),
-            matched_at=datetime.utcnow()
+            created_at=datetime.utcnow()
         )
 
         progress = get_status_progress(package)
 
         assert progress["current_step"] == 1
         assert progress["is_terminal"] is False
-        assert progress["progress_percent"] == 20  # 1/5 = 20%
-
-    def test_progress_accepted(self, db_session):
-        """Test progress calculation for ACCEPTED status."""
-        package = Package(
-            sender_id=1,
-            description="Test",
-            size="small",
-            weight_kg=1.0,
-            pickup_address="A",
-            pickup_lat=0,
-            pickup_lng=0,
-            dropoff_address="B",
-            dropoff_lat=0,
-            dropoff_lng=0,
-            status=PackageStatus.ACCEPTED,
-            requires_proof=True,
-            created_at=datetime.utcnow(),
-            matched_at=datetime.utcnow(),
-            accepted_at=datetime.utcnow()
-        )
-
-        progress = get_status_progress(package)
-
-        assert progress["current_step"] == 2
-        assert progress["is_terminal"] is False
-        assert progress["progress_percent"] == 40  # 2/5 = 40%
 
     def test_progress_delivered(self, db_session):
         """Test progress calculation for DELIVERED status."""
@@ -695,12 +692,12 @@ class TestGetStatusProgress:
 
         progress = get_status_progress(package)
 
-        assert progress["current_step"] == 5  # Now 5 steps with ACCEPTED
+        assert progress["current_step"] == 5
         assert progress["is_terminal"] is True
         assert progress["progress_percent"] == 100
 
-    def test_progress_cancelled(self, db_session):
-        """Test progress calculation for CANCELLED status."""
+    def test_progress_canceled(self, db_session):
+        """Test progress calculation for CANCELED status."""
         package = Package(
             sender_id=1,
             description="Test",
@@ -712,7 +709,7 @@ class TestGetStatusProgress:
             dropoff_address="B",
             dropoff_lat=0,
             dropoff_lng=0,
-            status=PackageStatus.CANCELLED,
+            status=PackageStatus.CANCELED,
             requires_proof=True,
             created_at=datetime.utcnow()
         )
@@ -721,321 +718,90 @@ class TestGetStatusProgress:
 
         assert progress["current_step"] == -1
         assert progress["is_terminal"] is True
-        assert progress["is_cancelled"] is True
+        assert progress["is_canceled"] is True
         assert progress["progress_percent"] == 0
+
+    def test_progress_failed(self, db_session):
+        """Test progress calculation for FAILED status."""
+        package = Package(
+            sender_id=1,
+            description="Test",
+            size="small",
+            weight_kg=1.0,
+            pickup_address="A",
+            pickup_lat=0,
+            pickup_lng=0,
+            dropoff_address="B",
+            dropoff_lat=0,
+            dropoff_lng=0,
+            status=PackageStatus.FAILED,
+            requires_proof=True,
+            created_at=datetime.utcnow()
+        )
+
+        progress = get_status_progress(package)
+
+        # FAILED is not terminal because admin can retry
+        assert progress["is_terminal"] is False
+        assert progress["is_failed"] is True
 
 
 class TestAllowedTransitionsComplete:
     """Comprehensive tests for all allowed transitions."""
 
     @pytest.mark.parametrize("from_status,to_status,expected_valid", [
-        # PENDING transitions
-        (PackageStatus.PENDING, PackageStatus.MATCHED, True),
-        (PackageStatus.PENDING, PackageStatus.CANCELLED, True),
-        (PackageStatus.PENDING, PackageStatus.ACCEPTED, False),
-        (PackageStatus.PENDING, PackageStatus.PICKED_UP, False),
-        (PackageStatus.PENDING, PackageStatus.IN_TRANSIT, False),
-        (PackageStatus.PENDING, PackageStatus.DELIVERED, False),
+        # NEW transitions
+        (PackageStatus.NEW, PackageStatus.OPEN_FOR_BIDS, True),
+        (PackageStatus.NEW, PackageStatus.CANCELED, True),
+        (PackageStatus.NEW, PackageStatus.BID_SELECTED, False),
+        (PackageStatus.NEW, PackageStatus.IN_TRANSIT, False),
+        (PackageStatus.NEW, PackageStatus.DELIVERED, False),
 
-        # MATCHED transitions
-        (PackageStatus.MATCHED, PackageStatus.ACCEPTED, True),
-        (PackageStatus.MATCHED, PackageStatus.PENDING, True),
-        (PackageStatus.MATCHED, PackageStatus.CANCELLED, True),
-        (PackageStatus.MATCHED, PackageStatus.PICKED_UP, False),  # Must go through ACCEPTED
-        (PackageStatus.MATCHED, PackageStatus.IN_TRANSIT, False),
-        (PackageStatus.MATCHED, PackageStatus.DELIVERED, False),
+        # OPEN_FOR_BIDS transitions
+        (PackageStatus.OPEN_FOR_BIDS, PackageStatus.BID_SELECTED, True),
+        (PackageStatus.OPEN_FOR_BIDS, PackageStatus.CANCELED, True),
+        (PackageStatus.OPEN_FOR_BIDS, PackageStatus.NEW, False),
+        (PackageStatus.OPEN_FOR_BIDS, PackageStatus.IN_TRANSIT, False),
+        (PackageStatus.OPEN_FOR_BIDS, PackageStatus.DELIVERED, False),
 
-        # ACCEPTED transitions
-        (PackageStatus.ACCEPTED, PackageStatus.PICKED_UP, True),
-        (PackageStatus.ACCEPTED, PackageStatus.CANCELLED, True),
-        (PackageStatus.ACCEPTED, PackageStatus.PENDING, False),
-        (PackageStatus.ACCEPTED, PackageStatus.MATCHED, False),
-        (PackageStatus.ACCEPTED, PackageStatus.IN_TRANSIT, False),
-        (PackageStatus.ACCEPTED, PackageStatus.DELIVERED, False),
+        # BID_SELECTED transitions
+        (PackageStatus.BID_SELECTED, PackageStatus.PENDING_PICKUP, True),
+        (PackageStatus.BID_SELECTED, PackageStatus.OPEN_FOR_BIDS, True),
+        (PackageStatus.BID_SELECTED, PackageStatus.CANCELED, True),
+        (PackageStatus.BID_SELECTED, PackageStatus.IN_TRANSIT, False),
+        (PackageStatus.BID_SELECTED, PackageStatus.DELIVERED, False),
 
-        # PICKED_UP transitions
-        (PackageStatus.PICKED_UP, PackageStatus.IN_TRANSIT, True),
-        (PackageStatus.PICKED_UP, PackageStatus.PENDING, False),
-        (PackageStatus.PICKED_UP, PackageStatus.MATCHED, False),
-        (PackageStatus.PICKED_UP, PackageStatus.ACCEPTED, False),
-        (PackageStatus.PICKED_UP, PackageStatus.DELIVERED, False),
-        (PackageStatus.PICKED_UP, PackageStatus.CANCELLED, False),
+        # PENDING_PICKUP transitions
+        (PackageStatus.PENDING_PICKUP, PackageStatus.IN_TRANSIT, True),
+        (PackageStatus.PENDING_PICKUP, PackageStatus.FAILED, True),
+        (PackageStatus.PENDING_PICKUP, PackageStatus.CANCELED, True),
+        (PackageStatus.PENDING_PICKUP, PackageStatus.DELIVERED, False),
+        (PackageStatus.PENDING_PICKUP, PackageStatus.NEW, False),
 
         # IN_TRANSIT transitions
         (PackageStatus.IN_TRANSIT, PackageStatus.DELIVERED, True),
-        (PackageStatus.IN_TRANSIT, PackageStatus.PENDING, False),
-        (PackageStatus.IN_TRANSIT, PackageStatus.MATCHED, False),
-        (PackageStatus.IN_TRANSIT, PackageStatus.ACCEPTED, False),
-        (PackageStatus.IN_TRANSIT, PackageStatus.PICKED_UP, False),
-        (PackageStatus.IN_TRANSIT, PackageStatus.CANCELLED, False),
+        (PackageStatus.IN_TRANSIT, PackageStatus.FAILED, True),
+        (PackageStatus.IN_TRANSIT, PackageStatus.CANCELED, False),
+        (PackageStatus.IN_TRANSIT, PackageStatus.PENDING_PICKUP, False),
+        (PackageStatus.IN_TRANSIT, PackageStatus.NEW, False),
 
         # DELIVERED transitions (terminal)
-        (PackageStatus.DELIVERED, PackageStatus.PENDING, False),
-        (PackageStatus.DELIVERED, PackageStatus.MATCHED, False),
-        (PackageStatus.DELIVERED, PackageStatus.ACCEPTED, False),
-        (PackageStatus.DELIVERED, PackageStatus.PICKED_UP, False),
-        (PackageStatus.DELIVERED, PackageStatus.IN_TRANSIT, False),
-        (PackageStatus.DELIVERED, PackageStatus.CANCELLED, False),
+        (PackageStatus.DELIVERED, PackageStatus.NEW, False),
+        (PackageStatus.DELIVERED, PackageStatus.OPEN_FOR_BIDS, False),
+        (PackageStatus.DELIVERED, PackageStatus.CANCELED, False),
+        (PackageStatus.DELIVERED, PackageStatus.FAILED, False),
 
-        # CANCELLED transitions (terminal)
-        (PackageStatus.CANCELLED, PackageStatus.PENDING, False),
-        (PackageStatus.CANCELLED, PackageStatus.MATCHED, False),
-        (PackageStatus.CANCELLED, PackageStatus.ACCEPTED, False),
-        (PackageStatus.CANCELLED, PackageStatus.PICKED_UP, False),
-        (PackageStatus.CANCELLED, PackageStatus.IN_TRANSIT, False),
-        (PackageStatus.CANCELLED, PackageStatus.DELIVERED, False),
+        # CANCELED transitions (terminal)
+        (PackageStatus.CANCELED, PackageStatus.NEW, False),
+        (PackageStatus.CANCELED, PackageStatus.OPEN_FOR_BIDS, False),
+        (PackageStatus.CANCELED, PackageStatus.DELIVERED, False),
+
+        # FAILED transitions (admin retry)
+        (PackageStatus.FAILED, PackageStatus.NEW, False),
+        (PackageStatus.FAILED, PackageStatus.DELIVERED, False),
+        (PackageStatus.FAILED, PackageStatus.CANCELED, False),
     ])
     def test_transition(self, from_status, to_status, expected_valid):
         """Parameterized test for all status transitions."""
         is_valid, _ = validate_transition(from_status, to_status)
         assert is_valid == expected_valid, f"Expected {from_status.value} -> {to_status.value} to be {'valid' if expected_valid else 'invalid'}"
-
-
-class TestAcceptPackageMatch:
-    """Tests for accept_package_match function."""
-
-    def test_sender_accepts_first(self, db_session):
-        """Test sender accepting first."""
-        sender = User(
-            email="sender_accept_test1@test.com",
-            hashed_password=get_password_hash("password"),
-            full_name="Sender",
-            role=UserRole.SENDER,
-            is_active=True,
-            is_verified=True,
-            max_deviation_km=5
-        )
-        db_session.add(sender)
-
-        courier = User(
-            email="courier_accept_test1@test.com",
-            hashed_password=get_password_hash("password"),
-            full_name="Courier",
-            role=UserRole.COURIER,
-            is_active=True,
-            is_verified=True,
-            max_deviation_km=5
-        )
-        db_session.add(courier)
-        db_session.commit()
-
-        package = Package(
-            sender_id=sender.id,
-            courier_id=courier.id,
-            description="Test",
-            size="small",
-            weight_kg=1.0,
-            pickup_address="A",
-            pickup_lat=0,
-            pickup_lng=0,
-            dropoff_address="B",
-            dropoff_lat=0,
-            dropoff_lng=0,
-            status=PackageStatus.MATCHED,
-            requires_proof=True
-        )
-        db_session.add(package)
-        db_session.commit()
-
-        # Sender accepts
-        updated_package, error = accept_package_match(db_session, package, sender.id, is_sender=True)
-
-        assert error == ""
-        assert updated_package.sender_accepted is True
-        assert updated_package.courier_accepted is False
-        assert updated_package.status == PackageStatus.MATCHED  # Still matched, waiting for courier
-
-    def test_courier_accepts_first(self, db_session):
-        """Test courier accepting first."""
-        sender = User(
-            email="sender_accept_test2@test.com",
-            hashed_password=get_password_hash("password"),
-            full_name="Sender",
-            role=UserRole.SENDER,
-            is_active=True,
-            is_verified=True,
-            max_deviation_km=5
-        )
-        db_session.add(sender)
-
-        courier = User(
-            email="courier_accept_test2@test.com",
-            hashed_password=get_password_hash("password"),
-            full_name="Courier",
-            role=UserRole.COURIER,
-            is_active=True,
-            is_verified=True,
-            max_deviation_km=5
-        )
-        db_session.add(courier)
-        db_session.commit()
-
-        package = Package(
-            sender_id=sender.id,
-            courier_id=courier.id,
-            description="Test",
-            size="small",
-            weight_kg=1.0,
-            pickup_address="A",
-            pickup_lat=0,
-            pickup_lng=0,
-            dropoff_address="B",
-            dropoff_lat=0,
-            dropoff_lng=0,
-            status=PackageStatus.MATCHED,
-            requires_proof=True
-        )
-        db_session.add(package)
-        db_session.commit()
-
-        # Courier accepts
-        updated_package, error = accept_package_match(db_session, package, courier.id, is_sender=False)
-
-        assert error == ""
-        assert updated_package.sender_accepted is False
-        assert updated_package.courier_accepted is True
-        assert updated_package.status == PackageStatus.MATCHED  # Still matched, waiting for sender
-
-    def test_both_accept_transitions_to_accepted(self, db_session):
-        """Test that when both accept, status transitions to ACCEPTED."""
-        sender = User(
-            email="sender_accept_test3@test.com",
-            hashed_password=get_password_hash("password"),
-            full_name="Sender",
-            role=UserRole.SENDER,
-            is_active=True,
-            is_verified=True,
-            max_deviation_km=5
-        )
-        db_session.add(sender)
-
-        courier = User(
-            email="courier_accept_test3@test.com",
-            hashed_password=get_password_hash("password"),
-            full_name="Courier",
-            role=UserRole.COURIER,
-            is_active=True,
-            is_verified=True,
-            max_deviation_km=5
-        )
-        db_session.add(courier)
-        db_session.commit()
-
-        package = Package(
-            sender_id=sender.id,
-            courier_id=courier.id,
-            description="Test",
-            size="small",
-            weight_kg=1.0,
-            pickup_address="A",
-            pickup_lat=0,
-            pickup_lng=0,
-            dropoff_address="B",
-            dropoff_lat=0,
-            dropoff_lng=0,
-            status=PackageStatus.MATCHED,
-            requires_proof=True
-        )
-        db_session.add(package)
-        db_session.commit()
-
-        # Sender accepts first
-        package, _ = accept_package_match(db_session, package, sender.id, is_sender=True)
-        assert package.status == PackageStatus.MATCHED
-
-        # Courier accepts second - should transition to ACCEPTED
-        package, error = accept_package_match(db_session, package, courier.id, is_sender=False)
-
-        assert error == ""
-        assert package.sender_accepted is True
-        assert package.courier_accepted is True
-        assert package.status == PackageStatus.ACCEPTED
-        assert package.accepted_at is not None
-
-    def test_cannot_accept_non_matched_package(self, db_session):
-        """Test that only MATCHED packages can be accepted."""
-        sender = User(
-            email="sender_accept_test4@test.com",
-            hashed_password=get_password_hash("password"),
-            full_name="Sender",
-            role=UserRole.SENDER,
-            is_active=True,
-            is_verified=True,
-            max_deviation_km=5
-        )
-        db_session.add(sender)
-        db_session.commit()
-
-        package = Package(
-            sender_id=sender.id,
-            description="Test",
-            size="small",
-            weight_kg=1.0,
-            pickup_address="A",
-            pickup_lat=0,
-            pickup_lng=0,
-            dropoff_address="B",
-            dropoff_lat=0,
-            dropoff_lng=0,
-            status=PackageStatus.PENDING,
-            requires_proof=True
-        )
-        db_session.add(package)
-        db_session.commit()
-
-        package, error = accept_package_match(db_session, package, sender.id, is_sender=True)
-
-        assert error != ""
-        assert "Matched status" in error
-
-    def test_double_acceptance_rejected(self, db_session):
-        """Test that double acceptance by same party is rejected."""
-        sender = User(
-            email="sender_accept_test5@test.com",
-            hashed_password=get_password_hash("password"),
-            full_name="Sender",
-            role=UserRole.SENDER,
-            is_active=True,
-            is_verified=True,
-            max_deviation_km=5
-        )
-        db_session.add(sender)
-
-        courier = User(
-            email="courier_accept_test5@test.com",
-            hashed_password=get_password_hash("password"),
-            full_name="Courier",
-            role=UserRole.COURIER,
-            is_active=True,
-            is_verified=True,
-            max_deviation_km=5
-        )
-        db_session.add(courier)
-        db_session.commit()
-
-        package = Package(
-            sender_id=sender.id,
-            courier_id=courier.id,
-            description="Test",
-            size="small",
-            weight_kg=1.0,
-            pickup_address="A",
-            pickup_lat=0,
-            pickup_lng=0,
-            dropoff_address="B",
-            dropoff_lat=0,
-            dropoff_lng=0,
-            status=PackageStatus.MATCHED,
-            requires_proof=True
-        )
-        db_session.add(package)
-        db_session.commit()
-
-        # Sender accepts
-        package, _ = accept_package_match(db_session, package, sender.id, is_sender=True)
-
-        # Sender tries to accept again
-        package, error = accept_package_match(db_session, package, sender.id, is_sender=True)
-
-        assert error != ""
-        assert "already accepted" in error.lower()

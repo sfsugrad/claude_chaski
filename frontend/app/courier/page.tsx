@@ -62,11 +62,11 @@ export default function CourierDashboard() {
     try {
       const response = await packagesAPI.getAll()
       // Filter to only show packages where user is the courier (not sender)
-      // and exclude delivered/cancelled packages
+      // and exclude delivered/canceled/failed packages
       const courierPackages = response.data.filter(
         (pkg: PackageResponse) =>
           pkg.courier_id !== null &&
-          !['delivered', 'cancelled'].includes(pkg.status)
+          !['delivered', 'canceled', 'failed'].includes(pkg.status)
       )
       setAssignedPackages(courierPackages)
     } catch (err) {

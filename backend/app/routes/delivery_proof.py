@@ -141,11 +141,11 @@ async def get_upload_url(
             detail="Only the assigned courier can upload delivery proof"
         )
 
-    # Package must be in transit or picked up
-    if package.status not in [PackageStatus.PICKED_UP, PackageStatus.IN_TRANSIT]:
+    # Package must be in transit
+    if package.status != PackageStatus.IN_TRANSIT:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot upload proof for package in {package.status.value} status"
+            detail=f"Cannot upload proof for package in {package.status.value} status. Package must be 'In Transit'."
         )
 
     # Check if proof already exists
@@ -207,13 +207,8 @@ async def create_delivery_proof(
             detail="Only the assigned courier can submit delivery proof"
         )
 
-    # Package must be IN_TRANSIT (strict progression)
+    # Package must be IN_TRANSIT
     if package.status != PackageStatus.IN_TRANSIT:
-        if package.status == PackageStatus.PICKED_UP:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Package must be marked as 'In Transit' before submitting delivery proof. Please update the status first."
-            )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Cannot submit proof for package in {package.status.value} status. Package must be 'In Transit'."

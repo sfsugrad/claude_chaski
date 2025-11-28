@@ -21,6 +21,7 @@ from app.models.user import User
 class TestAcceptPackageNotification:
     """Test that accepting a package creates notification for sender"""
 
+    @pytest.mark.skip(reason="accept-package endpoint removed; replaced by bidding system - see test_bids.py")
     def test_accept_package_creates_notification(
         self, client, authenticated_courier, db_session, test_package_data
     ):
@@ -49,7 +50,7 @@ class TestAcceptPackageNotification:
             dropoff_address="456 Dropoff Ave",
             dropoff_lat=40.7580,
             dropoff_lng=-73.9855,
-            status=PackageStatus.PENDING,
+            status=PackageStatus.OPEN_FOR_BIDS,
             is_active=True
         )
         db_session.add(package)
@@ -57,11 +58,10 @@ class TestAcceptPackageNotification:
         db_session.refresh(package)
 
         # Accept the package as courier
-        with patch('app.routes.matching.send_package_accepted_email', new_callable=AsyncMock):
-            response = client.post(
-                f"/api/matching/accept-package/{package.id}",
-                headers={"Authorization": f"Bearer {authenticated_courier}"}
-            )
+        response = client.post(
+            f"/api/matching/accept-package/{package.id}",
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
 
         assert response.status_code == status.HTTP_200_OK
 
@@ -73,9 +73,10 @@ class TestAcceptPackageNotification:
 
         assert notification is not None
         assert notification.package_id == package.id
-        assert "matched" in notification.message.lower()
+        assert "bid_selected" in notification.message.lower()
         assert notification.read is False
 
+    @pytest.mark.skip(reason="accept-package endpoint removed; replaced by bidding system - see test_bids.py")
     def test_accept_package_notification_contains_courier_name(
         self, client, authenticated_courier, db_session
     ):
@@ -103,18 +104,17 @@ class TestAcceptPackageNotification:
             dropoff_address="456 Dropoff Ave",
             dropoff_lat=40.7580,
             dropoff_lng=-73.9855,
-            status=PackageStatus.PENDING,
+            status=PackageStatus.OPEN_FOR_BIDS,
             is_active=True
         )
         db_session.add(package)
         db_session.commit()
         db_session.refresh(package)
 
-        with patch('app.routes.matching.send_package_accepted_email', new_callable=AsyncMock):
-            client.post(
-                f"/api/matching/accept-package/{package.id}",
-                headers={"Authorization": f"Bearer {authenticated_courier}"}
-            )
+        client.post(
+            f"/api/matching/accept-package/{package.id}",
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
 
         notification = db_session.query(Notification).filter(
             Notification.user_id == sender.id
@@ -127,6 +127,7 @@ class TestAcceptPackageNotification:
 class TestDeclinePackageNotification:
     """Test that declining a package creates notification for sender"""
 
+    @pytest.mark.skip(reason="decline-package endpoint removed; replaced by bidding system - see test_bids.py")
     def test_decline_package_creates_notification(
         self, client, authenticated_courier, db_session
     ):
@@ -159,7 +160,7 @@ class TestDeclinePackageNotification:
             dropoff_address="456 Dropoff Ave",
             dropoff_lat=40.7580,
             dropoff_lng=-73.9855,
-            status=PackageStatus.MATCHED,
+            status=PackageStatus.BID_SELECTED,
             is_active=True
         )
         db_session.add(package)
@@ -217,19 +218,18 @@ class TestStatusUpdateNotification:
             dropoff_address="456 Dropoff Ave",
             dropoff_lat=40.7580,
             dropoff_lng=-73.9855,
-            status=PackageStatus.MATCHED,
+            status=PackageStatus.PENDING_PICKUP,  # Must be PENDING_PICKUP to transition to IN_TRANSIT
             is_active=True
         )
         db_session.add(package)
         db_session.commit()
         db_session.refresh(package)
 
-        with patch('app.routes.packages.send_package_picked_up_email', new_callable=AsyncMock):
-            response = client.put(
-                f"/api/packages/{package.id}/status",
-                json={"status": "picked_up"},
-                headers={"Authorization": f"Bearer {authenticated_courier}"}
-            )
+        response = client.put(
+            f"/api/packages/{package.id}/status",
+            json={"status": "in_transit"},
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
 
         assert response.status_code == status.HTTP_200_OK
 
@@ -270,7 +270,7 @@ class TestStatusUpdateNotification:
             dropoff_address="456 Dropoff Ave",
             dropoff_lat=40.7580,
             dropoff_lng=-73.9855,
-            status=PackageStatus.PICKED_UP,
+            status=PackageStatus.PENDING_PICKUP,  # Must start from PENDING_PICKUP to transition to IN_TRANSIT
             is_active=True
         )
         db_session.add(package)
@@ -384,7 +384,7 @@ class TestCancelPackageNotification:
             dropoff_address="456 Dropoff Ave",
             dropoff_lat=40.7580,
             dropoff_lng=-73.9855,
-            status=PackageStatus.PENDING,
+            status=PackageStatus.OPEN_FOR_BIDS,
             is_active=True
         )
         db_session.add(package)
@@ -451,7 +451,7 @@ class TestCancelPackageNotification:
             dropoff_address="456 Dropoff Ave",
             dropoff_lat=40.7580,
             dropoff_lng=-73.9855,
-            status=PackageStatus.MATCHED,
+            status=PackageStatus.BID_SELECTED,
             is_active=True
         )
         db_session.add(package)
@@ -517,7 +517,7 @@ class TestRouteCreationNotification:
             dropoff_address="Near NYC dropoff",
             dropoff_lat=40.7500,
             dropoff_lng=-73.9900,
-            status=PackageStatus.PENDING,
+            status=PackageStatus.OPEN_FOR_BIDS,
             is_active=True
         )
         db_session.add(package)
@@ -593,6 +593,7 @@ class TestRouteCreationNotification:
 class TestNotificationReadStatus:
     """Test that automatically created notifications are unread"""
 
+    @pytest.mark.skip(reason="accept-package endpoint removed; replaced by bidding system - see test_bids.py")
     def test_auto_created_notifications_are_unread(
         self, client, authenticated_courier, db_session
     ):
@@ -619,18 +620,17 @@ class TestNotificationReadStatus:
             dropoff_address="456 Dropoff Ave",
             dropoff_lat=40.7580,
             dropoff_lng=-73.9855,
-            status=PackageStatus.PENDING,
+            status=PackageStatus.OPEN_FOR_BIDS,
             is_active=True
         )
         db_session.add(package)
         db_session.commit()
         db_session.refresh(package)
 
-        with patch('app.routes.matching.send_package_accepted_email', new_callable=AsyncMock):
-            client.post(
-                f"/api/matching/accept-package/{package.id}",
-                headers={"Authorization": f"Bearer {authenticated_courier}"}
-            )
+        client.post(
+            f"/api/matching/accept-package/{package.id}",
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
 
         notification = db_session.query(Notification).filter(
             Notification.user_id == sender.id
@@ -643,6 +643,7 @@ class TestNotificationReadStatus:
 class TestNotificationPackageReference:
     """Test that notifications correctly reference packages"""
 
+    @pytest.mark.skip(reason="accept-package endpoint removed; replaced by bidding system - see test_bids.py")
     def test_notification_has_correct_package_id(
         self, client, authenticated_courier, db_session
     ):
@@ -669,18 +670,17 @@ class TestNotificationPackageReference:
             dropoff_address="456 Dropoff Ave",
             dropoff_lat=40.7580,
             dropoff_lng=-73.9855,
-            status=PackageStatus.PENDING,
+            status=PackageStatus.OPEN_FOR_BIDS,
             is_active=True
         )
         db_session.add(package)
         db_session.commit()
         db_session.refresh(package)
 
-        with patch('app.routes.matching.send_package_accepted_email', new_callable=AsyncMock):
-            client.post(
-                f"/api/matching/accept-package/{package.id}",
-                headers={"Authorization": f"Bearer {authenticated_courier}"}
-            )
+        client.post(
+            f"/api/matching/accept-package/{package.id}",
+            headers={"Authorization": f"Bearer {authenticated_courier}"}
+        )
 
         notification = db_session.query(Notification).filter(
             Notification.user_id == sender.id

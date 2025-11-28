@@ -7,7 +7,6 @@ from app.models.notification import NotificationType
 from app.utils.dependencies import get_current_user
 from app.routes.notifications import create_notification, create_notification_with_broadcast
 from app.utils.email import (
-    send_package_picked_up_email,
     send_package_in_transit_email,
     send_package_delivered_email,
     send_package_cancelled_email,
@@ -24,8 +23,7 @@ from app.services.package_status import (
     transition_package,
     can_mark_delivered,
     get_status_progress,
-    accept_package_match,
-    get_acceptance_status,
+    can_cancel_with_reason,
 )
 from pydantic import BaseModel, Field
 from typing import List
@@ -82,15 +80,10 @@ class PackageResponse(BaseModel):
     updated_at: datetime | None
     # Status transition timestamps
     status_changed_at: datetime | None = None
-    matched_at: datetime | None = None
-    accepted_at: datetime | None = None
-    picked_up_at: datetime | None = None
+    bid_selected_at: datetime | None = None
+    pending_pickup_at: datetime | None = None
     in_transit_at: datetime | None = None
-    # Acceptance tracking
-    sender_accepted: bool = False
-    courier_accepted: bool = False
-    sender_accepted_at: datetime | None = None
-    courier_accepted_at: datetime | None = None
+    failed_at: datetime | None = None
     # Allowed next statuses for UI
     allowed_next_statuses: List[str] = []
 
@@ -98,7 +91,7 @@ class PackageResponse(BaseModel):
         from_attributes = True
 
 
-def package_to_response(package: Package, db: Session) -> PackageResponse:
+def package_to_response(package: Package, db: Session, is_admin: bool = False) -> PackageResponse:
     """Convert a Package model to PackageResponse with user names."""
     sender = db.query(User).filter(User.id == package.sender_id).first()
     courier = None
@@ -130,15 +123,11 @@ def package_to_response(package: Package, db: Session) -> PackageResponse:
         created_at=package.created_at,
         updated_at=package.updated_at,
         status_changed_at=package.status_changed_at,
-        matched_at=package.matched_at,
-        accepted_at=package.accepted_at,
-        picked_up_at=package.picked_up_at,
+        bid_selected_at=package.bid_selected_at,
+        pending_pickup_at=package.pending_pickup_at,
         in_transit_at=package.in_transit_at,
-        sender_accepted=package.sender_accepted if package.sender_accepted is not None else False,
-        courier_accepted=package.courier_accepted if package.courier_accepted is not None else False,
-        sender_accepted_at=package.sender_accepted_at,
-        courier_accepted_at=package.courier_accepted_at,
-        allowed_next_statuses=get_allowed_next_statuses(package.status),
+        failed_at=package.failed_at,
+        allowed_next_statuses=get_allowed_next_statuses(package.status, is_admin),
     )
 
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=PackageResponse)
@@ -187,7 +176,7 @@ async def create_package(
             )
         sender_id = package_data.sender_id
 
-    # Create package
+    # Create package with NEW status, then auto-transition to OPEN_FOR_BIDS
     new_package = Package(
         sender_id=sender_id,
         description=package_data.description,
@@ -205,11 +194,15 @@ async def create_package(
         dropoff_contact_phone=package_data.dropoff_contact_phone,
         price=package_data.price,
         requires_proof=package_data.requires_proof,
-        status=PackageStatus.PENDING
+        status=PackageStatus.NEW
     )
 
     db.add(new_package)
     db.commit()
+    db.refresh(new_package)
+
+    # Auto-transition from NEW to OPEN_FOR_BIDS
+    new_package, _ = transition_package(db, new_package, PackageStatus.OPEN_FOR_BIDS, sender_id, force=True)
     db.refresh(new_package)
 
     # Audit log package creation
@@ -236,9 +229,10 @@ async def get_packages(
     - If both: returns all their packages
     """
     # Admins can see all packages
-    if current_user.role.value == 'admin':
+    is_admin = current_user.role.value == 'admin'
+    if is_admin:
         packages = db.query(Package).order_by(Package.created_at.desc()).all()
-        return [package_to_response(pkg, db) for pkg in packages]
+        return [package_to_response(pkg, db, is_admin=True) for pkg in packages]
 
     packages = []
 
@@ -279,9 +273,11 @@ async def get_package(
             detail="Package not found"
         )
 
+    is_admin = current_user.role.value == 'admin'
+
     # Admins can view any package
-    if current_user.role.value == 'admin':
-        return package_to_response(package, db)
+    if is_admin:
+        return package_to_response(package, db, is_admin=True)
 
     # Sender can always view their own packages
     if package.sender_id == current_user.id:
@@ -291,8 +287,8 @@ async def get_package(
     if package.courier_id == current_user.id:
         return package_to_response(package, db)
 
-    # Couriers can view pending packages (to decide whether to accept)
-    if current_user.role in [UserRole.COURIER, UserRole.BOTH] and package.status == PackageStatus.PENDING:
+    # Couriers can view packages open for bids (to decide whether to bid)
+    if current_user.role in [UserRole.COURIER, UserRole.BOTH] and package.status == PackageStatus.OPEN_FOR_BIDS:
         return package_to_response(package, db)
 
     raise HTTPException(
@@ -348,11 +344,11 @@ async def update_package(
             detail="You don't have permission to edit this package"
         )
 
-    # Only allow editing pending packages
-    if package.status != PackageStatus.PENDING:
+    # Only allow editing NEW or OPEN_FOR_BIDS packages
+    if package.status not in [PackageStatus.NEW, PackageStatus.OPEN_FOR_BIDS]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot edit package with status '{package.status.value}'. Only pending packages can be edited."
+            detail=f"Cannot edit package with status '{package.status.value}'. Only new or open for bids packages can be edited."
         )
 
     # Track changes for audit log
@@ -420,11 +416,10 @@ async def update_package_status(
     """
     Update package status with strict transition validation.
 
-    Only the assigned courier can update status.
-    Status must follow strict progression: ACCEPTED → PICKED_UP → IN_TRANSIT → DELIVERED
+    Only the assigned courier can update status for delivery operations.
+    Status progression: PENDING_PICKUP → IN_TRANSIT → DELIVERED
 
-    Note: To move from MATCHED to ACCEPTED, both sender and courier must accept
-    using the /packages/{id}/accept endpoint.
+    FAILED status can be set from PENDING_PICKUP or IN_TRANSIT when delivery fails.
     """
     package = db.query(Package).filter(Package.id == package_id).first()
 
@@ -492,34 +487,14 @@ async def update_package_status(
     sender = db.query(User).filter(User.id == package.sender_id).first()
 
     # Send notifications based on new status
-    if new_status == PackageStatus.PICKED_UP and old_status != PackageStatus.PICKED_UP:
-        # Create in-app notification with WebSocket broadcast
-        await create_notification_with_broadcast(
-            db=db,
-            user_id=package.sender_id,
-            notification_type=NotificationType.PACKAGE_PICKED_UP,
-            message=f"Your package '{package.description[:50]}' has been picked up by the courier",
-            package_id=package.id
-        )
-        # Send email
-        if sender:
-            background_tasks.add_task(
-                send_package_picked_up_email,
-                sender_email=sender.email,
-                sender_name=sender.full_name,
-                courier_name=current_user.full_name,
-                package_description=package.description,
-                dropoff_address=package.dropoff_address,
-                package_id=package.id
-            )
-
-    elif new_status == PackageStatus.IN_TRANSIT and old_status != PackageStatus.IN_TRANSIT:
+    if new_status == PackageStatus.IN_TRANSIT and old_status != PackageStatus.IN_TRANSIT:
+        # IN_TRANSIT means courier confirmed pickup and package is now in transit
         # Create in-app notification with WebSocket broadcast
         await create_notification_with_broadcast(
             db=db,
             user_id=package.sender_id,
             notification_type=NotificationType.PACKAGE_IN_TRANSIT,
-            message=f"Your package '{package.description[:50]}' is now in transit",
+            message=f"Your package '{package.description[:50]}' has been picked up and is now in transit",
             package_id=package.id
         )
         # Send email
@@ -554,6 +529,16 @@ async def update_package_status(
                 package_id=package.id
             )
 
+    elif new_status == PackageStatus.FAILED and old_status != PackageStatus.FAILED:
+        # Create in-app notification with WebSocket broadcast for sender
+        await create_notification_with_broadcast(
+            db=db,
+            user_id=package.sender_id,
+            notification_type=NotificationType.DELIVERY_FAILED,
+            message=f"Delivery failed for package '{package.description[:50]}'. Please contact support.",
+            package_id=package.id
+        )
+
     return {"message": "Package status updated successfully", "status": new_status.value}
 
 
@@ -568,8 +553,8 @@ async def cancel_package(
     """
     Cancel a package.
 
-    Only the sender who created the package can cancel it.
-    Only pending or matched packages can be cancelled.
+    Only the sender who created the package or an admin can cancel it.
+    Cannot cancel packages that are IN_TRANSIT, DELIVERED, CANCELED, or FAILED.
     """
     package = db.query(Package).filter(Package.id == package_id).first()
 
@@ -589,17 +574,18 @@ async def cancel_package(
             detail="You don't have permission to cancel this package"
         )
 
-    # Only allow cancelling pending, matched, or accepted packages
-    if package.status not in [PackageStatus.PENDING, PackageStatus.MATCHED, PackageStatus.ACCEPTED]:
+    # Validate cancellation is allowed
+    can_cancel_pkg, error = can_cancel_with_reason(package)
+    if not can_cancel_pkg:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot cancel package with status '{package.status.value}'. Only pending, matched, or accepted packages can be cancelled."
+            detail=error
         )
 
     # Store courier_id before cancelling (for notification)
     courier_id = package.courier_id
 
-    package.status = PackageStatus.CANCELLED
+    package.status = PackageStatus.CANCELED
     package.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(package)
@@ -639,131 +625,3 @@ async def cancel_package(
     )
 
     return package
-
-
-@router.post("/{package_id}/accept", response_model=PackageResponse)
-async def accept_package_for_delivery(
-    request: Request,
-    package_id: int,
-    background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Accept a matched package for delivery.
-
-    Both the sender and courier must accept for the package to move to ACCEPTED status.
-    - Sender accepts to confirm they're ready for pickup
-    - Courier accepts to confirm they'll deliver the package
-
-    When both have accepted, the package automatically transitions to ACCEPTED status.
-    """
-    package = db.query(Package).filter(Package.id == package_id).first()
-
-    if not package:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Package not found"
-        )
-
-    # Determine if current user is sender or courier
-    is_sender = package.sender_id == current_user.id
-    is_courier = package.courier_id == current_user.id
-
-    if not is_sender and not is_courier:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the sender or assigned courier can accept this package"
-        )
-
-    # Call the acceptance service
-    package, error = accept_package_match(db, package, current_user.id, is_sender)
-    if error:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error
-        )
-
-    # Send notifications
-    if is_sender and package.courier_id:
-        # Notify courier that sender has accepted
-        courier = db.query(User).filter(User.id == package.courier_id).first()
-        if courier:
-            await create_notification_with_broadcast(
-                db=db,
-                user_id=package.courier_id,
-                notification_type=NotificationType.PACKAGE_MATCHED,
-                message=f"Sender has accepted the match for package '{package.description[:50]}'. Waiting for your acceptance.",
-                package_id=package.id
-            )
-    elif is_courier:
-        # Notify sender that courier has accepted
-        await create_notification_with_broadcast(
-            db=db,
-            user_id=package.sender_id,
-            notification_type=NotificationType.PACKAGE_MATCHED,
-            message=f"Courier {current_user.full_name} has accepted the match for your package '{package.description[:50]}'. Waiting for your acceptance.",
-            package_id=package.id
-        )
-
-    # If both accepted, notify both parties
-    if package.status == PackageStatus.ACCEPTED:
-        sender = db.query(User).filter(User.id == package.sender_id).first()
-        courier = db.query(User).filter(User.id == package.courier_id).first()
-
-        # Notify sender
-        await create_notification_with_broadcast(
-            db=db,
-            user_id=package.sender_id,
-            notification_type=NotificationType.PACKAGE_ACCEPTED,
-            message=f"Both parties have accepted! Courier {courier.full_name if courier else 'Unknown'} will pick up your package soon.",
-            package_id=package.id
-        )
-
-        # Notify courier
-        await create_notification_with_broadcast(
-            db=db,
-            user_id=package.courier_id,
-            notification_type=NotificationType.PACKAGE_ACCEPTED,
-            message=f"Both parties have accepted! You can now pick up the package from {sender.full_name if sender else 'the sender'}.",
-            package_id=package.id
-        )
-
-    return package_to_response(package, db)
-
-
-@router.get("/{package_id}/acceptance-status")
-async def get_package_acceptance_status(
-    package_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Get the acceptance status for a matched package.
-
-    Shows whether sender and courier have accepted.
-    """
-    package = db.query(Package).filter(Package.id == package_id).first()
-
-    if not package:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Package not found"
-        )
-
-    # Check access
-    is_sender = package.sender_id == current_user.id
-    is_courier = package.courier_id == current_user.id
-    is_admin = current_user.role.value == 'admin'
-
-    if not (is_sender or is_courier or is_admin):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You don't have access to this package"
-        )
-
-    return {
-        "package_id": package.id,
-        "status": package.status.value,
-        **get_acceptance_status(package)
-    }

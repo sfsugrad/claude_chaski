@@ -196,13 +196,13 @@ class TestAuditService:
             db=db_session,
             user=test_verified_user,
             package_id=1,
-            old_status="pending",
-            new_status="picked_up"
+            old_status="open_for_bids",
+            new_status="in_transit"
         )
 
         assert audit_log.action == AuditAction.PACKAGE_STATUS_CHANGE
-        assert audit_log.details["old_status"] == "pending"
-        assert audit_log.details["new_status"] == "picked_up"
+        assert audit_log.details["old_status"] == "open_for_bids"
+        assert audit_log.details["new_status"] == "in_transit"
 
     def test_log_route_create(self, db_session, test_verified_user):
         """Test logging route creation."""

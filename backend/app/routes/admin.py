@@ -20,7 +20,9 @@ from app.services.audit_service import (
     log_package_deactivate,
     log_admin_stats_access,
     log_matching_job_run,
+    log_audit,
 )
+from app.services.package_status import transition_package
 from pydantic import BaseModel, EmailStr, Field
 from typing import List
 
@@ -653,11 +655,11 @@ async def toggle_package_active(
             detail="Package not found"
         )
 
-    # Only allow deactivating packages that are in PENDING status
-    if not toggle_data.is_active and package.status != PackageStatus.PENDING:
+    # Only allow deactivating packages that are open for bids or new
+    if not toggle_data.is_active and package.status not in [PackageStatus.NEW, PackageStatus.OPEN_FOR_BIDS]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only pending packages can be deactivated. Package is currently in '{}' status.".format(package.status.value)
+            detail="Only new or open for bids packages can be deactivated. Package is currently in '{}' status.".format(package.status.value)
         )
 
     package.is_active = toggle_data.is_active
@@ -708,16 +710,17 @@ async def get_platform_stats(
     total_packages = db.query(func.count(Package.id)).scalar()
     active_packages = db.query(func.count(Package.id)).filter(
         or_(
-            Package.status == PackageStatus.PENDING,
-            Package.status == PackageStatus.IN_TRANSIT,
-            Package.status == PackageStatus.MATCHED
+            Package.status == PackageStatus.OPEN_FOR_BIDS,
+            Package.status == PackageStatus.BID_SELECTED,
+            Package.status == PackageStatus.PENDING_PICKUP,
+            Package.status == PackageStatus.IN_TRANSIT
         )
     ).scalar()
     completed_packages = db.query(func.count(Package.id)).filter(
         Package.status == PackageStatus.DELIVERED
     ).scalar()
     pending_packages = db.query(func.count(Package.id)).filter(
-        Package.status == PackageStatus.PENDING
+        Package.status == PackageStatus.OPEN_FOR_BIDS
     ).scalar()
 
     # Revenue statistics (sum of all package prices)
@@ -1008,4 +1011,81 @@ async def run_route_cleanup_job_endpoint(
         deactivated_routes=[
             DeactivatedRouteDetail(**route) for route in results['deactivated_routes']
         ]
+    )
+
+
+# Response model for retry endpoint
+class PackageRetryResponse(BaseModel):
+    id: int
+    status: str
+    message: str
+
+
+@router.post("/packages/{package_id}/retry", response_model=PackageRetryResponse)
+async def retry_failed_package(
+    package_id: int,
+    http_request: Request,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Retry a failed package by returning it to OPEN_FOR_BIDS status.
+
+    This endpoint is admin-only and allows failed deliveries to be
+    retried by opening them up for new courier bids.
+
+    Args:
+        package_id: The ID of the package to retry
+
+    Returns:
+        Updated package status information
+    """
+    # Get the package
+    package = db.query(Package).filter(Package.id == package_id).first()
+
+    if not package:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Package not found"
+        )
+
+    # Verify package is in FAILED status
+    if package.status != PackageStatus.FAILED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Can only retry packages with FAILED status. Current status: {package.status.value}"
+        )
+
+    # Clear previous courier assignment
+    package.courier_id = None
+    package.selected_bid_id = None
+
+    # Transition to OPEN_FOR_BIDS (is_admin=True allows FAILED -> OPEN_FOR_BIDS)
+    transition_package(
+        db=db,
+        package=package,
+        new_status=PackageStatus.OPEN_FOR_BIDS,
+        is_admin=True
+    )
+
+    # Log audit
+    log_audit(
+        db=db,
+        user_id=admin.id,
+        action="package_retry",
+        resource_type="package",
+        resource_id=package.id,
+        details={
+            "previous_status": PackageStatus.FAILED.value,
+            "new_status": PackageStatus.OPEN_FOR_BIDS.value
+        },
+        success=True,
+        ip_address=http_request.client.host if http_request.client else None,
+        user_agent=http_request.headers.get("user-agent")
+    )
+
+    return PackageRetryResponse(
+        id=package.id,
+        status=package.status.value,
+        message="Package has been returned to OPEN_FOR_BIDS status for new courier bids"
     )

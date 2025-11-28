@@ -18,18 +18,20 @@ import {
   SlideIn
 } from '@/components/ui'
 
-type StatusFilter = 'all' | 'pending' | 'matched' | 'picked_up' | 'in_transit' | 'delivered' | 'cancelled'
+type StatusFilter = 'all' | 'new' | 'open_for_bids' | 'bid_selected' | 'pending_pickup' | 'in_transit' | 'delivered' | 'canceled' | 'failed'
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: string; icon: string }> = {
-  pending: { label: 'Pending', color: 'text-yellow-800', bgColor: 'bg-yellow-100', icon: '⏳' },
-  matched: { label: 'Matched', color: 'text-blue-800', bgColor: 'bg-blue-100', icon: '🤝' },
-  picked_up: { label: 'Picked Up', color: 'text-purple-800', bgColor: 'bg-purple-100', icon: '📦' },
+  new: { label: 'New', color: 'text-gray-800', bgColor: 'bg-gray-100', icon: '📝' },
+  open_for_bids: { label: 'Open for Bids', color: 'text-yellow-800', bgColor: 'bg-yellow-100', icon: '⏳' },
+  bid_selected: { label: 'Bid Selected', color: 'text-blue-800', bgColor: 'bg-blue-100', icon: '🤝' },
+  pending_pickup: { label: 'Pending Pickup', color: 'text-purple-800', bgColor: 'bg-purple-100', icon: '📦' },
   in_transit: { label: 'In Transit', color: 'text-indigo-800', bgColor: 'bg-indigo-100', icon: '🚚' },
   delivered: { label: 'Delivered', color: 'text-green-800', bgColor: 'bg-green-100', icon: '✅' },
-  cancelled: { label: 'Cancelled', color: 'text-red-800', bgColor: 'bg-red-100', icon: '❌' },
+  canceled: { label: 'Canceled', color: 'text-red-800', bgColor: 'bg-red-100', icon: '❌' },
+  failed: { label: 'Failed', color: 'text-orange-800', bgColor: 'bg-orange-100', icon: '⚠️' },
 }
 
-const STATUS_ORDER = ['pending', 'matched', 'picked_up', 'in_transit', 'delivered']
+const STATUS_ORDER = ['new', 'open_for_bids', 'bid_selected', 'pending_pickup', 'in_transit', 'delivered']
 
 export default function SenderDashboard() {
   const [packages, setPackages] = useState<PackageResponse[]>([])
@@ -142,7 +144,7 @@ export default function SenderDashboard() {
   }
 
   const canCancel = (status: string) => {
-    return status === 'pending' || status === 'matched'
+    return ['new', 'open_for_bids', 'bid_selected', 'pending_pickup'].includes(status)
   }
 
   const getStatusStep = (status: string) => {
@@ -235,7 +237,7 @@ export default function SenderDashboard() {
         {/* Stats Overview */}
         <SlideIn direction="up" delay={100} duration={400}>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
-            {['all', 'pending', 'matched', 'in_transit', 'delivered', 'cancelled'].map((status, index) => (
+            {['all', 'open_for_bids', 'bid_selected', 'in_transit', 'delivered', 'canceled'].map((status, index) => (
               <button
                 key={status}
                 onClick={() => setStatusFilter(status as StatusFilter)}
@@ -308,12 +310,12 @@ function PackageCard({ pkg, onCancel, cancelling, canCancel }: PackageCardProps)
   }
 
   const currentStep = STATUS_ORDER.indexOf(pkg.status)
-  const isCancelled = pkg.status === 'cancelled'
+  const isCanceled = pkg.status === 'canceled' || pkg.status === 'failed'
 
   return (
     <Card className="overflow-hidden">
       {/* Status Progress Bar */}
-      {!isCancelled && currentStep >= 0 && (
+      {!isCanceled && currentStep >= 0 && (
         <div className="bg-surface-100 px-6 py-3">
           <div className="flex items-center justify-between">
             {STATUS_ORDER.map((status, index) => {
@@ -431,8 +433,8 @@ function PackageCard({ pkg, onCancel, cancelling, canCancel }: PackageCardProps)
               </span>
             </div>
 
-            {/* Courier Info (when matched) */}
-            {pkg.courier_id && pkg.status !== 'pending' && (
+            {/* Courier Info (when assigned) */}
+            {pkg.courier_id && !['new', 'open_for_bids'].includes(pkg.status) && (
               <div className="mt-4 p-3 bg-primary-50 rounded-lg">
                 <p className="text-sm text-primary-800">
                   <span className="font-medium">Courier assigned</span> - Your package is being handled by {pkg.courier_name || `courier #${pkg.courier_id}`}

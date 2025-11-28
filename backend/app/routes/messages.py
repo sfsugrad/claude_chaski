@@ -62,8 +62,8 @@ def check_message_access(package: Package, user: User) -> bool:
     if package.courier_id and user.id == package.courier_id:
         return True
 
-    # For pending packages, any courier can message (to ask questions before accepting)
-    if package.status.value == 'pending' and user.role in [UserRole.COURIER, UserRole.BOTH]:
+    # For packages open for bids, any courier can message (to ask questions before accepting)
+    if package.status.value == 'open_for_bids' and user.role in [UserRole.COURIER, UserRole.BOTH]:
         return True
 
     return False

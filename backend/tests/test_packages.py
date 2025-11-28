@@ -34,7 +34,7 @@ class TestCreatePackage:
         assert data["dropoff_contact_name"] == test_package_data["dropoff_contact_name"]
         assert data["dropoff_contact_phone"] == test_package_data["dropoff_contact_phone"]
         assert data["price"] == test_package_data["price"]
-        assert data["status"] == "pending"
+        assert data["status"] == "open_for_bids"
         assert "id" in data
         assert "sender_id" in data
         assert "created_at" in data
@@ -49,7 +49,7 @@ class TestCreatePackage:
 
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
-        assert data["status"] == "pending"
+        assert data["status"] == "open_for_bids"
 
     def test_create_package_without_optional_fields(self, client, authenticated_sender):
         """Test package creation without optional fields"""
@@ -367,7 +367,7 @@ class TestGetPackageById:
         # Change the package status to MATCHED (non-pending) so couriers can't browse it
         # Couriers are allowed to view PENDING packages to decide whether to accept
         package = db_session.query(Package).filter(Package.id == package_id).first()
-        package.status = PackageStatus.MATCHED
+        package.status = PackageStatus.BID_SELECTED
         db_session.commit()
 
         # User 2 (with both role, which includes courier) tries to access it
@@ -538,8 +538,8 @@ class TestUpdatePackage:
         assert response.status_code == status.HTTP_403_FORBIDDEN
         assert "don't have permission" in response.json()["detail"].lower()
 
-    def test_update_package_fails_for_non_pending_status(self, client, db_session, authenticated_sender, test_package_data):
-        """Test that only pending packages can be edited"""
+    def test_update_package_fails_for_non_editable_status(self, client, db_session, authenticated_sender, test_package_data):
+        """Test that only NEW or OPEN_FOR_BIDS packages can be edited"""
         # Create a package
         create_response = client.post(
             "/api/packages",
@@ -548,14 +548,14 @@ class TestUpdatePackage:
         )
         package_id = create_response.json()["id"]
 
-        # Change status to matched (simulating matching)
+        # Change status to bid_selected (cannot edit)
         package = db_session.query(Package).filter(Package.id == package_id).first()
-        package.status = PackageStatus.MATCHED
+        package.status = PackageStatus.BID_SELECTED
         db_session.commit()
 
         # Try to update it
         update_data = {
-            "description": "Trying to edit non-pending package"
+            "description": "Trying to edit non-editable package"
         }
 
         response = client.put(
@@ -565,7 +565,7 @@ class TestUpdatePackage:
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "only pending packages can be edited" in response.json()["detail"].lower()
+        assert "only new or open for bids packages can be edited" in response.json()["detail"].lower()
 
     def test_update_package_invalid_size(self, client, authenticated_sender, test_package_data):
         """Test updating package with invalid size"""
@@ -758,22 +758,23 @@ class TestUpdatePackageStatus:
         )
         package_id = create_response.json()["id"]
 
-        # Manually assign courier to package (simulating matching)
+        # Manually assign courier and set status to PENDING_PICKUP (simulating bid acceptance)
         package = db_session.query(Package).filter(Package.id == package_id).first()
         courier = db_session.query(User).filter(User.email == "courier@example.com").first()
         package.courier_id = courier.id
+        package.status = PackageStatus.PENDING_PICKUP  # Ready for in_transit transition
         db_session.commit()
 
-        # Courier updates status
+        # Courier updates status to in_transit
         response = client.put(
             f"/api/packages/{package_id}/status",
-            json={"status": "picked_up"},
+            json={"status": "in_transit"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data["status"] == "picked_up"
+        assert data["status"] == "in_transit"
         assert "successfully" in data["message"].lower()
 
     def test_update_package_status_invalid_status(self, client, db_session, authenticated_sender, authenticated_courier, test_package_data):
@@ -814,7 +815,7 @@ class TestUpdatePackageStatus:
         # Non-assigned courier tries to update
         response = client.put(
             f"/api/packages/{package_id}/status",
-            json={"status": "picked_up"},
+            json={"status": "in_transit"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
 
@@ -834,7 +835,7 @@ class TestUpdatePackageStatus:
         # Sender tries to update status
         response = client.put(
             f"/api/packages/{package_id}/status",
-            json={"status": "picked_up"},
+            json={"status": "in_transit"},
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
 
@@ -844,7 +845,7 @@ class TestUpdatePackageStatus:
         """Test updating status of non-existent package"""
         response = client.put(
             "/api/packages/99999/status",
-            json={"status": "picked_up"},
+            json={"status": "in_transit"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
 
@@ -854,7 +855,7 @@ class TestUpdatePackageStatus:
         """Test updating status without authentication"""
         response = client.put(
             "/api/packages/1/status",
-            json={"status": "picked_up"}
+            json={"status": "in_transit"}
         )
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
@@ -865,6 +866,9 @@ class TestPackageIntegration:
 
     def test_complete_package_lifecycle(self, client, db_session, authenticated_sender, authenticated_courier, test_package_data):
         """Test complete package lifecycle from creation to delivery"""
+        # Create package without proof requirement for easier testing
+        test_package_data["requires_proof"] = False
+
         # Step 1: Sender creates package
         create_response = client.post(
             "/api/packages",
@@ -873,25 +877,25 @@ class TestPackageIntegration:
         )
         assert create_response.status_code == status.HTTP_201_CREATED
         package_id = create_response.json()["id"]
-        assert create_response.json()["status"] == "pending"
+        assert create_response.json()["status"] == "open_for_bids"
 
-        # Step 2: Assign courier (simulating matching)
+        # Step 2: Assign courier and set to BID_SELECTED (simulating bid acceptance)
         package = db_session.query(Package).filter(Package.id == package_id).first()
         courier = db_session.query(User).filter(User.email == "courier@example.com").first()
         package.courier_id = courier.id
-        package.status = PackageStatus.MATCHED
+        package.status = PackageStatus.BID_SELECTED
         db_session.commit()
 
-        # Step 3: Courier picks up package
-        pickup_response = client.put(
+        # Step 3: Courier confirms pending pickup
+        pending_pickup_response = client.put(
             f"/api/packages/{package_id}/status",
-            json={"status": "picked_up"},
+            json={"status": "pending_pickup"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
-        assert pickup_response.status_code == status.HTTP_200_OK
-        assert pickup_response.json()["status"] == "picked_up"
+        assert pending_pickup_response.status_code == status.HTTP_200_OK
+        assert pending_pickup_response.json()["status"] == "pending_pickup"
 
-        # Step 4: Courier marks in transit
+        # Step 4: Courier marks in transit (picks up package)
         transit_response = client.put(
             f"/api/packages/{package_id}/status",
             json={"status": "in_transit"},
@@ -985,7 +989,7 @@ class TestCancelPackage:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["id"] == package_id
-        assert data["status"] == "cancelled"
+        assert data["status"] == "canceled"
 
     def test_cancel_matched_package_success(self, client, db_session, authenticated_sender, test_package_data):
         """Test successful cancellation of a matched package by sender"""
@@ -999,7 +1003,7 @@ class TestCancelPackage:
 
         # Change status to matched
         package = db_session.query(Package).filter(Package.id == package_id).first()
-        package.status = PackageStatus.MATCHED
+        package.status = PackageStatus.BID_SELECTED
         db_session.commit()
 
         # Cancel the package
@@ -1010,7 +1014,7 @@ class TestCancelPackage:
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data["status"] == "cancelled"
+        assert data["status"] == "canceled"
 
     def test_cancel_package_as_admin(self, client, authenticated_sender, authenticated_admin, test_package_data):
         """Test admin can cancel any pending package"""
@@ -1030,10 +1034,10 @@ class TestCancelPackage:
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data["status"] == "cancelled"
+        assert data["status"] == "canceled"
 
-    def test_cancel_package_fails_for_picked_up_status(self, client, db_session, authenticated_sender, test_package_data):
-        """Test that picked_up packages cannot be cancelled"""
+    def test_cancel_package_fails_for_in_transit_status_first(self, client, db_session, authenticated_sender, test_package_data):
+        """Test that in_transit packages cannot be cancelled"""
         # Create a package
         create_response = client.post(
             "/api/packages",
@@ -1042,9 +1046,9 @@ class TestCancelPackage:
         )
         package_id = create_response.json()["id"]
 
-        # Change status to picked_up
+        # Change status to in_transit
         package = db_session.query(Package).filter(Package.id == package_id).first()
-        package.status = PackageStatus.PICKED_UP
+        package.status = PackageStatus.IN_TRANSIT
         db_session.commit()
 
         # Try to cancel
@@ -1054,7 +1058,7 @@ class TestCancelPackage:
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "only pending or matched packages can be cancelled" in response.json()["detail"].lower()
+        assert "cannot cancel a package that is in transit" in response.json()["detail"].lower()
 
     def test_cancel_package_fails_for_in_transit_status(self, client, db_session, authenticated_sender, test_package_data):
         """Test that in_transit packages cannot be cancelled"""
@@ -1078,7 +1082,7 @@ class TestCancelPackage:
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "only pending or matched packages can be cancelled" in response.json()["detail"].lower()
+        assert "cannot cancel a package that is in transit" in response.json()["detail"].lower()
 
     def test_cancel_package_fails_for_delivered_status(self, client, db_session, authenticated_sender, test_package_data):
         """Test that delivered packages cannot be cancelled"""
@@ -1102,7 +1106,7 @@ class TestCancelPackage:
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "only pending or matched packages can be cancelled" in response.json()["detail"].lower()
+        assert "cannot cancel a package that is already delivered" in response.json()["detail"].lower()
 
     def test_cancel_already_cancelled_package(self, client, db_session, authenticated_sender, test_package_data):
         """Test that already cancelled packages cannot be cancelled again"""
@@ -1116,7 +1120,7 @@ class TestCancelPackage:
 
         # Change status to cancelled
         package = db_session.query(Package).filter(Package.id == package_id).first()
-        package.status = PackageStatus.CANCELLED
+        package.status = PackageStatus.CANCELED
         db_session.commit()
 
         # Try to cancel again
@@ -1225,7 +1229,7 @@ class TestCancelPackage:
 
         # Simulate matching with courier
         package = db_session.query(Package).filter(Package.id == package_id).first()
-        package.status = PackageStatus.MATCHED
+        package.status = PackageStatus.BID_SELECTED
         # Get courier user id
         from app.models.user import User
         courier = db_session.query(User).filter(User.email == "courier@example.com").first()
@@ -1261,7 +1265,7 @@ class TestStrictStatusTransitions:
         package = db_session.query(Package).filter(Package.id == package_id).first()
         courier = db_session.query(User).filter(User.email == "courier@example.com").first()
         package.courier_id = courier.id
-        package.status = PackageStatus.MATCHED
+        package.status = PackageStatus.BID_SELECTED
         db_session.commit()
 
         # Try to skip to DELIVERED
@@ -1288,7 +1292,7 @@ class TestStrictStatusTransitions:
         package = db_session.query(Package).filter(Package.id == package_id).first()
         courier = db_session.query(User).filter(User.email == "courier@example.com").first()
         package.courier_id = courier.id
-        package.status = PackageStatus.MATCHED
+        package.status = PackageStatus.BID_SELECTED
         db_session.commit()
 
         # Try to skip to IN_TRANSIT
@@ -1301,8 +1305,8 @@ class TestStrictStatusTransitions:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "invalid status transition" in response.json()["detail"].lower()
 
-    def test_cannot_skip_from_picked_up_to_delivered(self, client, db_session, authenticated_sender, authenticated_courier, test_package_data):
-        """Test that courier cannot skip from PICKED_UP directly to DELIVERED."""
+    def test_cannot_skip_from_bid_selected_to_delivered(self, client, db_session, authenticated_sender, authenticated_courier, test_package_data):
+        """Test that courier cannot skip from BID_SELECTED directly to DELIVERED."""
         # Create package
         create_response = client.post(
             "/api/packages",
@@ -1311,14 +1315,14 @@ class TestStrictStatusTransitions:
         )
         package_id = create_response.json()["id"]
 
-        # Set to PICKED_UP with courier
+        # Set to BID_SELECTED with courier
         package = db_session.query(Package).filter(Package.id == package_id).first()
         courier = db_session.query(User).filter(User.email == "courier@example.com").first()
         package.courier_id = courier.id
-        package.status = PackageStatus.PICKED_UP
+        package.status = PackageStatus.BID_SELECTED
         db_session.commit()
 
-        # Try to skip to DELIVERED
+        # Try to skip to DELIVERED (should fail - need PENDING_PICKUP, IN_TRANSIT first)
         response = client.put(
             f"/api/packages/{package_id}/status",
             json={"status": "delivered"},
@@ -1328,8 +1332,8 @@ class TestStrictStatusTransitions:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "invalid status transition" in response.json()["detail"].lower()
 
-    def test_valid_strict_progression_matched_to_picked_up(self, client, db_session, authenticated_sender, authenticated_courier, test_package_data):
-        """Test valid transition from MATCHED to PICKED_UP."""
+    def test_valid_strict_progression_bid_selected_to_pending_pickup(self, client, db_session, authenticated_sender, authenticated_courier, test_package_data):
+        """Test valid transition from BID_SELECTED to PENDING_PICKUP."""
         # Create package
         create_response = client.post(
             "/api/packages",
@@ -1338,25 +1342,25 @@ class TestStrictStatusTransitions:
         )
         package_id = create_response.json()["id"]
 
-        # Set to MATCHED with courier
+        # Set to BID_SELECTED with courier
         package = db_session.query(Package).filter(Package.id == package_id).first()
         courier = db_session.query(User).filter(User.email == "courier@example.com").first()
         package.courier_id = courier.id
-        package.status = PackageStatus.MATCHED
+        package.status = PackageStatus.BID_SELECTED
         db_session.commit()
 
-        # Transition to PICKED_UP
+        # Transition to PENDING_PICKUP
         response = client.put(
             f"/api/packages/{package_id}/status",
-            json={"status": "picked_up"},
+            json={"status": "pending_pickup"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
 
         assert response.status_code == status.HTTP_200_OK
-        assert response.json()["status"] == "picked_up"
+        assert response.json()["status"] == "pending_pickup"
 
-    def test_valid_strict_progression_picked_up_to_in_transit(self, client, db_session, authenticated_sender, authenticated_courier, test_package_data):
-        """Test valid transition from PICKED_UP to IN_TRANSIT."""
+    def test_valid_strict_progression_pending_pickup_to_in_transit(self, client, db_session, authenticated_sender, authenticated_courier, test_package_data):
+        """Test valid transition from PENDING_PICKUP to IN_TRANSIT."""
         # Create package
         create_response = client.post(
             "/api/packages",
@@ -1365,11 +1369,11 @@ class TestStrictStatusTransitions:
         )
         package_id = create_response.json()["id"]
 
-        # Set to PICKED_UP with courier
+        # Set to PENDING_PICKUP with courier
         package = db_session.query(Package).filter(Package.id == package_id).first()
         courier = db_session.query(User).filter(User.email == "courier@example.com").first()
         package.courier_id = courier.id
-        package.status = PackageStatus.PICKED_UP
+        package.status = PackageStatus.PENDING_PICKUP
         db_session.commit()
 
         # Transition to IN_TRANSIT
@@ -1478,13 +1482,13 @@ class TestStrictStatusTransitions:
         package = db_session.query(Package).filter(Package.id == package_id).first()
         courier = db_session.query(User).filter(User.email == "courier@example.com").first()
         package.courier_id = courier.id
-        package.status = PackageStatus.PICKED_UP
+        package.status = PackageStatus.IN_TRANSIT
         db_session.commit()
 
         # Try to cancel via status endpoint
         response = client.put(
             f"/api/packages/{package_id}/status",
-            json={"status": "cancelled"},
+            json={"status": "canceled"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
 
@@ -1511,8 +1515,8 @@ class TestStrictStatusTransitions:
         data = response.json()
         assert "allowed_next_statuses" in data
         # PENDING allows MATCHED and CANCELLED
-        assert "matched" in data["allowed_next_statuses"]
-        assert "cancelled" in data["allowed_next_statuses"]
+        assert "bid_selected" in data["allowed_next_statuses"]
+        assert "canceled" in data["allowed_next_statuses"]
 
     def test_package_response_includes_requires_proof(self, client, authenticated_sender, test_package_data):
         """Test that package response includes requires_proof field."""
@@ -1539,17 +1543,17 @@ class TestStrictStatusTransitions:
         )
         package_id = create_response.json()["id"]
 
-        # Set to MATCHED with courier
+        # Set to PENDING_PICKUP with courier
         package = db_session.query(Package).filter(Package.id == package_id).first()
         courier = db_session.query(User).filter(User.email == "courier@example.com").first()
         package.courier_id = courier.id
-        package.status = PackageStatus.MATCHED
+        package.status = PackageStatus.PENDING_PICKUP
         db_session.commit()
 
-        # Transition to PICKED_UP
+        # Transition to IN_TRANSIT
         response = client.put(
             f"/api/packages/{package_id}/status",
-            json={"status": "picked_up"},
+            json={"status": "in_transit"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
 
@@ -1562,7 +1566,7 @@ class TestStrictStatusTransitions:
         )
 
         data = get_response.json()
-        assert data["picked_up_at"] is not None
+        assert data["in_transit_at"] is not None
         assert data["status_changed_at"] is not None
 
 
@@ -1592,7 +1596,7 @@ class TestCourierPackageAccess:
             description="Pending package for courier view",
             size="small",
             weight_kg=1.0,
-            status=PackageStatus.PENDING,
+            status=PackageStatus.OPEN_FOR_BIDS,
             pickup_address=test_package_data["pickup_address"],
             pickup_lat=test_package_data["pickup_lat"],
             pickup_lng=test_package_data["pickup_lng"],
@@ -1613,7 +1617,7 @@ class TestCourierPackageAccess:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["id"] == package.id
-        assert data["status"] == "pending"
+        assert data["status"] == "open_for_bids"
 
     def test_courier_cannot_view_accepted_package_not_assigned(self, client, db_session, authenticated_courier, test_package_data):
         """Courier should NOT be able to view accepted packages they're not assigned to."""
@@ -1649,7 +1653,7 @@ class TestCourierPackageAccess:
             description="Accepted package",
             size="small",
             weight_kg=1.0,
-            status=PackageStatus.MATCHED,
+            status=PackageStatus.BID_SELECTED,
             pickup_address=test_package_data["pickup_address"],
             pickup_lat=test_package_data["pickup_lat"],
             pickup_lng=test_package_data["pickup_lng"],
@@ -1692,7 +1696,7 @@ class TestCourierPackageAccess:
             description="Pending package for both role view",
             size="medium",
             weight_kg=2.0,
-            status=PackageStatus.PENDING,
+            status=PackageStatus.OPEN_FOR_BIDS,
             pickup_address=test_package_data["pickup_address"],
             pickup_lat=test_package_data["pickup_lat"],
             pickup_lng=test_package_data["pickup_lng"],

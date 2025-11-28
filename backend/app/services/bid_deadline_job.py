@@ -4,7 +4,7 @@ Background job service for handling bid deadlines.
 This service runs periodically to:
 1. Send warning notifications (6 hours before deadline)
 2. Extend deadlines when they expire (by 12 hours, max 2 extensions)
-3. Expire all bids after max extensions and return package to PENDING
+3. Expire all bids after max extensions and reset package to OPEN_FOR_BIDS
 """
 
 import logging
@@ -81,7 +81,7 @@ def extend_deadline(db: Session, package: Package) -> None:
 
 
 def expire_all_bids(db: Session, package: Package) -> List[int]:
-    """Expire all pending bids for a package and return to PENDING status."""
+    """Expire all pending bids for a package and reset to OPEN_FOR_BIDS status."""
     # Get all pending bids
     pending_bids = db.query(CourierBid).filter(
         and_(
@@ -95,8 +95,8 @@ def expire_all_bids(db: Session, package: Package) -> List[int]:
         bid.status = BidStatus.EXPIRED
         courier_ids.append(bid.courier_id)
 
-    # Reset package to PENDING
-    package.status = PackageStatus.PENDING
+    # Reset package to OPEN_FOR_BIDS (or keep as is since it's already OPEN_FOR_BIDS)
+    package.status = PackageStatus.OPEN_FOR_BIDS
     package.bid_deadline = None
     package.bid_count = 0
     package.deadline_extensions = 0
@@ -160,16 +160,16 @@ def run_bid_deadline_job(dry_run: bool = False) -> Dict[str, Any]:
             'details': []
         }
 
-        # Get all packages in BIDDING status with deadlines
+        # Get all packages in OPEN_FOR_BIDS status with deadlines
         bidding_packages = db.query(Package).filter(
             and_(
-                Package.status == PackageStatus.BIDDING,
+                Package.status == PackageStatus.OPEN_FOR_BIDS,
                 Package.bid_deadline.isnot(None),
                 Package.is_active == True
             )
         ).all()
 
-        logger.info(f"Found {len(bidding_packages)} packages in bidding status")
+        logger.info(f"Found {len(bidding_packages)} packages open for bids")
 
         for package in bidding_packages:
             package_detail = {
@@ -214,7 +214,7 @@ def run_bid_deadline_job(dry_run: bool = False) -> Dict[str, Any]:
                         results['bids_expired'] += pending_count
                     results['packages_expired'] += 1
                     package_detail['action'] = 'bids_expired'
-                    logger.info(f"Package {package.id}: Expiring all bids, returning to PENDING")
+                    logger.info(f"Package {package.id}: Expiring all bids, resetting to OPEN_FOR_BIDS")
 
             results['details'].append(package_detail)
 

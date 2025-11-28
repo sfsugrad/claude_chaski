@@ -15,7 +15,7 @@
     "dropoff_lng": -122.4010,
     "dropoff_contact_name": "Office Reception",
     "dropoff_contact_phone": "+1987654321",
-    "status": "pending",
+    "status": "open_for_bids",
     "price": 15.00
   },
   {
@@ -34,7 +34,7 @@
     "dropoff_lng": -122.4013,
     "dropoff_contact_name": "Library Desk",
     "dropoff_contact_phone": "+1987654322",
-    "status": "matched",
+    "status": "bid_selected",
     "price": 25.00
   },
   {
@@ -53,7 +53,7 @@
     "dropoff_lng": -122.4096,
     "dropoff_contact_name": "Tech Store",
     "dropoff_contact_phone": "+1987654323",
-    "status": "picked_up",
+    "status": "in_transit",
     "price": 45.00
   },
   {
@@ -110,7 +110,7 @@
     "dropoff_lng": -122.4109,
     "dropoff_contact_name": "Apartment 5B",
     "dropoff_contact_phone": "+1987654326",
-    "status": "pending",
+    "status": "open_for_bids",
     "price": 80.00
   },
   {
@@ -129,7 +129,7 @@
     "dropoff_lng": -122.4284,
     "dropoff_contact_name": "Business Office",
     "dropoff_contact_phone": "+1987654327",
-    "status": "pending",
+    "status": "open_for_bids",
     "price": 12.00
   },
   {
@@ -148,7 +148,7 @@
     "dropoff_lng": -122.4014,
     "dropoff_contact_name": "Medical Center",
     "dropoff_contact_phone": "+1987654328",
-    "status": "cancelled",
+    "status": "canceled",
     "price": 30.00
   },
   {
@@ -167,7 +167,7 @@
     "dropoff_lng": -122.4076,
     "dropoff_contact_name": "Sports Club",
     "dropoff_contact_phone": "+1987654329",
-    "status": "pending",
+    "status": "open_for_bids",
     "price": 50.00
   },
   {
@@ -186,7 +186,7 @@
     "dropoff_lng": -122.4051,
     "dropoff_contact_name": "Jewelry Store",
     "dropoff_contact_phone": "+1987654330",
-    "status": "matched",
+    "status": "bid_selected",
     "price": 20.00
   },
   {
@@ -262,7 +262,7 @@
     "dropoff_lng": -122.4004,
     "dropoff_contact_name": "Moscone Center",
     "dropoff_contact_phone": "+1415555104",
-    "status": "pending",
+    "status": "open_for_bids",
     "price": 40.00
   },
   {
@@ -281,7 +281,7 @@
     "dropoff_lng": -122.4075,
     "dropoff_contact_name": "Computer Repair Shop",
     "dropoff_contact_phone": "+1415555105",
-    "status": "pending",
+    "status": "open_for_bids",
     "price": 25.00
   },
   {
@@ -338,7 +338,7 @@
     "dropoff_lng": -122.4466,
     "dropoff_contact_name": "Amoeba Music",
     "dropoff_contact_phone": "+1415555108",
-    "status": "picked_up",
+    "status": "in_transit",
     "price": 28.00
   },
   {
@@ -357,7 +357,7 @@
     "dropoff_lng": -122.4380,
     "dropoff_contact_name": "Friend's House",
     "dropoff_contact_phone": "+1415555109",
-    "status": "pending",
+    "status": "open_for_bids",
     "price": 18.00
   },
   {
@@ -376,7 +376,7 @@
     "dropoff_lng": -122.4307,
     "dropoff_contact_name": "Photo Studio",
     "dropoff_contact_phone": "+1415555110",
-    "status": "matched",
+    "status": "bid_selected",
     "price": 65.00
   },
   {
@@ -395,7 +395,7 @@
     "dropoff_lng": -122.4183,
     "dropoff_contact_name": "City Hall",
     "dropoff_contact_phone": "+1415555111",
-    "status": "pending",
+    "status": "open_for_bids",
     "price": 8.00
   },
   {
@@ -414,7 +414,7 @@
     "dropoff_lng": -122.4017,
     "dropoff_contact_name": "Industrial Warehouse",
     "dropoff_contact_phone": "+1415555112",
-    "status": "pending",
+    "status": "open_for_bids",
     "price": 150.00
   },
   {
@@ -433,7 +433,7 @@
     "dropoff_lng": -122.3933,
     "dropoff_contact_name": "Ferry Building Market",
     "dropoff_contact_phone": "+1415555113",
-    "status": "pending",
+    "status": "open_for_bids",
     "price": null
   },
   {
@@ -471,7 +471,7 @@
     "dropoff_lng": -122.3982,
     "dropoff_contact_name": "Financial District Office",
     "dropoff_contact_phone": "+1415555115",
-    "status": "matched",
+    "status": "bid_selected",
     "price": 35.00
   }
 ]

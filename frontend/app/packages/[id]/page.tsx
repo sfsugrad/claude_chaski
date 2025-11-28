@@ -203,24 +203,22 @@ export default function PackageDetailPage() {
   const getStatusVariant = (status: string): 'warning' | 'info' | 'primary' | 'success' | 'error' | 'secondary' => {
     const statusLower = status.toLowerCase()
     switch (statusLower) {
-      case 'pending':
+      case 'new':
+        return 'secondary'
+      case 'open_for_bids':
         return 'warning'
-      case 'bidding':
-        return 'info'
       case 'bid_selected':
         return 'primary'
       case 'pending_pickup':
         return 'info'
-      case 'accepted':
-        return 'info'
-      case 'picked_up':
-        return 'primary'
       case 'in_transit':
         return 'info'
       case 'delivered':
         return 'success'
-      case 'cancelled':
+      case 'canceled':
         return 'error'
+      case 'failed':
+        return 'warning'
       default:
         return 'secondary'
     }
@@ -240,17 +238,20 @@ export default function PackageDetailPage() {
     if (!currentUser || !pkg) return false
     const isAdmin = currentUser.role === 'admin' || currentUser.role === 'ADMIN'
     const isSender = pkg.sender_id === currentUser.id
-    const isPending = pkg.status.toLowerCase() === 'pending'
-    return (isAdmin || isSender) && isPending
+    const statusLower = pkg.status.toLowerCase()
+    const isEditable = statusLower === 'new' || statusLower === 'open_for_bids'
+    return (isAdmin || isSender) && isEditable
   }
 
   const canAcceptPackage = () => {
+    // This is now handled through the bidding system, but kept for backwards compatibility
     if (!currentUser || !pkg) return false
     const isCourier = currentUser.role === 'courier' || currentUser.role === 'COURIER' ||
                       currentUser.role === 'both' || currentUser.role === 'BOTH'
-    const isPending = pkg.status.toLowerCase() === 'pending'
+    const statusLower = pkg.status.toLowerCase()
+    const isOpenForBids = statusLower === 'open_for_bids'
     const isNotSender = pkg.sender_id !== currentUser.id
-    return isCourier && isPending && isNotSender
+    return isCourier && isOpenForBids && isNotSender
   }
 
   const handleAcceptPackage = async () => {
@@ -662,8 +663,8 @@ export default function PackageDetailPage() {
           </SlideIn>
         </div>
 
-        {/* Bids Section - Show for packages in bidding phase */}
-        {currentUser && pkg && ['bidding', 'bid_selected'].includes(pkg.status.toLowerCase()) && (
+        {/* Bids Section - Show for packages open for bids or with bid selected */}
+        {currentUser && pkg && ['open_for_bids', 'bid_selected'].includes(pkg.status.toLowerCase()) && (
           <SlideIn direction="up" delay={275}>
             <Card className="mt-6 p-6">
               <div className="flex items-center gap-2 mb-4">
@@ -678,7 +679,7 @@ export default function PackageDetailPage() {
                 )}
               </div>
 
-              {pkg.status.toLowerCase() === 'bidding' && currentUser.id === pkg.sender_id ? (
+              {pkg.status.toLowerCase() === 'open_for_bids' && currentUser.id === pkg.sender_id ? (
                 <>
                   <p className="text-surface-600 mb-4">
                     Review bids from couriers and select your preferred one.

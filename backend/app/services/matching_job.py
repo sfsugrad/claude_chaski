@@ -61,10 +61,10 @@ def find_matching_packages_for_route(
         (route.end_lng, route.end_lat)
     ])
 
-    # Get all pending packages
+    # Get all packages open for bids
     pending_packages = db.query(Package).filter(
         and_(
-            Package.status == PackageStatus.PENDING,
+            Package.status == PackageStatus.OPEN_FOR_BIDS,
             Package.is_active == True
         )
     ).all()

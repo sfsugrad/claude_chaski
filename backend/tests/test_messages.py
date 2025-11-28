@@ -27,7 +27,7 @@ class TestMessagesAPI:
             dropoff_address=test_package_data["dropoff_address"],
             dropoff_lat=test_package_data["dropoff_lat"],
             dropoff_lng=test_package_data["dropoff_lng"],
-            status=PackageStatus.MATCHED
+            status=PackageStatus.BID_SELECTED
         )
         db_session.add(package)
         db_session.commit()
@@ -66,7 +66,7 @@ class TestMessagesAPI:
             dropoff_address=test_package_data["dropoff_address"],
             dropoff_lat=test_package_data["dropoff_lat"],
             dropoff_lng=test_package_data["dropoff_lng"],
-            status=PackageStatus.MATCHED
+            status=PackageStatus.BID_SELECTED
         )
         db_session.add(package)
         db_session.commit()
@@ -102,7 +102,7 @@ class TestMessagesAPI:
             dropoff_address=test_package_data["dropoff_address"],
             dropoff_lat=test_package_data["dropoff_lat"],
             dropoff_lng=test_package_data["dropoff_lng"],
-            status=PackageStatus.MATCHED
+            status=PackageStatus.BID_SELECTED
         )
         db_session.add(package)
         db_session.commit()
@@ -137,7 +137,7 @@ class TestMessagesAPI:
             dropoff_address=test_package_data["dropoff_address"],
             dropoff_lat=test_package_data["dropoff_lat"],
             dropoff_lng=test_package_data["dropoff_lng"],
-            status=PackageStatus.MATCHED
+            status=PackageStatus.BID_SELECTED
         )
         db_session.add(package)
         db_session.commit()
@@ -179,7 +179,7 @@ class TestMessagesAPI:
             dropoff_address=test_package_data["dropoff_address"],
             dropoff_lat=test_package_data["dropoff_lat"],
             dropoff_lng=test_package_data["dropoff_lng"],
-            status=PackageStatus.MATCHED
+            status=PackageStatus.BID_SELECTED
         )
         db_session.add(package)
         db_session.commit()
@@ -222,7 +222,7 @@ class TestMessagesAPI:
             dropoff_address=test_package_data["dropoff_address"],
             dropoff_lat=test_package_data["dropoff_lat"],
             dropoff_lng=test_package_data["dropoff_lng"],
-            status=PackageStatus.MATCHED
+            status=PackageStatus.BID_SELECTED
         )
         db_session.add(package)
         db_session.commit()
@@ -263,7 +263,7 @@ class TestMessagesAPI:
             dropoff_address=test_package_data["dropoff_address"],
             dropoff_lat=test_package_data["dropoff_lat"],
             dropoff_lng=test_package_data["dropoff_lng"],
-            status=PackageStatus.MATCHED
+            status=PackageStatus.BID_SELECTED
         )
         db_session.add(package)
         db_session.commit()
@@ -305,7 +305,7 @@ class TestMessagesAPI:
             dropoff_address=test_package_data["dropoff_address"],
             dropoff_lat=test_package_data["dropoff_lat"],
             dropoff_lng=test_package_data["dropoff_lng"],
-            status=PackageStatus.MATCHED
+            status=PackageStatus.BID_SELECTED
         )
         db_session.add(package)
         db_session.commit()
@@ -346,7 +346,7 @@ class TestMessagesAPI:
             dropoff_address=test_package_data["dropoff_address"],
             dropoff_lat=test_package_data["dropoff_lat"],
             dropoff_lng=test_package_data["dropoff_lng"],
-            status=PackageStatus.MATCHED
+            status=PackageStatus.BID_SELECTED
         )
         db_session.add(package)
         db_session.commit()
@@ -390,7 +390,7 @@ class TestMessagesAPI:
             dropoff_address=test_package_data["dropoff_address"],
             dropoff_lat=test_package_data["dropoff_lat"],
             dropoff_lng=test_package_data["dropoff_lng"],
-            status=PackageStatus.MATCHED
+            status=PackageStatus.BID_SELECTED
         )
         db_session.add(package)
         db_session.commit()
@@ -423,7 +423,7 @@ class TestMessagesAPI:
             dropoff_address=test_package_data["dropoff_address"],
             dropoff_lat=test_package_data["dropoff_lat"],
             dropoff_lng=test_package_data["dropoff_lng"],
-            status=PackageStatus.PENDING
+            status=PackageStatus.OPEN_FOR_BIDS
         )
         db_session.add(package)
         db_session.commit()
@@ -461,7 +461,7 @@ class TestMessagesAPI:
             dropoff_address=test_package_data["dropoff_address"],
             dropoff_lat=test_package_data["dropoff_lat"],
             dropoff_lng=test_package_data["dropoff_lng"],
-            status=PackageStatus.MATCHED
+            status=PackageStatus.BID_SELECTED
         )
         db_session.add(package)
         db_session.commit()
@@ -497,7 +497,7 @@ class TestMessagesAPI:
             dropoff_address=test_package_data["dropoff_address"],
             dropoff_lat=test_package_data["dropoff_lat"],
             dropoff_lng=test_package_data["dropoff_lng"],
-            status=PackageStatus.PENDING
+            status=PackageStatus.OPEN_FOR_BIDS
         )
         db_session.add(package)
         db_session.commit()
@@ -543,7 +543,7 @@ class TestMessagesAPI:
             dropoff_address=test_package_data["dropoff_address"],
             dropoff_lat=test_package_data["dropoff_lat"],
             dropoff_lng=test_package_data["dropoff_lng"],
-            status=PackageStatus.PENDING
+            status=PackageStatus.OPEN_FOR_BIDS
         )
         db_session.add(package)
         db_session.commit()

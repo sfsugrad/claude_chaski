@@ -1,83 +1,79 @@
 """
 Package status transition validation and service.
-Enforces strict status progression: MATCHED → ACCEPTED → PICKED_UP → IN_TRANSIT → DELIVERED
+Enforces strict status progression: NEW → OPEN_FOR_BIDS → BID_SELECTED → PENDING_PICKUP → IN_TRANSIT → DELIVERED
 
-The ACCEPTED status requires both sender and courier to explicitly accept the match.
+FAILED status can occur from PENDING_PICKUP or IN_TRANSIT, and only admins can retry (→ OPEN_FOR_BIDS).
+CANCELED can occur from any non-terminal state.
 """
 from datetime import datetime
-from typing import Tuple, List, Optional
+from typing import Tuple, List
 from sqlalchemy.orm import Session
 
 from app.models.package import Package, PackageStatus
-from app.models.user import User
 
 
 # Define allowed status transitions
 ALLOWED_TRANSITIONS = {
-    # New bidding workflow
-    PackageStatus.PENDING: [PackageStatus.BIDDING, PackageStatus.MATCHED, PackageStatus.CANCELLED],
-    PackageStatus.BIDDING: [PackageStatus.BID_SELECTED, PackageStatus.PENDING, PackageStatus.CANCELLED],
-    PackageStatus.BID_SELECTED: [PackageStatus.PENDING_PICKUP, PackageStatus.BIDDING, PackageStatus.CANCELLED],
-    PackageStatus.PENDING_PICKUP: [PackageStatus.PICKED_UP, PackageStatus.CANCELLED],
-    PackageStatus.PICKED_UP: [PackageStatus.IN_TRANSIT],
-    PackageStatus.IN_TRANSIT: [PackageStatus.DELIVERED],
+    PackageStatus.NEW: [PackageStatus.OPEN_FOR_BIDS, PackageStatus.CANCELED],
+    PackageStatus.OPEN_FOR_BIDS: [PackageStatus.BID_SELECTED, PackageStatus.CANCELED],
+    PackageStatus.BID_SELECTED: [PackageStatus.PENDING_PICKUP, PackageStatus.OPEN_FOR_BIDS, PackageStatus.CANCELED],
+    PackageStatus.PENDING_PICKUP: [PackageStatus.IN_TRANSIT, PackageStatus.FAILED, PackageStatus.CANCELED],
+    PackageStatus.IN_TRANSIT: [PackageStatus.DELIVERED, PackageStatus.FAILED],
     PackageStatus.DELIVERED: [],  # Terminal state
-    PackageStatus.CANCELLED: [],  # Terminal state
-    # Legacy workflow (keep for existing data)
-    PackageStatus.MATCHED: [PackageStatus.ACCEPTED, PackageStatus.PENDING, PackageStatus.CANCELLED],
-    PackageStatus.ACCEPTED: [PackageStatus.PICKED_UP, PackageStatus.CANCELLED],
+    PackageStatus.CANCELED: [],  # Terminal state
+    PackageStatus.FAILED: [PackageStatus.OPEN_FOR_BIDS],  # Admin only retry
 }
 
 # Human-readable status names for error messages
 STATUS_LABELS = {
-    PackageStatus.PENDING: "Pending",
-    PackageStatus.BIDDING: "Open for Bidding",
+    PackageStatus.NEW: "New",
+    PackageStatus.OPEN_FOR_BIDS: "Open for Bids",
     PackageStatus.BID_SELECTED: "Bid Selected",
     PackageStatus.PENDING_PICKUP: "Pending Pickup",
-    PackageStatus.PICKED_UP: "Picked Up",
     PackageStatus.IN_TRANSIT: "In Transit",
     PackageStatus.DELIVERED: "Delivered",
-    PackageStatus.CANCELLED: "Cancelled",
-    # Legacy statuses
-    PackageStatus.MATCHED: "Matched (Awaiting Acceptance)",
-    PackageStatus.ACCEPTED: "Accepted",
+    PackageStatus.CANCELED: "Canceled",
+    PackageStatus.FAILED: "Failed",
 }
 
-# Required progression path for delivery (new bidding workflow)
+# Required progression path for delivery
 DELIVERY_PATH = [
-    PackageStatus.PENDING,
-    PackageStatus.BIDDING,
+    PackageStatus.NEW,
+    PackageStatus.OPEN_FOR_BIDS,
     PackageStatus.BID_SELECTED,
     PackageStatus.PENDING_PICKUP,
-    PackageStatus.PICKED_UP,
     PackageStatus.IN_TRANSIT,
     PackageStatus.DELIVERED,
 ]
 
-# Legacy delivery path (for existing packages)
-LEGACY_DELIVERY_PATH = [
-    PackageStatus.PENDING,
-    PackageStatus.MATCHED,
-    PackageStatus.ACCEPTED,
-    PackageStatus.PICKED_UP,
-    PackageStatus.IN_TRANSIT,
-    PackageStatus.DELIVERED,
-]
+# Terminal states that cannot transition further (except FAILED with admin retry)
+TERMINAL_STATES = [PackageStatus.DELIVERED, PackageStatus.CANCELED]
 
 
-def validate_transition(current: PackageStatus, target: PackageStatus) -> Tuple[bool, str]:
+def validate_transition(
+    current: PackageStatus,
+    target: PackageStatus,
+    is_admin: bool = False
+) -> Tuple[bool, str]:
     """
     Validate if a status transition is allowed.
 
     Args:
         current: Current package status
         target: Target package status
+        is_admin: Whether the actor is an admin (required for FAILED → OPEN_FOR_BIDS)
 
     Returns:
         Tuple of (is_valid, error_message)
     """
     if current == target:
         return False, f"Package is already in {STATUS_LABELS[current]} status"
+
+    # Special case: FAILED → OPEN_FOR_BIDS requires admin
+    if current == PackageStatus.FAILED and target == PackageStatus.OPEN_FOR_BIDS:
+        if not is_admin:
+            return False, "Only administrators can retry failed packages"
+        return True, ""
 
     if target not in ALLOWED_TRANSITIONS.get(current, []):
         allowed = ALLOWED_TRANSITIONS.get(current, [])
@@ -93,17 +89,24 @@ def validate_transition(current: PackageStatus, target: PackageStatus) -> Tuple[
     return True, ""
 
 
-def get_allowed_next_statuses(current: PackageStatus) -> List[str]:
+def get_allowed_next_statuses(current: PackageStatus, is_admin: bool = False) -> List[str]:
     """
     Get list of allowed next statuses for a given current status.
 
     Args:
         current: Current package status
+        is_admin: Whether the actor is an admin
 
     Returns:
         List of allowed status values
     """
-    return [s.value for s in ALLOWED_TRANSITIONS.get(current, [])]
+    allowed = ALLOWED_TRANSITIONS.get(current, [])
+
+    # If not admin and current is FAILED, they can't transition
+    if current == PackageStatus.FAILED and not is_admin:
+        return []
+
+    return [s.value for s in allowed]
 
 
 def can_mark_delivered(package: Package) -> Tuple[bool, str]:
@@ -138,6 +141,7 @@ def transition_package(
     package: Package,
     target_status: PackageStatus,
     actor_id: int,
+    is_admin: bool = False,
     force: bool = False
 ) -> Tuple[Package, str]:
     """
@@ -148,6 +152,7 @@ def transition_package(
         package: The package to transition
         target_status: The target status
         actor_id: ID of the user performing the action
+        is_admin: Whether the actor is an admin
         force: If True, skip validation (admin only)
 
     Returns:
@@ -155,7 +160,7 @@ def transition_package(
         If error_message is not empty, the transition failed
     """
     if not force:
-        is_valid, error = validate_transition(package.status, target_status)
+        is_valid, error = validate_transition(package.status, target_status, is_admin)
         if not is_valid:
             return package, error
 
@@ -166,126 +171,32 @@ def transition_package(
     package.status_changed_at = now
 
     # Update specific timestamp fields based on target status
-    if target_status == PackageStatus.MATCHED:
-        package.matched_at = now
-        package.courier_id = actor_id  # Set courier when matched
-        # Reset acceptance flags for new match
-        package.sender_accepted = False
-        package.courier_accepted = False
-        package.sender_accepted_at = None
-        package.courier_accepted_at = None
-    elif target_status == PackageStatus.ACCEPTED:
-        package.accepted_at = now
-    elif target_status == PackageStatus.PICKED_UP:
-        package.picked_up_at = now
-        package.pickup_time = now  # Also update legacy field
+    if target_status == PackageStatus.OPEN_FOR_BIDS:
+        # When retrying from FAILED, clear the failed state
+        if old_status == PackageStatus.FAILED:
+            package.failed_at = None
+            package.courier_id = None
+    elif target_status == PackageStatus.BID_SELECTED:
+        package.bid_selected_at = now
+        # courier_id is set when bid is selected (in bids.py)
+    elif target_status == PackageStatus.PENDING_PICKUP:
+        package.pending_pickup_at = now
     elif target_status == PackageStatus.IN_TRANSIT:
         package.in_transit_at = now
+        package.pickup_time = now  # Also update pickup_time for compatibility
     elif target_status == PackageStatus.DELIVERED:
         package.delivery_time = now
-    elif target_status == PackageStatus.PENDING:
-        # Courier declined or match reset - clear courier assignment
-        if old_status in [PackageStatus.MATCHED, PackageStatus.ACCEPTED]:
+    elif target_status == PackageStatus.FAILED:
+        package.failed_at = now
+    elif target_status == PackageStatus.CANCELED:
+        # Clear courier assignment if canceling before delivery
+        if old_status in [PackageStatus.BID_SELECTED, PackageStatus.PENDING_PICKUP]:
             package.courier_id = None
-            package.matched_at = None
-            package.accepted_at = None
-            package.sender_accepted = False
-            package.courier_accepted = False
-            package.sender_accepted_at = None
-            package.courier_accepted_at = None
 
     db.commit()
     db.refresh(package)
 
     return package, ""
-
-
-def accept_package_match(
-    db: Session,
-    package: Package,
-    user_id: int,
-    is_sender: bool
-) -> Tuple[Package, str]:
-    """
-    Record acceptance from sender or courier for a matched package.
-    When both have accepted, automatically transitions to ACCEPTED status.
-
-    Args:
-        db: Database session
-        package: The package to accept
-        user_id: ID of the user accepting
-        is_sender: True if the user is the sender, False if courier
-
-    Returns:
-        Tuple of (updated_package, error_message)
-    """
-    # Must be in MATCHED status
-    if package.status != PackageStatus.MATCHED:
-        return package, f"Package must be in Matched status to accept. Current status: {STATUS_LABELS[package.status]}"
-
-    # Verify user is authorized
-    if is_sender:
-        if package.sender_id != user_id:
-            return package, "Only the package sender can accept as sender"
-        if package.sender_accepted:
-            return package, "Sender has already accepted this match"
-    else:
-        if package.courier_id != user_id:
-            return package, "Only the assigned courier can accept as courier"
-        if package.courier_accepted:
-            return package, "Courier has already accepted this match"
-
-    now = datetime.utcnow()
-
-    # Record acceptance
-    if is_sender:
-        package.sender_accepted = True
-        package.sender_accepted_at = now
-    else:
-        package.courier_accepted = True
-        package.courier_accepted_at = now
-
-    # Check if both have accepted
-    if package.sender_accepted and package.courier_accepted:
-        # Auto-transition to ACCEPTED
-        package.status = PackageStatus.ACCEPTED
-        package.accepted_at = now
-        package.status_changed_at = now
-
-    db.commit()
-    db.refresh(package)
-
-    return package, ""
-
-
-def get_acceptance_status(package: Package) -> dict:
-    """
-    Get the acceptance status for a matched package.
-
-    Args:
-        package: The package to check
-
-    Returns:
-        Dict with acceptance information
-    """
-    return {
-        "sender_accepted": package.sender_accepted,
-        "courier_accepted": package.courier_accepted,
-        "sender_accepted_at": package.sender_accepted_at.isoformat() if package.sender_accepted_at else None,
-        "courier_accepted_at": package.courier_accepted_at.isoformat() if package.courier_accepted_at else None,
-        "both_accepted": package.sender_accepted and package.courier_accepted,
-        "awaiting_sender": not package.sender_accepted,
-        "awaiting_courier": not package.courier_accepted,
-    }
-
-
-def _get_delivery_path(package: Package) -> list:
-    """Determine which delivery path to use based on package status."""
-    # If package is using legacy statuses (MATCHED or ACCEPTED), use legacy path
-    if package.status in [PackageStatus.MATCHED, PackageStatus.ACCEPTED]:
-        return LEGACY_DELIVERY_PATH
-    # Otherwise use the new bidding workflow path
-    return DELIVERY_PATH
 
 
 def get_status_progress(package: Package) -> dict:
@@ -298,58 +209,61 @@ def get_status_progress(package: Package) -> dict:
     Returns:
         Dict with progress information
     """
-    delivery_path = _get_delivery_path(package)
-
     current_index = -1
-    for i, status in enumerate(delivery_path):
+    for i, status in enumerate(DELIVERY_PATH):
         if package.status == status:
             current_index = i
             break
 
-    # Handle cancelled separately
-    if package.status == PackageStatus.CANCELLED:
+    # Handle special states
+    if package.status == PackageStatus.CANCELED:
         return {
             "current_step": -1,
-            "total_steps": len(delivery_path) - 1,  # Exclude PENDING from count
+            "total_steps": len(DELIVERY_PATH) - 1,  # Exclude NEW from count
             "is_terminal": True,
-            "is_cancelled": True,
+            "is_canceled": True,
+            "is_failed": False,
             "progress_percent": 0,
-            "steps": _build_steps(package, -1, delivery_path),
+            "steps": _build_steps(package, -1),
+        }
+
+    if package.status == PackageStatus.FAILED:
+        return {
+            "current_step": -1,
+            "total_steps": len(DELIVERY_PATH) - 1,
+            "is_terminal": False,  # Can be retried by admin
+            "is_canceled": False,
+            "is_failed": True,
+            "progress_percent": 0,
+            "steps": _build_steps(package, -1),
         }
 
     return {
         "current_step": current_index,
-        "total_steps": len(delivery_path) - 1,  # Exclude PENDING from count
-        "is_terminal": package.status in [PackageStatus.DELIVERED, PackageStatus.CANCELLED],
-        "is_cancelled": False,
-        "progress_percent": int((current_index / (len(delivery_path) - 1)) * 100) if current_index > 0 else 0,
-        "steps": _build_steps(package, current_index, delivery_path),
+        "total_steps": len(DELIVERY_PATH) - 1,  # Exclude NEW from count
+        "is_terminal": package.status == PackageStatus.DELIVERED,
+        "is_canceled": False,
+        "is_failed": False,
+        "progress_percent": int((current_index / (len(DELIVERY_PATH) - 1)) * 100) if current_index > 0 else 0,
+        "steps": _build_steps(package, current_index),
     }
 
 
-def _build_steps(package: Package, current_index: int, delivery_path: list = None) -> List[dict]:
+def _build_steps(package: Package, current_index: int) -> List[dict]:
     """Build step information for progress display."""
-    if delivery_path is None:
-        delivery_path = DELIVERY_PATH
-
     steps = []
     timestamps = {
-        # New bidding workflow timestamps
-        PackageStatus.PENDING: package.created_at,
-        PackageStatus.BIDDING: package.status_changed_at if package.status == PackageStatus.BIDDING else None,
-        PackageStatus.BID_SELECTED: package.status_changed_at if package.status == PackageStatus.BID_SELECTED else None,
-        PackageStatus.PENDING_PICKUP: package.status_changed_at if package.status == PackageStatus.PENDING_PICKUP else None,
-        PackageStatus.PICKED_UP: package.picked_up_at,
+        PackageStatus.NEW: package.created_at,
+        PackageStatus.OPEN_FOR_BIDS: package.status_changed_at if package.status == PackageStatus.OPEN_FOR_BIDS else None,
+        PackageStatus.BID_SELECTED: package.bid_selected_at,
+        PackageStatus.PENDING_PICKUP: package.pending_pickup_at,
         PackageStatus.IN_TRANSIT: package.in_transit_at,
         PackageStatus.DELIVERED: package.delivery_time,
-        # Legacy workflow timestamps
-        PackageStatus.MATCHED: package.matched_at,
-        PackageStatus.ACCEPTED: package.accepted_at,
     }
 
-    for i, status in enumerate(delivery_path):
-        if status == PackageStatus.PENDING:
-            continue  # Skip pending in display
+    for i, status in enumerate(DELIVERY_PATH):
+        if status == PackageStatus.NEW:
+            continue  # Skip NEW in display
 
         timestamp = timestamps.get(status)
         steps.append({
@@ -361,3 +275,64 @@ def _build_steps(package: Package, current_index: int, delivery_path: list = Non
         })
 
     return steps
+
+
+def is_terminal_state(status: PackageStatus) -> bool:
+    """Check if a status is a terminal state."""
+    return status in TERMINAL_STATES
+
+
+def can_cancel(status_or_package) -> bool:
+    """
+    Check if a package/status can be canceled.
+
+    Args:
+        status_or_package: Either a PackageStatus enum or a Package object
+
+    Returns:
+        Boolean indicating if cancellation is allowed
+    """
+    # Get status from either Package or PackageStatus
+    if isinstance(status_or_package, Package):
+        status = status_or_package.status
+    else:
+        status = status_or_package
+
+    # Cannot cancel terminal states
+    if status in TERMINAL_STATES:
+        return False
+
+    # Cannot cancel FAILED (must retry or leave as is)
+    if status == PackageStatus.FAILED:
+        return False
+
+    # Cannot cancel IN_TRANSIT (package is already with courier)
+    if status == PackageStatus.IN_TRANSIT:
+        return False
+
+    return True
+
+
+def can_cancel_with_reason(package: Package) -> Tuple[bool, str]:
+    """
+    Check if a package can be canceled, with error message.
+
+    Args:
+        package: The package to check
+
+    Returns:
+        Tuple of (can_cancel, error_message)
+    """
+    # Cannot cancel terminal states
+    if package.status in TERMINAL_STATES:
+        return False, f"Cannot cancel a package that is already {STATUS_LABELS[package.status]}"
+
+    # Cannot cancel FAILED (must retry or leave as is)
+    if package.status == PackageStatus.FAILED:
+        return False, "Cannot cancel a failed package. Contact admin to retry or resolve."
+
+    # Cannot cancel IN_TRANSIT (package is already with courier)
+    if package.status == PackageStatus.IN_TRANSIT:
+        return False, "Cannot cancel a package that is in transit"
+
+    return True, ""
