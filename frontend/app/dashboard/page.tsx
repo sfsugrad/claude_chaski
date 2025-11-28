@@ -6,7 +6,7 @@ import { authAPI, ratingsAPI, UserResponse, PendingRating } from '@/lib/api'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import RatingModal from '@/components/RatingModal'
-import { Card, CardBody, CardHeader, Button, Badge, Alert } from '@/components/ui'
+import { Card, CardBody, CardHeader, Button, Badge, Alert, DashboardSkeleton } from '@/components/ui'
 
 // Icons
 const PackageIcon = () => (
@@ -115,14 +115,7 @@ export default function DashboardPage() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-surface-50 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
-          <p className="text-surface-500 font-medium">Loading dashboard...</p>
-        </div>
-      </div>
-    )
+    return <DashboardSkeleton />
   }
 
   if (!user) {

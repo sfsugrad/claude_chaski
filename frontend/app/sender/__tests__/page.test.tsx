@@ -16,6 +16,13 @@ jest.mock('@/components/Navbar', () => {
   }
 })
 
+// Mock UI components - only mock what's needed for this test
+jest.mock('@/components/ui', () => ({
+  SenderDashboardSkeleton: () => (
+    <div data-testid="sender-dashboard-skeleton" className="animate-pulse">Loading skeleton...</div>
+  ),
+}))
+
 // Mock the API modules
 jest.mock('@/lib/api', () => ({
   packagesAPI: {
@@ -158,7 +165,9 @@ describe('SenderDashboard', () => {
 
     it('shows loading state initially', () => {
       render(<SenderDashboard />)
-      expect(screen.getByText('Loading your packages...')).toBeInTheDocument()
+      // Check for skeleton loading state (uses animate-pulse class)
+      const skeletons = document.querySelectorAll('.animate-pulse')
+      expect(skeletons.length).toBeGreaterThan(0)
     })
   })
 

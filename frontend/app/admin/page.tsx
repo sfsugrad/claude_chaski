@@ -1,9 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { authAPI, adminAPI, AdminUser, AdminPackage, AdminStats, MatchingJobResult, UserResponse } from '@/lib/api'
+import { StatsCard, StatsGrid, AdminDashboardSkeleton } from '@/components/ui'
+import { BarChart, DonutChart, LineChart } from '@/components/charts'
 
 type User = AdminUser
 type Package = AdminPackage
@@ -45,6 +47,50 @@ export default function AdminPage() {
   })
   const [matchingJobRunning, setMatchingJobRunning] = useState(false)
   const [matchingJobResult, setMatchingJobResult] = useState<MatchingJobResult | null>(null)
+
+  // Chart data computations
+  const userRoleChartData = useMemo(() => [
+    { name: 'Senders', value: stats.total_senders, color: '#3B82F6' },
+    { name: 'Couriers', value: stats.total_couriers, color: '#10B981' },
+    { name: 'Both', value: stats.total_both, color: '#8B5CF6' },
+    { name: 'Admins', value: stats.total_admins, color: '#EF4444' },
+  ], [stats])
+
+  const packageStatusChartData = useMemo(() => {
+    const statusCounts: Record<string, number> = {}
+    packages.forEach(pkg => {
+      const status = pkg.status.toLowerCase()
+      statusCounts[status] = (statusCounts[status] || 0) + 1
+    })
+
+    const statusColors: Record<string, string> = {
+      pending: '#F59E0B',
+      matched: '#3B82F6',
+      picked_up: '#8B5CF6',
+      in_transit: '#06B6D4',
+      delivered: '#10B981',
+      cancelled: '#EF4444',
+    }
+
+    return Object.entries(statusCounts).map(([name, value]) => ({
+      name: name.charAt(0).toUpperCase() + name.slice(1).replace('_', ' '),
+      value,
+      color: statusColors[name] || '#6B7280',
+    }))
+  }, [packages])
+
+  const packageSizeChartData = useMemo(() => {
+    const sizeCounts: Record<string, number> = {}
+    packages.forEach(pkg => {
+      const size = pkg.size || 'unknown'
+      sizeCounts[size] = (sizeCounts[size] || 0) + 1
+    })
+
+    return Object.entries(sizeCounts).map(([name, value]) => ({
+      name: name.charAt(0).toUpperCase() + name.slice(1).replace('_', ' '),
+      value,
+    }))
+  }, [packages])
 
   useEffect(() => {
     checkAuth()
@@ -243,11 +289,7 @@ export default function AdminPage() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-xl">Loading...</div>
-      </div>
-    )
+    return <AdminDashboardSkeleton />
   }
 
   if (error) {
@@ -334,72 +376,147 @@ export default function AdminPage() {
           <div>
             <h2 className="text-2xl font-bold mb-6">Platform Overview</h2>
 
-            {/* Stats Cards */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-              <div className="bg-white p-6 rounded-lg shadow">
-                <div className="text-gray-600 text-sm mb-2">Total Users</div>
-                <div className="text-3xl font-bold text-purple-600">
-                  {stats.total_users}
-                </div>
+            {/* User Stats Cards */}
+            <h3 className="text-lg font-semibold text-surface-700 mb-4">User Statistics</h3>
+            <StatsGrid columns={4} className="mb-8">
+              <StatsCard
+                label="Total Users"
+                value={stats.total_users}
+                variant="primary"
+                icon={
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                }
+              />
+              <StatsCard
+                label="Senders"
+                value={stats.total_senders}
+                variant="primary"
+                icon={
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                }
+              />
+              <StatsCard
+                label="Couriers"
+                value={stats.total_couriers}
+                variant="success"
+                icon={
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                }
+              />
+              <StatsCard
+                label="Both Roles"
+                value={stats.total_both}
+                variant="default"
+                icon={
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                }
+              />
+            </StatsGrid>
+
+            {/* Package Stats Cards */}
+            <h3 className="text-lg font-semibold text-surface-700 mb-4">Package Statistics</h3>
+            <StatsGrid columns={4} className="mb-8">
+              <StatsCard
+                label="Total Packages"
+                value={stats.total_packages}
+                variant="warning"
+                icon={
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                  </svg>
+                }
+              />
+              <StatsCard
+                label="Active Packages"
+                value={stats.active_packages}
+                variant="primary"
+                icon={
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                  </svg>
+                }
+              />
+              <StatsCard
+                label="Completed"
+                value={stats.completed_packages}
+                variant="success"
+                icon={
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                }
+              />
+              <StatsCard
+                label="Total Revenue"
+                value={`$${stats.total_revenue.toFixed(2)}`}
+                variant="success"
+                icon={
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                }
+              />
+            </StatsGrid>
+
+            {/* Charts Section */}
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+              {/* User Distribution Donut Chart */}
+              <div className="bg-white rounded-xl border border-surface-200 p-6">
+                <h3 className="text-lg font-semibold text-surface-900 mb-4">User Distribution</h3>
+                {stats.total_users > 0 ? (
+                  <DonutChart
+                    data={userRoleChartData}
+                    height={250}
+                    centerValue={stats.total_users}
+                    centerLabel="Total Users"
+                  />
+                ) : (
+                  <div className="h-[250px] flex items-center justify-center text-surface-500">
+                    No user data available
+                  </div>
+                )}
               </div>
 
-              <div className="bg-white p-6 rounded-lg shadow">
-                <div className="text-gray-600 text-sm mb-2">Senders Only</div>
-                <div className="text-3xl font-bold text-blue-600">
-                  {stats.total_senders}
-                </div>
+              {/* Package Status Donut Chart */}
+              <div className="bg-white rounded-xl border border-surface-200 p-6">
+                <h3 className="text-lg font-semibold text-surface-900 mb-4">Package Status</h3>
+                {packageStatusChartData.length > 0 ? (
+                  <DonutChart
+                    data={packageStatusChartData}
+                    height={250}
+                    centerValue={packages.length}
+                    centerLabel="Total"
+                  />
+                ) : (
+                  <div className="h-[250px] flex items-center justify-center text-surface-500">
+                    No package data available
+                  </div>
+                )}
               </div>
 
-              <div className="bg-white p-6 rounded-lg shadow">
-                <div className="text-gray-600 text-sm mb-2">Couriers Only</div>
-                <div className="text-3xl font-bold text-green-600">
-                  {stats.total_couriers}
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-lg shadow">
-                <div className="text-gray-600 text-sm mb-2">Both Roles</div>
-                <div className="text-3xl font-bold text-teal-600">
-                  {stats.total_both}
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-lg shadow">
-                <div className="text-gray-600 text-sm mb-2">Admins</div>
-                <div className="text-3xl font-bold text-red-600">
-                  {stats.total_admins}
-                </div>
-              </div>
-            </div>
-
-            {/* Package Stats */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              <div className="bg-white p-6 rounded-lg shadow">
-                <div className="text-gray-600 text-sm mb-2">Total Packages</div>
-                <div className="text-3xl font-bold text-orange-600">
-                  {stats.total_packages}
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-lg shadow">
-                <div className="text-gray-600 text-sm mb-2">Active Packages</div>
-                <div className="text-3xl font-bold text-yellow-600">
-                  {stats.active_packages}
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-lg shadow">
-                <div className="text-gray-600 text-sm mb-2">Completed</div>
-                <div className="text-3xl font-bold text-green-600">
-                  {stats.completed_packages}
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-lg shadow">
-                <div className="text-gray-600 text-sm mb-2">Total Revenue</div>
-                <div className="text-3xl font-bold text-purple-600">
-                  ${stats.total_revenue.toFixed(2)}
-                </div>
+              {/* Package Size Bar Chart */}
+              <div className="bg-white rounded-xl border border-surface-200 p-6">
+                <h3 className="text-lg font-semibold text-surface-900 mb-4">Package Sizes</h3>
+                {packageSizeChartData.length > 0 ? (
+                  <BarChart
+                    data={packageSizeChartData}
+                    height={250}
+                    color="#3B82F6"
+                    showGrid={true}
+                  />
+                ) : (
+                  <div className="h-[250px] flex items-center justify-center text-surface-500">
+                    No package data available
+                  </div>
+                )}
               </div>
             </div>
 

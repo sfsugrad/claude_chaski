@@ -40,6 +40,13 @@ jest.mock('@/components/Navbar', () => {
   }
 })
 
+// Mock UI components
+jest.mock('@/components/ui', () => ({
+  CourierDashboardSkeleton: () => (
+    <div data-testid="courier-dashboard-skeleton" className="animate-pulse">Loading skeleton...</div>
+  ),
+}))
+
 describe('CourierPage', () => {
   const mockRouter = {
     push: jest.fn(),
@@ -78,7 +85,9 @@ describe('CourierPage', () => {
 
       render(<CourierPage />)
 
-      expect(screen.getByText('Loading...')).toBeInTheDocument()
+      // Check for skeleton loading state (uses animate-pulse class)
+      const skeletons = document.querySelectorAll('.animate-pulse')
+      expect(skeletons.length).toBeGreaterThan(0)
     })
 
     it('renders dashboard for courier users', async () => {

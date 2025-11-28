@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { couriersAPI, authAPI, ratingsAPI, packagesAPI, RouteResponse, UserResponse, PendingRating, PackageResponse } from '@/lib/api'
 import Navbar from '@/components/Navbar'
 import RatingModal from '@/components/RatingModal'
+import { CourierDashboardSkeleton } from '@/components/ui'
 
 export default function CourierDashboard() {
   const [routes, setRoutes] = useState<RouteResponse[]>([])
@@ -135,11 +136,7 @@ export default function CourierDashboard() {
   }
 
   if (loading) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center">Loading...</div>
-      </div>
-    )
+    return <CourierDashboardSkeleton />
   }
 
   return (

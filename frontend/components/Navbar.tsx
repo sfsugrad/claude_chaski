@@ -7,7 +7,7 @@ import { UserResponse, messagesAPI, authAPI } from '@/lib/api'
 import NotificationDropdown from './NotificationDropdown'
 import StarRating from './StarRating'
 import { useWebSocketContext } from '@/contexts/WebSocketContext'
-import { Badge } from '@/components/ui'
+import { Badge, ConnectionStatus } from '@/components/ui'
 
 interface NavbarProps {
   user: UserResponse | null
@@ -21,7 +21,7 @@ export default function Navbar({ user }: NavbarProps) {
   const [unreadMessageCount, setUnreadMessageCount] = useState(0)
 
   // Get shared WebSocket context
-  const { onMessageReceived } = useWebSocketContext()
+  const { onMessageReceived, connectionStatus } = useWebSocketContext()
 
   // Subscribe to message events
   useEffect(() => {
@@ -145,6 +145,14 @@ export default function Navbar({ user }: NavbarProps) {
           <div className="flex items-center gap-2">
             {user && (
               <>
+                {/* Connection Status Indicator */}
+                <ConnectionStatus
+                  status={connectionStatus}
+                  size="sm"
+                  className="hidden sm:flex"
+                  data-testid="connection-status"
+                />
+
                 {/* Messages Link */}
                 <Link
                   href="/messages"

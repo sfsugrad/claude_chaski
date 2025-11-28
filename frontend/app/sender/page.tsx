@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { packagesAPI, authAPI, ratingsAPI, PackageResponse, UserResponse, PendingRating } from '@/lib/api'
 import Navbar from '@/components/Navbar'
 import RatingModal from '@/components/RatingModal'
+import { SenderDashboardSkeleton } from '@/components/ui'
 
 type StatusFilter = 'all' | 'pending' | 'matched' | 'picked_up' | 'in_transit' | 'delivered' | 'cancelled'
 
@@ -140,14 +141,7 @@ export default function SenderDashboard() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading your packages...</p>
-        </div>
-      </div>
-    )
+    return <SenderDashboardSkeleton />
   }
 
   const filteredPackages = getFilteredPackages()

@@ -70,6 +70,9 @@ jest.mock('@/components/ui', () => ({
   Alert: ({ children, variant, className }: any) => (
     <div role="alert" className={`alert alert-${variant} ${className || ''}`}>{children}</div>
   ),
+  DashboardSkeleton: () => (
+    <div data-testid="dashboard-skeleton" className="animate-pulse">Loading skeleton...</div>
+  ),
 }))
 
 describe('DashboardPage', () => {
@@ -124,7 +127,9 @@ describe('DashboardPage', () => {
 
       render(<DashboardPage />)
 
-      expect(screen.getByText(/loading/i)).toBeInTheDocument()
+      // Check for skeleton loading state (uses animate-pulse class)
+      const skeletons = document.querySelectorAll('.animate-pulse')
+      expect(skeletons.length).toBeGreaterThan(0)
     })
   })
 

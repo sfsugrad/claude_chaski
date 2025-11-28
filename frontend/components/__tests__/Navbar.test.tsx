@@ -31,6 +31,9 @@ jest.mock('@/components/ui', () => ({
       {children}
     </span>
   ),
+  ConnectionStatus: ({ status }: { status: string }) => (
+    <div data-testid="connection-status" data-status={status} />
+  ),
 }))
 
 // Mock WebSocketContext
@@ -39,6 +42,7 @@ jest.mock('@/contexts/WebSocketContext', () => ({
     unreadCount: 0,
     setUnreadCount: jest.fn(),
     onMessageReceived: jest.fn(() => () => {}), // Returns an unsubscribe function
+    connectionStatus: 'connected',
   }),
 }))
 

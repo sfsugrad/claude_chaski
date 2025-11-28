@@ -8,6 +8,7 @@ import StarRating from '@/components/StarRating'
 import RatingModal from '@/components/RatingModal'
 import ChatWindow from '@/components/ChatWindow'
 import { useWebSocket } from '@/hooks/useWebSocket'
+import { RouteMap } from '@/components/map'
 
 interface Package {
   id: number
@@ -658,18 +659,34 @@ export default function PackageDetailPage() {
             </svg>
             Route
           </h2>
-          <div className="bg-gray-100 rounded-lg p-8 text-center">
-            <p className="text-gray-600 mb-2">Map View</p>
-            <p className="text-sm text-gray-500">
-              From: {pkg.pickup_address}
-            </p>
-            <div className="text-gray-400 my-2">↓</div>
-            <p className="text-sm text-gray-500">
-              To: {pkg.dropoff_address}
-            </p>
-            <p className="text-xs text-gray-400 mt-4">
-              Map integration coming soon
-            </p>
+          <RouteMap
+            pickup={{
+              address: pkg.pickup_address,
+              lat: pkg.pickup_lat,
+              lng: pkg.pickup_lng,
+              label: 'Pickup',
+            }}
+            dropoff={{
+              address: pkg.dropoff_address,
+              lat: pkg.dropoff_lat,
+              lng: pkg.dropoff_lng,
+              label: 'Dropoff',
+            }}
+            height={350}
+            showRoute={true}
+          />
+          <div className="mt-3 flex items-center justify-between text-sm text-surface-600">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-success-500"></span>
+              <span>{pkg.pickup_address}</span>
+            </div>
+            <svg className="w-4 h-4 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+            </svg>
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-primary-500"></span>
+              <span>{pkg.dropoff_address}</span>
+            </div>
           </div>
         </div>
 

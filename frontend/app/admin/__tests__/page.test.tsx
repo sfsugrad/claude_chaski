@@ -45,6 +45,28 @@ jest.mock('@/lib/api', () => ({
   },
 }))
 
+// Mock UI components
+jest.mock('@/components/ui', () => ({
+  StatsCard: ({ label, value, icon, variant }: any) => (
+    <div data-testid="stats-card" data-label={label} data-value={value} className={`text-${variant}-600`}>
+      {icon && <span className="icon">{icon}</span>}
+      <span>{label}</span>
+      <span>{value}</span>
+    </div>
+  ),
+  StatsGrid: ({ children }: any) => <div data-testid="stats-grid">{children}</div>,
+  AdminDashboardSkeleton: () => (
+    <div data-testid="admin-dashboard-skeleton" className="animate-pulse">Loading skeleton...</div>
+  ),
+}))
+
+// Mock chart components
+jest.mock('@/components/charts', () => ({
+  BarChart: ({ data }: any) => <div data-testid="bar-chart">{JSON.stringify(data)}</div>,
+  DonutChart: ({ data }: any) => <div data-testid="donut-chart">{JSON.stringify(data)}</div>,
+  LineChart: ({ data }: any) => <div data-testid="line-chart">{JSON.stringify(data)}</div>,
+}))
+
 // Helper to set up admin mocks with default data
 const setupAdminMocks = (options: {
   user?: any
@@ -152,7 +174,9 @@ describe('AdminPage', () => {
     it('renders loading state initially', () => {
       render(<AdminPage />)
 
-      expect(screen.getByText('Loading...')).toBeInTheDocument()
+      // Check for skeleton loading state (uses animate-pulse class)
+      const skeletons = document.querySelectorAll('.animate-pulse')
+      expect(skeletons.length).toBeGreaterThan(0)
     })
 
     it('renders header with admin info', async () => {
@@ -238,8 +262,8 @@ describe('AdminPage', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Total Users')).toBeInTheDocument()
-        expect(screen.getByText('Senders Only')).toBeInTheDocument()
-        expect(screen.getByText('Couriers Only')).toBeInTheDocument()
+        expect(screen.getByText('Senders')).toBeInTheDocument()
+        expect(screen.getByText('Couriers')).toBeInTheDocument()
         expect(screen.getByText('Active Packages')).toBeInTheDocument()
       })
     })
@@ -375,10 +399,10 @@ describe('AdminPage', () => {
       const { container } = render(<AdminPage />)
 
       await waitFor(() => {
-        expect(container.querySelector('.text-purple-600')).toBeInTheDocument()
-        expect(container.querySelector('.text-blue-600')).toBeInTheDocument()
-        expect(container.querySelector('.text-green-600')).toBeInTheDocument()
-        expect(container.querySelector('.text-orange-600')).toBeInTheDocument()
+        // Stats now use design system colors via StatsCard component
+        expect(container.querySelector('.text-primary-600')).toBeInTheDocument()
+        expect(container.querySelector('.text-success-600')).toBeInTheDocument()
+        expect(container.querySelector('.text-warning-600')).toBeInTheDocument()
       })
     })
   })

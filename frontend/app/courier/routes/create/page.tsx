@@ -7,6 +7,7 @@ import { clsx } from 'clsx';
 import { couriersAPI, RouteCreate } from '@/lib/api';
 import { Button, Card, CardBody, Alert, Input } from '@/components/ui';
 import AddressAutocomplete from '@/components/AddressAutocomplete';
+import { RouteMap } from '@/components/map';
 
 const deviationPresets = [
   { value: 2, label: '2 km', description: 'Very close to route' },
@@ -163,6 +164,41 @@ export default function CreateRoutePage() {
               </div>
             </CardBody>
           </Card>
+
+          {/* Route Preview Map */}
+          {(formData.start_lat !== 0 || formData.end_lat !== 0) && (
+            <Card>
+              <CardBody className="p-6">
+                <h3 className="text-lg font-semibold text-surface-900 mb-4">Route Preview</h3>
+                <RouteMap
+                  pickup={
+                    formData.start_lat !== 0
+                      ? {
+                          address: formData.start_address,
+                          lat: formData.start_lat,
+                          lng: formData.start_lng,
+                          label: 'Start',
+                        }
+                      : undefined
+                  }
+                  dropoff={
+                    formData.end_lat !== 0
+                      ? {
+                          address: formData.end_address,
+                          lat: formData.end_lat,
+                          lng: formData.end_lng,
+                          label: 'End',
+                        }
+                      : undefined
+                  }
+                  height={300}
+                  showRoute={formData.start_lat !== 0 && formData.end_lat !== 0}
+                  showDeviationRadius={formData.start_lat !== 0 && formData.end_lat !== 0}
+                  deviationKm={formData.max_deviation_km}
+                />
+              </CardBody>
+            </Card>
+          )}
 
           {/* Deviation Card */}
           <Card>
