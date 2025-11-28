@@ -9,6 +9,7 @@ import RatingModal from '@/components/RatingModal'
 import ChatWindow from '@/components/ChatWindow'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { RouteMap } from '@/components/map'
+import { Card, Button, Badge, Alert, FadeIn, SlideIn, PackageDetailSkeleton } from '@/components/ui'
 
 interface Package {
   id: number
@@ -193,23 +194,23 @@ export default function PackageDetailPage() {
     }
   }
 
-  const getStatusColor = (status: string) => {
+  const getStatusVariant = (status: string): 'warning' | 'info' | 'primary' | 'success' | 'error' | 'secondary' => {
     const statusLower = status.toLowerCase()
     switch (statusLower) {
       case 'pending':
-        return 'bg-yellow-100 text-yellow-800'
+        return 'warning'
       case 'accepted':
-        return 'bg-blue-100 text-blue-800'
+        return 'info'
       case 'picked_up':
-        return 'bg-purple-100 text-purple-800'
+        return 'primary'
       case 'in_transit':
-        return 'bg-indigo-100 text-indigo-800'
+        return 'info'
       case 'delivered':
-        return 'bg-green-100 text-green-800'
+        return 'success'
       case 'cancelled':
-        return 'bg-red-100 text-red-800'
+        return 'error'
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'secondary'
     }
   }
 
@@ -303,490 +304,494 @@ export default function PackageDetailPage() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-xl">Loading package details...</div>
-      </div>
-    )
+    return <PackageDetailSkeleton />
   }
 
   if (error || !pkg) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-red-600 text-xl mb-4">{error || 'Package not found'}</div>
+      <div className="min-h-screen bg-surface-50 flex items-center justify-center">
+        <Card className="text-center p-8 max-w-md">
+          <Alert variant="error" className="mb-4">{error || 'Package not found'}</Alert>
           <Link
             href="/dashboard"
-            className="text-purple-600 hover:text-purple-700 underline"
+            className="text-primary-600 hover:text-primary-700 underline"
           >
             Return to Dashboard
           </Link>
-        </div>
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface-50">
       {/* Header */}
-      <div className="bg-white shadow">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link
-                href={currentUser?.role === 'admin' || currentUser?.role === 'ADMIN' ? '/admin' : '/dashboard'}
-                className="text-purple-600 hover:text-purple-700"
-              >
-                ← Back
-              </Link>
-              <h1 className="text-2xl font-bold text-gray-900">
-                Package #{pkg.id}
-              </h1>
-              <span className={`px-3 py-1 text-sm font-semibold rounded-full ${getStatusColor(pkg.status)}`}>
-                {pkg.status.replace('_', ' ').toUpperCase()}
-              </span>
-            </div>
-            <div className="flex gap-2">
-              {canAcceptPackage() && (
-                <button
-                  onClick={handleAcceptPackage}
-                  disabled={acceptingPackage}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+      <FadeIn duration={300}>
+        <div className="bg-white shadow">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Link
+                  href={currentUser?.role === 'admin' || currentUser?.role === 'ADMIN' ? '/admin' : '/dashboard'}
+                  className="text-primary-600 hover:text-primary-700"
                 >
-                  {acceptingPackage ? 'Accepting...' : 'Accept Package'}
-                </button>
-              )}
-              {canEdit() && !isEditing && (
-                <button
-                  onClick={handleEdit}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"
-                >
-                  Edit Package
-                </button>
-              )}
-              {isEditing && (
-                <>
-                  <button
-                    onClick={handleCancel}
-                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 font-medium"
+                  ← Back
+                </Link>
+                <h1 className="text-2xl font-bold text-surface-900">
+                  Package #{pkg.id}
+                </h1>
+                <Badge variant={getStatusVariant(pkg.status)}>
+                  {pkg.status.replace('_', ' ').toUpperCase()}
+                </Badge>
+              </div>
+              <div className="flex gap-2">
+                {canAcceptPackage() && (
+                  <Button
+                    variant="success"
+                    onClick={handleAcceptPackage}
+                    disabled={acceptingPackage}
+                    loading={acceptingPackage}
                   >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSave}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
-                  >
-                    Save Changes
-                  </button>
-                </>
-              )}
+                    {acceptingPackage ? 'Accepting...' : 'Accept Package'}
+                  </Button>
+                )}
+                {canEdit() && !isEditing && (
+                  <Button variant="primary" onClick={handleEdit}>
+                    Edit Package
+                  </Button>
+                )}
+                {isEditing && (
+                  <>
+                    <Button variant="secondary" onClick={handleCancel}>
+                      Cancel
+                    </Button>
+                    <Button variant="success" onClick={handleSave}>
+                      Save Changes
+                    </Button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </FadeIn>
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
         <div className="grid md:grid-cols-2 gap-6">
           {/* Package Details */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-              </svg>
-              Package Details
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-gray-500">Description</label>
-                {isEditing ? (
-                  <textarea
-                    value={editedPackage.description || ''}
-                    onChange={(e) => setEditedPackage({ ...editedPackage, description: e.target.value })}
-                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    rows={3}
-                  />
-                ) : (
-                  <p className="text-gray-900 mt-1">{pkg.description}</p>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+          <SlideIn direction="up" delay={100}>
+            <Card className="p-6">
+              <h2 className="text-xl font-bold text-surface-900 mb-4 flex items-center gap-2">
+                <svg className="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+                Package Details
+              </h2>
+              <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Size</label>
+                  <label className="text-sm font-medium text-surface-500">Description</label>
                   {isEditing ? (
-                    <select
-                      value={editedPackage.size || pkg.size}
-                      onChange={(e) => setEditedPackage({ ...editedPackage, size: e.target.value })}
-                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    >
-                      <option value="small">Small</option>
-                      <option value="medium">Medium</option>
-                      <option value="large">Large</option>
-                      <option value="extra_large">Extra Large</option>
-                    </select>
-                  ) : (
-                    <p className="text-gray-900 mt-1">{getSizeLabel(pkg.size)}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Weight (kg)</label>
-                  {isEditing ? (
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0.1"
-                      value={editedPackage.weight_kg || ''}
-                      onChange={(e) => setEditedPackage({ ...editedPackage, weight_kg: parseFloat(e.target.value) })}
-                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    <textarea
+                      value={editedPackage.description || ''}
+                      onChange={(e) => setEditedPackage({ ...editedPackage, description: e.target.value })}
+                      className="mt-1 w-full border border-surface-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      rows={3}
                     />
                   ) : (
-                    <p className="text-gray-900 mt-1">{pkg.weight_kg} kg</p>
+                    <p className="text-surface-900 mt-1">{pkg.description}</p>
                   )}
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Price ($)</label>
-                  {isEditing ? (
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={editedPackage.price ?? ''}
-                      onChange={(e) => setEditedPackage({ ...editedPackage, price: e.target.value ? parseFloat(e.target.value) : null })}
-                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                  ) : (
-                    <p className="text-gray-900 mt-1 text-lg font-semibold">
-                      ${pkg.price?.toFixed(2) || 'N/A'}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-surface-500">Size</label>
+                    {isEditing ? (
+                      <select
+                        value={editedPackage.size || pkg.size}
+                        onChange={(e) => setEditedPackage({ ...editedPackage, size: e.target.value })}
+                        className="mt-1 w-full border border-surface-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      >
+                        <option value="small">Small</option>
+                        <option value="medium">Medium</option>
+                        <option value="large">Large</option>
+                        <option value="extra_large">Extra Large</option>
+                      </select>
+                    ) : (
+                      <p className="text-surface-900 mt-1">{getSizeLabel(pkg.size)}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-surface-500">Weight (kg)</label>
+                    {isEditing ? (
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0.1"
+                        value={editedPackage.weight_kg || ''}
+                        onChange={(e) => setEditedPackage({ ...editedPackage, weight_kg: parseFloat(e.target.value) })}
+                        className="mt-1 w-full border border-surface-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    ) : (
+                      <p className="text-surface-900 mt-1">{pkg.weight_kg} kg</p>
+                    )}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-surface-500">Price ($)</label>
+                    {isEditing ? (
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={editedPackage.price ?? ''}
+                        onChange={(e) => setEditedPackage({ ...editedPackage, price: e.target.value ? parseFloat(e.target.value) : null })}
+                        className="mt-1 w-full border border-surface-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    ) : (
+                      <p className="text-surface-900 mt-1 text-lg font-semibold">
+                        ${pkg.price?.toFixed(2) || 'N/A'}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-surface-500">Created</label>
+                    <p className="text-surface-900 mt-1">
+                      {new Date(pkg.created_at).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
                     </p>
-                  )}
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Created</label>
-                  <p className="text-gray-900 mt-1">
-                    {new Date(pkg.created_at).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                  </p>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
+            </Card>
+          </SlideIn>
 
           {/* User Information */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-              People Involved
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-gray-500">Sender</label>
-                {sender ? (
-                  <div className="mt-1">
-                    {currentUser?.role === 'admin' || currentUser?.role === 'ADMIN' ? (
-                      <Link
-                        href={`/users/${sender.id}`}
-                        className="text-purple-600 hover:text-purple-800 font-medium underline"
-                      >
-                        {sender.full_name}
-                      </Link>
-                    ) : (
-                      <p className="text-gray-900 font-medium">{sender.full_name}</p>
-                    )}
-                    <p className="text-gray-600 text-sm">{sender.email}</p>
-                  </div>
-                ) : pkg.sender_name ? (
-                  <p className="text-gray-900 mt-1 font-medium">{pkg.sender_name}</p>
-                ) : (
-                  <p className="text-gray-900 mt-1">User ID: {pkg.sender_id}</p>
-                )}
+          <SlideIn direction="up" delay={150}>
+            <Card className="p-6">
+              <h2 className="text-xl font-bold text-surface-900 mb-4 flex items-center gap-2">
+                <svg className="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                People Involved
+              </h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-surface-500">Sender</label>
+                  {sender ? (
+                    <div className="mt-1">
+                      {currentUser?.role === 'admin' || currentUser?.role === 'ADMIN' ? (
+                        <Link
+                          href={`/users/${sender.id}`}
+                          className="text-primary-600 hover:text-primary-800 font-medium underline"
+                        >
+                          {sender.full_name}
+                        </Link>
+                      ) : (
+                        <p className="text-surface-900 font-medium">{sender.full_name}</p>
+                      )}
+                      <p className="text-surface-600 text-sm">{sender.email}</p>
+                    </div>
+                  ) : pkg.sender_name ? (
+                    <p className="text-surface-900 mt-1 font-medium">{pkg.sender_name}</p>
+                  ) : (
+                    <p className="text-surface-900 mt-1">User ID: {pkg.sender_id}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-surface-500">Courier</label>
+                  {courier ? (
+                    <div className="mt-1">
+                      {currentUser?.role === 'admin' || currentUser?.role === 'ADMIN' ? (
+                        <Link
+                          href={`/users/${courier.id}`}
+                          className="text-primary-600 hover:text-primary-800 font-medium underline"
+                        >
+                          {courier.full_name}
+                        </Link>
+                      ) : (
+                        <p className="text-surface-900 font-medium">{courier.full_name}</p>
+                      )}
+                      <p className="text-surface-600 text-sm">{courier.email}</p>
+                    </div>
+                  ) : pkg.courier_id ? (
+                    <p className="text-surface-900 mt-1 font-medium">{pkg.courier_name || `User ID: ${pkg.courier_id}`}</p>
+                  ) : (
+                    <p className="text-surface-500 italic mt-1">Not assigned yet</p>
+                  )}
+                </div>
               </div>
-              <div>
-                <label className="text-sm font-medium text-gray-500">Courier</label>
-                {courier ? (
-                  <div className="mt-1">
-                    {currentUser?.role === 'admin' || currentUser?.role === 'ADMIN' ? (
-                      <Link
-                        href={`/users/${courier.id}`}
-                        className="text-purple-600 hover:text-purple-800 font-medium underline"
-                      >
-                        {courier.full_name}
-                      </Link>
-                    ) : (
-                      <p className="text-gray-900 font-medium">{courier.full_name}</p>
-                    )}
-                    <p className="text-gray-600 text-sm">{courier.email}</p>
-                  </div>
-                ) : pkg.courier_id ? (
-                  <p className="text-gray-900 mt-1 font-medium">{pkg.courier_name || `User ID: ${pkg.courier_id}`}</p>
-                ) : (
-                  <p className="text-gray-500 italic mt-1">Not assigned yet</p>
-                )}
-              </div>
-            </div>
-          </div>
+            </Card>
+          </SlideIn>
 
           {/* Pickup Information */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              Pickup Location
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-gray-500">Address</label>
-                <p className="text-gray-900 mt-1">{pkg.pickup_address}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+          <SlideIn direction="up" delay={200}>
+            <Card className="p-6">
+              <h2 className="text-xl font-bold text-surface-900 mb-4 flex items-center gap-2">
+                <svg className="w-6 h-6 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Pickup Location
+              </h2>
+              <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Latitude</label>
-                  <p className="text-gray-900 mt-1 font-mono text-sm">{pkg.pickup_lat}</p>
+                  <label className="text-sm font-medium text-surface-500">Address</label>
+                  <p className="text-surface-900 mt-1">{pkg.pickup_address}</p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Longitude</label>
-                  <p className="text-gray-900 mt-1 font-mono text-sm">{pkg.pickup_lng}</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-surface-500">Latitude</label>
+                    <p className="text-surface-900 mt-1 font-mono text-sm">{pkg.pickup_lat}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-surface-500">Longitude</label>
+                    <p className="text-surface-900 mt-1 font-mono text-sm">{pkg.pickup_lng}</p>
+                  </div>
                 </div>
+                {(pkg.pickup_contact_name || pkg.pickup_contact_phone || isEditing) && (
+                  <div className="border-t border-surface-200 pt-4">
+                    <label className="text-sm font-medium text-surface-500">Contact Information</label>
+                    {isEditing ? (
+                      <div className="mt-2 space-y-2">
+                        <input
+                          type="text"
+                          placeholder="Contact Name"
+                          value={editedPackage.pickup_contact_name || ''}
+                          onChange={(e) => setEditedPackage({ ...editedPackage, pickup_contact_name: e.target.value })}
+                          className="w-full border border-surface-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        />
+                        <input
+                          type="tel"
+                          placeholder="Contact Phone"
+                          value={editedPackage.pickup_contact_phone || ''}
+                          onChange={(e) => setEditedPackage({ ...editedPackage, pickup_contact_phone: e.target.value })}
+                          className="w-full border border-surface-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        />
+                      </div>
+                    ) : (
+                      <div className="mt-2 space-y-1">
+                        {pkg.pickup_contact_name && (
+                          <p className="text-surface-900">{pkg.pickup_contact_name}</p>
+                        )}
+                        {pkg.pickup_contact_phone && (
+                          <p className="text-surface-600">{pkg.pickup_contact_phone}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              {(pkg.pickup_contact_name || pkg.pickup_contact_phone || isEditing) && (
-                <div className="border-t pt-4">
-                  <label className="text-sm font-medium text-gray-500">Contact Information</label>
-                  {isEditing ? (
-                    <div className="mt-2 space-y-2">
-                      <input
-                        type="text"
-                        placeholder="Contact Name"
-                        value={editedPackage.pickup_contact_name || ''}
-                        onChange={(e) => setEditedPackage({ ...editedPackage, pickup_contact_name: e.target.value })}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      />
-                      <input
-                        type="tel"
-                        placeholder="Contact Phone"
-                        value={editedPackage.pickup_contact_phone || ''}
-                        onChange={(e) => setEditedPackage({ ...editedPackage, pickup_contact_phone: e.target.value })}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      />
-                    </div>
-                  ) : (
-                    <div className="mt-2 space-y-1">
-                      {pkg.pickup_contact_name && (
-                        <p className="text-gray-900">{pkg.pickup_contact_name}</p>
-                      )}
-                      {pkg.pickup_contact_phone && (
-                        <p className="text-gray-600">{pkg.pickup_contact_phone}</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+            </Card>
+          </SlideIn>
 
           {/* Dropoff Information */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              Dropoff Location
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-gray-500">Address</label>
-                <p className="text-gray-900 mt-1">{pkg.dropoff_address}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+          <SlideIn direction="up" delay={250}>
+            <Card className="p-6">
+              <h2 className="text-xl font-bold text-surface-900 mb-4 flex items-center gap-2">
+                <svg className="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Dropoff Location
+              </h2>
+              <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Latitude</label>
-                  <p className="text-gray-900 mt-1 font-mono text-sm">{pkg.dropoff_lat}</p>
+                  <label className="text-sm font-medium text-surface-500">Address</label>
+                  <p className="text-surface-900 mt-1">{pkg.dropoff_address}</p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Longitude</label>
-                  <p className="text-gray-900 mt-1 font-mono text-sm">{pkg.dropoff_lng}</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-surface-500">Latitude</label>
+                    <p className="text-surface-900 mt-1 font-mono text-sm">{pkg.dropoff_lat}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-surface-500">Longitude</label>
+                    <p className="text-surface-900 mt-1 font-mono text-sm">{pkg.dropoff_lng}</p>
+                  </div>
                 </div>
+                {(pkg.dropoff_contact_name || pkg.dropoff_contact_phone || isEditing) && (
+                  <div className="border-t border-surface-200 pt-4">
+                    <label className="text-sm font-medium text-surface-500">Contact Information</label>
+                    {isEditing ? (
+                      <div className="mt-2 space-y-2">
+                        <input
+                          type="text"
+                          placeholder="Contact Name"
+                          value={editedPackage.dropoff_contact_name || ''}
+                          onChange={(e) => setEditedPackage({ ...editedPackage, dropoff_contact_name: e.target.value })}
+                          className="w-full border border-surface-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        />
+                        <input
+                          type="tel"
+                          placeholder="Contact Phone"
+                          value={editedPackage.dropoff_contact_phone || ''}
+                          onChange={(e) => setEditedPackage({ ...editedPackage, dropoff_contact_phone: e.target.value })}
+                          className="w-full border border-surface-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        />
+                      </div>
+                    ) : (
+                      <div className="mt-2 space-y-1">
+                        {pkg.dropoff_contact_name && (
+                          <p className="text-surface-900">{pkg.dropoff_contact_name}</p>
+                        )}
+                        {pkg.dropoff_contact_phone && (
+                          <p className="text-surface-600">{pkg.dropoff_contact_phone}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              {(pkg.dropoff_contact_name || pkg.dropoff_contact_phone || isEditing) && (
-                <div className="border-t pt-4">
-                  <label className="text-sm font-medium text-gray-500">Contact Information</label>
-                  {isEditing ? (
-                    <div className="mt-2 space-y-2">
-                      <input
-                        type="text"
-                        placeholder="Contact Name"
-                        value={editedPackage.dropoff_contact_name || ''}
-                        onChange={(e) => setEditedPackage({ ...editedPackage, dropoff_contact_name: e.target.value })}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      />
-                      <input
-                        type="tel"
-                        placeholder="Contact Phone"
-                        value={editedPackage.dropoff_contact_phone || ''}
-                        onChange={(e) => setEditedPackage({ ...editedPackage, dropoff_contact_phone: e.target.value })}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      />
-                    </div>
-                  ) : (
-                    <div className="mt-2 space-y-1">
-                      {pkg.dropoff_contact_name && (
-                        <p className="text-gray-900">{pkg.dropoff_contact_name}</p>
-                      )}
-                      {pkg.dropoff_contact_phone && (
-                        <p className="text-gray-600">{pkg.dropoff_contact_phone}</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+            </Card>
+          </SlideIn>
         </div>
 
         {/* Map View */}
-        <div className="mt-6 bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-            </svg>
-            Route
-          </h2>
-          <RouteMap
-            pickup={{
-              address: pkg.pickup_address,
-              lat: pkg.pickup_lat,
-              lng: pkg.pickup_lng,
-              label: 'Pickup',
-            }}
-            dropoff={{
-              address: pkg.dropoff_address,
-              lat: pkg.dropoff_lat,
-              lng: pkg.dropoff_lng,
-              label: 'Dropoff',
-            }}
-            height={350}
-            showRoute={true}
-          />
-          <div className="mt-3 flex items-center justify-between text-sm text-surface-600">
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-success-500"></span>
-              <span>{pkg.pickup_address}</span>
+        <SlideIn direction="up" delay={300}>
+          <Card className="mt-6 p-6">
+            <h2 className="text-xl font-bold text-surface-900 mb-4 flex items-center gap-2">
+              <svg className="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+              </svg>
+              Route
+            </h2>
+            <RouteMap
+              pickup={{
+                address: pkg.pickup_address,
+                lat: pkg.pickup_lat,
+                lng: pkg.pickup_lng,
+                label: 'Pickup',
+              }}
+              dropoff={{
+                address: pkg.dropoff_address,
+                lat: pkg.dropoff_lat,
+                lng: pkg.dropoff_lng,
+                label: 'Dropoff',
+              }}
+              height={350}
+              showRoute={true}
+            />
+            <div className="mt-3 flex items-center justify-between text-sm text-surface-600">
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-success-500"></span>
+                <span>{pkg.pickup_address}</span>
+              </div>
+              <svg className="w-4 h-4 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+              </svg>
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-primary-500"></span>
+                <span>{pkg.dropoff_address}</span>
+              </div>
             </div>
-            <svg className="w-4 h-4 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-            </svg>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-primary-500"></span>
-              <span>{pkg.dropoff_address}</span>
-            </div>
-          </div>
-        </div>
+          </Card>
+        </SlideIn>
 
         {/* Chat Section - Show for sender/courier (not admin) */}
         {currentUser && pkg && (currentUser.id === pkg.sender_id || currentUser.id === pkg.courier_id) && (
-          <div className="mt-6 bg-white rounded-lg shadow-md overflow-hidden">
-            <button
-              onClick={() => {
-                setShowChat(!showChat)
-                if (!showChat) {
-                  setUnreadMessageCount(0)
-                }
-              }}
-              className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-                <span className="text-lg font-bold text-gray-900">
-                  Messages {otherUserName && `with ${otherUserName}`}
-                </span>
-                {unreadMessageCount > 0 && (
-                  <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold text-white bg-blue-600 rounded-full">
-                    {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
-                  </span>
-                )}
-              </div>
-              <svg
-                className={`w-5 h-5 text-gray-400 transition-transform ${showChat ? 'rotate-180' : ''}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+          <SlideIn direction="up" delay={350}>
+            <Card className="mt-6 overflow-hidden">
+              <button
+                onClick={() => {
+                  setShowChat(!showChat)
+                  if (!showChat) {
+                    setUnreadMessageCount(0)
+                  }
+                }}
+                className="w-full p-4 flex items-center justify-between hover:bg-surface-50 transition-colors"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
+                <div className="flex items-center gap-3">
+                  <svg className="w-6 h-6 text-info-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  <span className="text-lg font-bold text-surface-900">
+                    Messages {otherUserName && `with ${otherUserName}`}
+                  </span>
+                  {unreadMessageCount > 0 && (
+                    <Badge variant="primary" size="sm">
+                      {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
+                    </Badge>
+                  )}
+                </div>
+                <svg
+                  className={`w-5 h-5 text-surface-400 transition-transform ${showChat ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
 
-            {showChat && (
-              <div className="border-t border-gray-200">
-                <ChatWindow
-                  packageId={pkg.id}
-                  currentUserId={currentUser.id}
-                  otherUserName={otherUserName || (currentUser.id === pkg.sender_id ? 'Courier' : 'Sender')}
-                  className="rounded-none border-0"
-                />
-              </div>
-            )}
-          </div>
+              {showChat && (
+                <div className="border-t border-surface-200">
+                  <ChatWindow
+                    packageId={pkg.id}
+                    currentUserId={currentUser.id}
+                    otherUserName={otherUserName || (currentUser.id === pkg.sender_id ? 'Courier' : 'Sender')}
+                    className="rounded-none border-0"
+                  />
+                </div>
+              )}
+            </Card>
+          </SlideIn>
         )}
 
         {/* Ratings Section - Only show for delivered packages */}
         {pkg.status.toLowerCase() === 'delivered' && (
-          <div className="mt-6 bg-white rounded-lg shadow-md p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <svg className="w-6 h-6 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                </svg>
-                Ratings & Reviews
-              </h2>
-              {pendingRating && (
-                <button
-                  onClick={() => setShowRatingModal(true)}
-                  className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 font-medium"
-                >
-                  Rate {pendingRating.user_to_rate_role === 'courier' ? 'Courier' : 'Sender'}
-                </button>
-              )}
-            </div>
+          <SlideIn direction="up" delay={400}>
+            <Card className="mt-6 p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-surface-900 flex items-center gap-2">
+                  <svg className="w-6 h-6 text-warning-500" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                  </svg>
+                  Ratings & Reviews
+                </h2>
+                {pendingRating && (
+                  <Button
+                    variant="warning"
+                    onClick={() => setShowRatingModal(true)}
+                  >
+                    Rate {pendingRating.user_to_rate_role === 'courier' ? 'Courier' : 'Sender'}
+                  </Button>
+                )}
+              </div>
 
-            {packageRatings.length === 0 ? (
-              <p className="text-gray-500">No ratings yet for this delivery.</p>
-            ) : (
-              <div className="space-y-4">
-                {packageRatings.map((rating) => (
-                  <div key={rating.id} className="border-b border-gray-200 pb-4 last:border-b-0">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-gray-900">
-                          {rating.rater_name || `User #${rating.rater_id}`}
-                        </span>
-                        <span className="text-gray-400">→</span>
-                        <span className="text-gray-600">
-                          {rating.rated_user_id === pkg.sender_id ? 'Sender' : 'Courier'}
+              {packageRatings.length === 0 ? (
+                <p className="text-surface-500">No ratings yet for this delivery.</p>
+              ) : (
+                <div className="space-y-4">
+                  {packageRatings.map((rating) => (
+                    <div key={rating.id} className="border-b border-surface-200 pb-4 last:border-b-0">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-surface-900">
+                            {rating.rater_name || `User #${rating.rater_id}`}
+                          </span>
+                          <span className="text-surface-400">→</span>
+                          <span className="text-surface-600">
+                            {rating.rated_user_id === pkg.sender_id ? 'Sender' : 'Courier'}
+                          </span>
+                        </div>
+                        <span className="text-sm text-surface-400">
+                          {new Date(rating.created_at).toLocaleDateString()}
                         </span>
                       </div>
-                      <span className="text-sm text-gray-400">
-                        {new Date(rating.created_at).toLocaleDateString()}
-                      </span>
+                      <StarRating rating={rating.score} size="sm" />
+                      {rating.comment && (
+                        <p className="mt-2 text-surface-600">{rating.comment}</p>
+                      )}
                     </div>
-                    <StarRating rating={rating.score} size="sm" />
-                    {rating.comment && (
-                      <p className="mt-2 text-gray-600">{rating.comment}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </SlideIn>
         )}
       </div>
 

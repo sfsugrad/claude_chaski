@@ -12,6 +12,7 @@ jest.mock('next/navigation', () => ({
 const mockGetCurrentUser = jest.fn()
 const mockGetMyRoutes = jest.fn()
 const mockGetMyPendingRatings = jest.fn()
+const mockGetAllPackages = jest.fn()
 
 jest.mock('@/lib/api', () => ({
   authAPI: {
@@ -23,6 +24,9 @@ jest.mock('@/lib/api', () => ({
   },
   ratingsAPI: {
     getMyPendingRatings: () => mockGetMyPendingRatings(),
+  },
+  packagesAPI: {
+    getAll: () => mockGetAllPackages(),
   },
 }))
 
@@ -45,6 +49,23 @@ jest.mock('@/components/ui', () => ({
   CourierDashboardSkeleton: () => (
     <div data-testid="courier-dashboard-skeleton" className="animate-pulse">Loading skeleton...</div>
   ),
+  Card: ({ children, className }: any) => <div className={className}>{children}</div>,
+  CardBody: ({ children, className }: any) => <div className={className}>{children}</div>,
+  CardHeader: ({ title, subtitle }: any) => <div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div>,
+  Button: ({ children, onClick, disabled, className, variant, size, leftIcon }: any) => (
+    <button onClick={onClick} disabled={disabled} className={className}>{leftIcon}{children}</button>
+  ),
+  Badge: ({ children, variant, size }: any) => <span className={`badge-${variant}`}>{children}</span>,
+  Alert: ({ children, variant, className }: any) => <div role="alert" className={`alert-${variant} ${className || ''}`}>{children}</div>,
+  EmptyRoutes: ({ title, description, action }: any) => (
+    <div data-testid="empty-routes">
+      <h2>{title}</h2>
+      <p>{description}</p>
+      {action}
+    </div>
+  ),
+  FadeIn: ({ children }: any) => <div>{children}</div>,
+  SlideIn: ({ children }: any) => <div>{children}</div>,
 }))
 
 describe('CourierPage', () => {
@@ -144,6 +165,7 @@ describe('CourierPage', () => {
       })
       mockGetMyRoutes.mockResolvedValue({ data: [] })
       mockGetMyPendingRatings.mockResolvedValue({ data: [] })
+      mockGetAllPackages.mockResolvedValue({ data: [] })
     })
 
     it('renders navbar', async () => {
@@ -158,7 +180,7 @@ describe('CourierPage', () => {
       render(<CourierPage />)
 
       await waitFor(() => {
-        expect(screen.getByText(/No routes yet/)).toBeInTheDocument()
+        expect(screen.getByText(/Welcome to Chaski/)).toBeInTheDocument()
       })
     })
   })

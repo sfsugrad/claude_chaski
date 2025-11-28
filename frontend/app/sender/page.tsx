@@ -6,7 +6,17 @@ import Link from 'next/link'
 import { packagesAPI, authAPI, ratingsAPI, PackageResponse, UserResponse, PendingRating } from '@/lib/api'
 import Navbar from '@/components/Navbar'
 import RatingModal from '@/components/RatingModal'
-import { SenderDashboardSkeleton } from '@/components/ui'
+import {
+  SenderDashboardSkeleton,
+  Card,
+  CardBody,
+  Button,
+  Badge,
+  Alert,
+  EmptyPackages,
+  FadeIn,
+  SlideIn
+} from '@/components/ui'
 
 type StatusFilter = 'all' | 'pending' | 'matched' | 'picked_up' | 'in_transit' | 'delivered' | 'cancelled'
 
@@ -148,7 +158,7 @@ export default function SenderDashboard() {
   const statusCounts = getStatusCounts()
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface-50">
       <Navbar user={user} />
 
       {/* Rating Modal */}
@@ -162,112 +172,121 @@ export default function SenderDashboard() {
       )}
 
       {/* Page Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">My Packages</h1>
-              <p className="text-gray-600 mt-1">Track and manage your deliveries</p>
+      <div className="bg-white shadow-sm border-b border-surface-200">
+        <div className="page-container py-6">
+          <FadeIn duration={400}>
+            <div className="flex justify-between items-center">
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-surface-900">My Packages</h1>
+                <p className="text-surface-500 mt-1">Track and manage your deliveries</p>
+              </div>
+              <Link href="/packages/create">
+                <Button
+                  variant="primary"
+                  leftIcon={
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                  }
+                >
+                  New Package
+                </Button>
+              </Link>
             </div>
-            <Link
-              href="/packages/create"
-              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              New Package
-            </Link>
-          </div>
+          </FadeIn>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="page-container py-8">
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+          <Alert variant="error" className="mb-6">
             {error}
-          </div>
+          </Alert>
         )}
 
         {/* Pending Ratings Banner */}
         {pendingRatings.length > 0 && !showRatingModal && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">⭐</span>
-              <div>
-                <p className="font-medium text-yellow-800">
-                  You have {pendingRatings.length} pending {pendingRatings.length === 1 ? 'review' : 'reviews'}
-                </p>
-                <p className="text-sm text-yellow-600">
-                  Rate your experience with couriers who delivered your packages
-                </p>
+          <SlideIn direction="down" duration={400}>
+            <Alert variant="warning" className="mb-6">
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">⭐</span>
+                  <div>
+                    <p className="font-medium">
+                      You have {pendingRatings.length} pending {pendingRatings.length === 1 ? 'review' : 'reviews'}
+                    </p>
+                    <p className="text-sm opacity-80">
+                      Rate your experience with couriers who delivered your packages
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setShowRatingModal(true)}
+                >
+                  Rate Now
+                </Button>
               </div>
-            </div>
-            <button
-              onClick={() => setShowRatingModal(true)}
-              className="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 transition-colors font-medium"
-            >
-              Rate Now
-            </button>
-          </div>
+            </Alert>
+          </SlideIn>
         )}
 
         {/* Stats Overview */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
-          {['all', 'pending', 'matched', 'in_transit', 'delivered', 'cancelled'].map((status) => (
-            <button
-              key={status}
-              onClick={() => setStatusFilter(status as StatusFilter)}
-              className={`p-4 rounded-lg border-2 transition-all ${
-                statusFilter === status
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 bg-white hover:border-gray-300'
-              }`}
-            >
-              <div className="text-2xl font-bold text-gray-900">
-                {statusCounts[status] || 0}
-              </div>
-              <div className="text-sm text-gray-600 capitalize">
-                {status === 'all' ? 'All' : STATUS_CONFIG[status]?.label || status}
-              </div>
-            </button>
-          ))}
-        </div>
-
-        {/* Package List */}
-        {filteredPackages.length === 0 ? (
-          <div className="bg-white rounded-lg shadow p-12 text-center">
-            <div className="text-6xl mb-4">📦</div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              {statusFilter === 'all' ? 'No packages yet' : `No ${statusFilter} packages`}
-            </h2>
-            <p className="text-gray-600 mb-6">
-              {statusFilter === 'all'
-                ? 'Create your first package to get started with Chaski!'
-                : 'Try selecting a different filter to see more packages.'}
-            </p>
-            {statusFilter === 'all' && (
-              <Link
-                href="/packages/create"
-                className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+        <SlideIn direction="up" delay={100} duration={400}>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
+            {['all', 'pending', 'matched', 'in_transit', 'delivered', 'cancelled'].map((status, index) => (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status as StatusFilter)}
+                className={`p-4 rounded-xl border-2 transition-all duration-200 transform-gpu hover:-translate-y-0.5 ${
+                  statusFilter === status
+                    ? 'border-primary-500 bg-primary-50 shadow-sm'
+                    : 'border-surface-200 bg-white hover:border-surface-300 hover:shadow-sm'
+                }`}
               >
-                Create Your First Package
-              </Link>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {filteredPackages.map((pkg) => (
-              <PackageCard
-                key={pkg.id}
-                pkg={pkg}
-                onCancel={handleCancelPackage}
-                cancelling={cancellingId === pkg.id}
-                canCancel={canCancel(pkg.status)}
-              />
+                <div className="text-2xl font-bold text-surface-900">
+                  {statusCounts[status] || 0}
+                </div>
+                <div className="text-sm text-surface-600 capitalize">
+                  {status === 'all' ? 'All' : STATUS_CONFIG[status]?.label || status}
+                </div>
+              </button>
             ))}
           </div>
-        )}
+        </SlideIn>
+
+        {/* Package List */}
+        <FadeIn delay={200} duration={500}>
+          {filteredPackages.length === 0 ? (
+            <EmptyPackages
+              title={statusFilter === 'all' ? 'No packages yet' : `No ${statusFilter} packages`}
+              description={statusFilter === 'all'
+                ? 'Create your first package to get started with Chaski!'
+                : 'Try selecting a different filter to see more packages.'}
+              action={statusFilter === 'all' ? (
+                <Link href="/packages/create">
+                  <Button variant="primary">
+                    Create Your First Package
+                  </Button>
+                </Link>
+              ) : undefined}
+            />
+          ) : (
+            <div className="space-y-4">
+              {filteredPackages.map((pkg, index) => (
+                <SlideIn key={pkg.id} direction="up" delay={index * 50} duration={300}>
+                  <PackageCard
+                    pkg={pkg}
+                    onCancel={handleCancelPackage}
+                    cancelling={cancellingId === pkg.id}
+                    canCancel={canCancel(pkg.status)}
+                  />
+                </SlideIn>
+              ))}
+            </div>
+          )}
+        </FadeIn>
       </div>
     </div>
   )
@@ -292,10 +311,10 @@ function PackageCard({ pkg, onCancel, cancelling, canCancel }: PackageCardProps)
   const isCancelled = pkg.status === 'cancelled'
 
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden">
+    <Card className="overflow-hidden">
       {/* Status Progress Bar */}
       {!isCancelled && currentStep >= 0 && (
-        <div className="bg-gray-100 px-6 py-3">
+        <div className="bg-surface-100 px-6 py-3">
           <div className="flex items-center justify-between">
             {STATUS_ORDER.map((status, index) => {
               const isCompleted = index <= currentStep
@@ -306,17 +325,17 @@ function PackageCard({ pkg, onCancel, cancelling, canCancel }: PackageCardProps)
                 <div key={status} className="flex items-center flex-1">
                   <div className="flex flex-col items-center">
                     <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all duration-300 ${
                         isCompleted
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-300 text-gray-500'
-                      } ${isCurrent ? 'ring-2 ring-blue-300 ring-offset-2' : ''}`}
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-surface-300 text-surface-500'
+                      } ${isCurrent ? 'ring-2 ring-primary-300 ring-offset-2' : ''}`}
                     >
                       {isCompleted ? '✓' : index + 1}
                     </div>
                     <span
                       className={`text-xs mt-1 ${
-                        isCompleted ? 'text-blue-600 font-medium' : 'text-gray-500'
+                        isCompleted ? 'text-primary-600 font-medium' : 'text-surface-500'
                       }`}
                     >
                       {config.label}
@@ -324,8 +343,8 @@ function PackageCard({ pkg, onCancel, cancelling, canCancel }: PackageCardProps)
                   </div>
                   {index < STATUS_ORDER.length - 1 && (
                     <div
-                      className={`flex-1 h-1 mx-2 ${
-                        index < currentStep ? 'bg-blue-600' : 'bg-gray-300'
+                      className={`flex-1 h-1 mx-2 transition-all duration-300 ${
+                        index < currentStep ? 'bg-primary-600' : 'bg-surface-300'
                       }`}
                     />
                   )}
@@ -414,8 +433,8 @@ function PackageCard({ pkg, onCancel, cancelling, canCancel }: PackageCardProps)
 
             {/* Courier Info (when matched) */}
             {pkg.courier_id && pkg.status !== 'pending' && (
-              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                <p className="text-sm text-blue-800">
+              <div className="mt-4 p-3 bg-primary-50 rounded-lg">
+                <p className="text-sm text-primary-800">
                   <span className="font-medium">Courier assigned</span> - Your package is being handled by {pkg.courier_name || `courier #${pkg.courier_id}`}
                 </p>
               </div>
@@ -424,24 +443,25 @@ function PackageCard({ pkg, onCancel, cancelling, canCancel }: PackageCardProps)
 
           {/* Actions */}
           <div className="flex flex-col gap-2 ml-4">
-            <Link
-              href={`/packages/${pkg.id}`}
-              className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
-            >
-              View Details
+            <Link href={`/packages/${pkg.id}`}>
+              <Button variant="ghost" size="sm">
+                View Details
+              </Button>
             </Link>
             {canCancel && (
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => onCancel(pkg.id)}
                 disabled={cancelling}
-                className="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                className="text-error-600 hover:text-error-700 hover:bg-error-50"
               >
                 {cancelling ? 'Cancelling...' : 'Cancel'}
-              </button>
+              </Button>
             )}
           </div>
         </div>
       </div>
-    </div>
+    </Card>
   )
 }

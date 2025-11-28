@@ -4,7 +4,19 @@ import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { authAPI, adminAPI, AdminUser, AdminPackage, AdminStats, MatchingJobResult, UserResponse } from '@/lib/api'
-import { StatsCard, StatsGrid, AdminDashboardSkeleton } from '@/components/ui'
+import {
+  StatsCard,
+  StatsGrid,
+  AdminDashboardSkeleton,
+  Card,
+  CardBody,
+  CardHeader,
+  Button,
+  Badge,
+  Alert,
+  FadeIn,
+  SlideIn
+} from '@/components/ui'
 import { BarChart, DonutChart, LineChart } from '@/components/charts'
 
 type User = AdminUser
@@ -294,54 +306,62 @@ export default function AdminPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-red-600 text-xl mb-4">{error}</div>
-          <div className="text-gray-600">Redirecting...</div>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-surface-50">
+        <FadeIn>
+          <Alert variant="error" className="max-w-md">
+            <div className="text-center">
+              <p className="font-semibold mb-2">{error}</p>
+              <p className="text-sm text-surface-600">Redirecting...</p>
+            </div>
+          </Alert>
+        </FadeIn>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface-50">
       {/* Header */}
-      <div className="bg-purple-600 text-white shadow-md">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold">Chaski Admin Dashboard</h1>
-            <div className="flex items-center gap-4">
-              <span className="text-purple-100">
-                {user?.full_name} ({user?.email})
-              </span>
-              <button
-                onClick={async () => {
-                  try {
-                    await authAPI.logout()
-                  } catch (err) {
-                    console.error('Logout failed:', err)
-                  }
-                  router.push('/login')
-                }}
-                className="bg-purple-700 hover:bg-purple-800 px-4 py-2 rounded transition"
-              >
-                Logout
-              </button>
+      <FadeIn duration={300}>
+        <div className="bg-primary-600 text-white shadow-md">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex justify-between items-center">
+              <h1 className="text-2xl font-bold">Chaski Admin Dashboard</h1>
+              <div className="flex items-center gap-4">
+                <span className="text-primary-100">
+                  {user?.full_name} ({user?.email})
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      await authAPI.logout()
+                    } catch (err) {
+                      console.error('Logout failed:', err)
+                    }
+                    router.push('/login')
+                  }}
+                  className="text-white hover:bg-primary-700"
+                >
+                  Logout
+                </Button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </FadeIn>
 
       {/* Navigation Tabs */}
-      <div className="bg-white border-b">
+      <div className="bg-white border-b border-surface-200">
         <div className="container mx-auto px-4">
           <div className="flex gap-8">
             <button
               onClick={() => setActiveTab('overview')}
               className={`py-4 px-2 border-b-2 transition ${
                 activeTab === 'overview'
-                  ? 'border-purple-600 text-purple-600 font-semibold'
-                  : 'border-transparent text-gray-600 hover:text-purple-600'
+                  ? 'border-primary-600 text-primary-600 font-semibold'
+                  : 'border-transparent text-surface-600 hover:text-primary-600'
               }`}
             >
               Overview
@@ -350,8 +370,8 @@ export default function AdminPage() {
               onClick={() => setActiveTab('users')}
               className={`py-4 px-2 border-b-2 transition ${
                 activeTab === 'users'
-                  ? 'border-purple-600 text-purple-600 font-semibold'
-                  : 'border-transparent text-gray-600 hover:text-purple-600'
+                  ? 'border-primary-600 text-primary-600 font-semibold'
+                  : 'border-transparent text-surface-600 hover:text-primary-600'
               }`}
             >
               Users
@@ -360,8 +380,8 @@ export default function AdminPage() {
               onClick={() => setActiveTab('packages')}
               className={`py-4 px-2 border-b-2 transition ${
                 activeTab === 'packages'
-                  ? 'border-purple-600 text-purple-600 font-semibold'
-                  : 'border-transparent text-gray-600 hover:text-purple-600'
+                  ? 'border-primary-600 text-primary-600 font-semibold'
+                  : 'border-transparent text-surface-600 hover:text-primary-600'
               }`}
             >
               Packages
@@ -373,292 +393,297 @@ export default function AdminPage() {
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
         {activeTab === 'overview' && (
-          <div>
-            <h2 className="text-2xl font-bold mb-6">Platform Overview</h2>
+          <FadeIn duration={400}>
+            <div>
+              <h2 className="text-2xl font-bold text-surface-900 mb-6">Platform Overview</h2>
 
-            {/* User Stats Cards */}
-            <h3 className="text-lg font-semibold text-surface-700 mb-4">User Statistics</h3>
-            <StatsGrid columns={4} className="mb-8">
-              <StatsCard
-                label="Total Users"
-                value={stats.total_users}
-                variant="primary"
-                icon={
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                }
-              />
-              <StatsCard
-                label="Senders"
-                value={stats.total_senders}
-                variant="primary"
-                icon={
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                }
-              />
-              <StatsCard
-                label="Couriers"
-                value={stats.total_couriers}
-                variant="success"
-                icon={
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                }
-              />
-              <StatsCard
-                label="Both Roles"
-                value={stats.total_both}
-                variant="default"
-                icon={
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                  </svg>
-                }
-              />
-            </StatsGrid>
-
-            {/* Package Stats Cards */}
-            <h3 className="text-lg font-semibold text-surface-700 mb-4">Package Statistics</h3>
-            <StatsGrid columns={4} className="mb-8">
-              <StatsCard
-                label="Total Packages"
-                value={stats.total_packages}
-                variant="warning"
-                icon={
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                  </svg>
-                }
-              />
-              <StatsCard
-                label="Active Packages"
-                value={stats.active_packages}
-                variant="primary"
-                icon={
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                  </svg>
-                }
-              />
-              <StatsCard
-                label="Completed"
-                value={stats.completed_packages}
-                variant="success"
-                icon={
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                }
-              />
-              <StatsCard
-                label="Total Revenue"
-                value={`$${stats.total_revenue.toFixed(2)}`}
-                variant="success"
-                icon={
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                }
-              />
-            </StatsGrid>
-
-            {/* Charts Section */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-              {/* User Distribution Donut Chart */}
-              <div className="bg-white rounded-xl border border-surface-200 p-6">
-                <h3 className="text-lg font-semibold text-surface-900 mb-4">User Distribution</h3>
-                {stats.total_users > 0 ? (
-                  <DonutChart
-                    data={userRoleChartData}
-                    height={250}
-                    centerValue={stats.total_users}
-                    centerLabel="Total Users"
-                  />
-                ) : (
-                  <div className="h-[250px] flex items-center justify-center text-surface-500">
-                    No user data available
-                  </div>
-                )}
-              </div>
-
-              {/* Package Status Donut Chart */}
-              <div className="bg-white rounded-xl border border-surface-200 p-6">
-                <h3 className="text-lg font-semibold text-surface-900 mb-4">Package Status</h3>
-                {packageStatusChartData.length > 0 ? (
-                  <DonutChart
-                    data={packageStatusChartData}
-                    height={250}
-                    centerValue={packages.length}
-                    centerLabel="Total"
-                  />
-                ) : (
-                  <div className="h-[250px] flex items-center justify-center text-surface-500">
-                    No package data available
-                  </div>
-                )}
-              </div>
-
-              {/* Package Size Bar Chart */}
-              <div className="bg-white rounded-xl border border-surface-200 p-6">
-                <h3 className="text-lg font-semibold text-surface-900 mb-4">Package Sizes</h3>
-                {packageSizeChartData.length > 0 ? (
-                  <BarChart
-                    data={packageSizeChartData}
-                    height={250}
-                    color="#3B82F6"
-                    showGrid={true}
-                  />
-                ) : (
-                  <div className="h-[250px] flex items-center justify-center text-surface-500">
-                    No package data available
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-xl font-bold mb-4">Quick Actions</h3>
-              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <button
-                  onClick={() => setActiveTab('users')}
-                  className="bg-purple-600 text-white px-6 py-3 rounded hover:bg-purple-700 transition"
-                >
-                  Manage Users
-                </button>
-                <button
-                  onClick={() => setActiveTab('packages')}
-                  className="bg-purple-600 text-white px-6 py-3 rounded hover:bg-purple-700 transition"
-                >
-                  View Packages
-                </button>
-                <button
-                  onClick={handleRunMatchingJob}
-                  disabled={matchingJobRunning}
-                  className="bg-green-600 text-white px-6 py-3 rounded hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {matchingJobRunning ? (
-                    <>
-                      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              {/* User Stats Cards */}
+              <SlideIn direction="up" delay={100}>
+                <h3 className="text-lg font-semibold text-surface-700 mb-4">User Statistics</h3>
+                <StatsGrid columns={4} className="mb-8">
+                  <StatsCard
+                    label="Total Users"
+                    value={stats.total_users}
+                    variant="primary"
+                    icon={
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                       </svg>
-                      Running...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    }
+                  />
+                  <StatsCard
+                    label="Senders"
+                    value={stats.total_senders}
+                    variant="primary"
+                    icon={
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                       </svg>
-                      Run Matching Job
-                    </>
-                  )}
-                </button>
-                <button
-                  className="bg-gray-400 text-white px-6 py-3 rounded cursor-not-allowed"
-                  disabled
-                >
-                  Generate Reports (Soon)
-                </button>
-              </div>
+                    }
+                  />
+                  <StatsCard
+                    label="Couriers"
+                    value={stats.total_couriers}
+                    variant="success"
+                    icon={
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    }
+                  />
+                  <StatsCard
+                    label="Both Roles"
+                    value={stats.total_both}
+                    variant="default"
+                    icon={
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                      </svg>
+                    }
+                  />
+                </StatsGrid>
+              </SlideIn>
 
-              {/* Matching Job Results */}
-              {matchingJobResult && (
-                <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-lg font-semibold text-green-800 flex items-center gap-2">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {/* Package Stats Cards */}
+              <SlideIn direction="up" delay={200}>
+                <h3 className="text-lg font-semibold text-surface-700 mb-4">Package Statistics</h3>
+                <StatsGrid columns={4} className="mb-8">
+                  <StatsCard
+                    label="Total Packages"
+                    value={stats.total_packages}
+                    variant="warning"
+                    icon={
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                      </svg>
+                    }
+                  />
+                  <StatsCard
+                    label="Active Packages"
+                    value={stats.active_packages}
+                    variant="primary"
+                    icon={
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                      </svg>
+                    }
+                  />
+                  <StatsCard
+                    label="Completed"
+                    value={stats.completed_packages}
+                    variant="success"
+                    icon={
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      Matching Job Completed
-                    </h4>
-                    <button
-                      onClick={() => setMatchingJobResult(null)}
-                      className="text-gray-500 hover:text-gray-700"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    }
+                  />
+                  <StatsCard
+                    label="Total Revenue"
+                    value={`$${stats.total_revenue.toFixed(2)}`}
+                    variant="success"
+                    icon={
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
-                    <div className="bg-white p-3 rounded shadow-sm">
-                      <div className="text-gray-500">Routes Processed</div>
-                      <div className="text-2xl font-bold text-purple-600">{matchingJobResult.routes_processed}</div>
-                    </div>
-                    <div className="bg-white p-3 rounded shadow-sm">
-                      <div className="text-gray-500">Matches Found</div>
-                      <div className="text-2xl font-bold text-blue-600">{matchingJobResult.total_matches_found}</div>
-                    </div>
-                    <div className="bg-white p-3 rounded shadow-sm">
-                      <div className="text-gray-500">Notifications Sent</div>
-                      <div className="text-2xl font-bold text-green-600">{matchingJobResult.notifications_created}</div>
-                    </div>
-                    <div className="bg-white p-3 rounded shadow-sm">
-                      <div className="text-gray-500">Skipped (Recent)</div>
-                      <div className="text-2xl font-bold text-gray-600">{matchingJobResult.notifications_skipped}</div>
-                    </div>
+                    }
+                  />
+                </StatsGrid>
+              </SlideIn>
+
+              {/* Charts Section */}
+              <SlideIn direction="up" delay={300}>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                  {/* User Distribution Donut Chart */}
+                  <Card className="p-6">
+                    <h3 className="text-lg font-semibold text-surface-900 mb-4">User Distribution</h3>
+                    {stats.total_users > 0 ? (
+                      <DonutChart
+                        data={userRoleChartData}
+                        height={250}
+                        centerValue={stats.total_users}
+                        centerLabel="Total Users"
+                      />
+                    ) : (
+                      <div className="h-[250px] flex items-center justify-center text-surface-500">
+                        No user data available
+                      </div>
+                    )}
+                  </Card>
+
+                  {/* Package Status Donut Chart */}
+                  <Card className="p-6">
+                    <h3 className="text-lg font-semibold text-surface-900 mb-4">Package Status</h3>
+                    {packageStatusChartData.length > 0 ? (
+                      <DonutChart
+                        data={packageStatusChartData}
+                        height={250}
+                        centerValue={packages.length}
+                        centerLabel="Total"
+                      />
+                    ) : (
+                      <div className="h-[250px] flex items-center justify-center text-surface-500">
+                        No package data available
+                      </div>
+                    )}
+                  </Card>
+
+                  {/* Package Size Bar Chart */}
+                  <Card className="p-6">
+                    <h3 className="text-lg font-semibold text-surface-900 mb-4">Package Sizes</h3>
+                    {packageSizeChartData.length > 0 ? (
+                      <BarChart
+                        data={packageSizeChartData}
+                        height={250}
+                        color="#3B82F6"
+                        showGrid={true}
+                      />
+                    ) : (
+                      <div className="h-[250px] flex items-center justify-center text-surface-500">
+                        No package data available
+                      </div>
+                    )}
+                  </Card>
+                </div>
+              </SlideIn>
+
+              {/* Quick Actions */}
+              <SlideIn direction="up" delay={400}>
+                <Card className="p-6">
+                  <h3 className="text-xl font-bold text-surface-900 mb-4">Quick Actions</h3>
+                  <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <Button
+                      variant="primary"
+                      onClick={() => setActiveTab('users')}
+                      className="w-full justify-center"
+                    >
+                      Manage Users
+                    </Button>
+                    <Button
+                      variant="primary"
+                      onClick={() => setActiveTab('packages')}
+                      className="w-full justify-center"
+                    >
+                      View Packages
+                    </Button>
+                    <Button
+                      variant="success"
+                      onClick={handleRunMatchingJob}
+                      disabled={matchingJobRunning}
+                      loading={matchingJobRunning}
+                      className="w-full justify-center"
+                      leftIcon={!matchingJobRunning ? (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                      ) : undefined}
+                    >
+                      {matchingJobRunning ? 'Running...' : 'Run Matching Job'}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      disabled
+                      className="w-full justify-center"
+                    >
+                      Generate Reports (Soon)
+                    </Button>
                   </div>
 
-                  {/* Detailed Route/Package Breakdown */}
-                  {matchingJobResult.route_details && matchingJobResult.route_details.length > 0 && (
-                    <div className="mt-4 border-t border-green-200 pt-4">
-                      <h5 className="text-sm font-semibold text-green-800 mb-3">Match Details by Courier</h5>
-                      <div className="space-y-3 max-h-64 overflow-y-auto">
-                        {matchingJobResult.route_details.map((rd) => (
-                          <div key={rd.route_id} className="bg-white p-3 rounded shadow-sm">
-                            <div className="flex items-center justify-between mb-2">
-                              <div>
-                                <span className="font-medium text-gray-900">{rd.courier_name}</span>
-                                <span className="text-gray-400 text-xs ml-2">(Route #{rd.route_id})</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">
-                                  {rd.matches_found} match{rd.matches_found !== 1 ? 'es' : ''}
-                                </span>
-                                <span className={`text-xs px-2 py-1 rounded ${rd.notifications_sent > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                                  {rd.notifications_sent} notified
-                                </span>
-                              </div>
-                            </div>
-                            <div className="text-xs text-gray-500 mb-2">
-                              {rd.route}
-                            </div>
-                            {rd.matched_packages && rd.matched_packages.length > 0 && (
-                              <div className="mt-2 space-y-1">
-                                {rd.matched_packages.map((pkg) => (
-                                  <div key={pkg.package_id} className="flex items-center justify-between text-xs bg-gray-50 p-2 rounded">
-                                    <div className="flex items-center gap-2">
-                                      <Link href={`/packages/${pkg.package_id}`} className="text-purple-600 hover:underline font-medium">
-                                        Package #{pkg.package_id}
-                                      </Link>
-                                      <span className="text-gray-500 truncate max-w-[150px]">{pkg.description}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-gray-400">{pkg.distance_km}km from route</span>
-                                      {pkg.notified ? (
-                                        <span className="text-green-600">Notified</span>
-                                      ) : (
-                                        <span className="text-gray-400">Skipped</span>
-                                      )}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                  {/* Matching Job Results */}
+                  {matchingJobResult && (
+                    <div className="mt-6 p-4 bg-success-50 border border-success-200 rounded-lg">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-lg font-semibold text-success-800 flex items-center gap-2">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Matching Job Completed
+                        </h4>
+                        <button
+                          onClick={() => setMatchingJobResult(null)}
+                          className="text-surface-500 hover:text-surface-700"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
                       </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
+                        <div className="bg-white p-3 rounded shadow-sm">
+                          <div className="text-surface-500">Routes Processed</div>
+                          <div className="text-2xl font-bold text-primary-600">{matchingJobResult.routes_processed}</div>
+                        </div>
+                        <div className="bg-white p-3 rounded shadow-sm">
+                          <div className="text-surface-500">Matches Found</div>
+                          <div className="text-2xl font-bold text-info-600">{matchingJobResult.total_matches_found}</div>
+                        </div>
+                        <div className="bg-white p-3 rounded shadow-sm">
+                          <div className="text-surface-500">Notifications Sent</div>
+                          <div className="text-2xl font-bold text-success-600">{matchingJobResult.notifications_created}</div>
+                        </div>
+                        <div className="bg-white p-3 rounded shadow-sm">
+                          <div className="text-surface-500">Skipped (Recent)</div>
+                          <div className="text-2xl font-bold text-surface-600">{matchingJobResult.notifications_skipped}</div>
+                        </div>
+                      </div>
+
+                      {/* Detailed Route/Package Breakdown */}
+                      {matchingJobResult.route_details && matchingJobResult.route_details.length > 0 && (
+                        <div className="mt-4 border-t border-success-200 pt-4">
+                          <h5 className="text-sm font-semibold text-success-800 mb-3">Match Details by Courier</h5>
+                          <div className="space-y-3 max-h-64 overflow-y-auto">
+                            {matchingJobResult.route_details.map((rd) => (
+                              <div key={rd.route_id} className="bg-white p-3 rounded shadow-sm">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div>
+                                    <span className="font-medium text-surface-900">{rd.courier_name}</span>
+                                    <span className="text-surface-400 text-xs ml-2">(Route #{rd.route_id})</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="info" size="sm">
+                                      {rd.matches_found} match{rd.matches_found !== 1 ? 'es' : ''}
+                                    </Badge>
+                                    <Badge variant={rd.notifications_sent > 0 ? 'success' : 'secondary'} size="sm">
+                                      {rd.notifications_sent} notified
+                                    </Badge>
+                                  </div>
+                                </div>
+                                <div className="text-xs text-surface-500 mb-2">
+                                  {rd.route}
+                                </div>
+                                {rd.matched_packages && rd.matched_packages.length > 0 && (
+                                  <div className="mt-2 space-y-1">
+                                    {rd.matched_packages.map((pkg) => (
+                                      <div key={pkg.package_id} className="flex items-center justify-between text-xs bg-surface-50 p-2 rounded">
+                                        <div className="flex items-center gap-2">
+                                          <Link href={`/packages/${pkg.package_id}`} className="text-primary-600 hover:underline font-medium">
+                                            Package #{pkg.package_id}
+                                          </Link>
+                                          <span className="text-surface-500 truncate max-w-[150px]">{pkg.description}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-surface-400">{pkg.distance_km}km from route</span>
+                                          {pkg.notified ? (
+                                            <span className="text-success-600">Notified</span>
+                                          ) : (
+                                            <span className="text-surface-400">Skipped</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
-              )}
+                </Card>
+              </SlideIn>
             </div>
-          </div>
+          </FadeIn>
         )}
 
         {activeTab === 'users' && (

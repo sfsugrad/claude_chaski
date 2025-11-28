@@ -58,6 +58,16 @@ jest.mock('@/components/ui', () => ({
   AdminDashboardSkeleton: () => (
     <div data-testid="admin-dashboard-skeleton" className="animate-pulse">Loading skeleton...</div>
   ),
+  Card: ({ children, className }: any) => <div className={className}>{children}</div>,
+  CardBody: ({ children, className }: any) => <div className={className}>{children}</div>,
+  CardHeader: ({ title, subtitle }: any) => <div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div>,
+  Button: ({ children, onClick, disabled, className, variant, size, leftIcon, loading }: any) => (
+    <button onClick={onClick} disabled={disabled || loading} className={className}>{leftIcon}{children}</button>
+  ),
+  Badge: ({ children, variant, size }: any) => <span className={`badge-${variant}`}>{children}</span>,
+  Alert: ({ children, variant, className }: any) => <div role="alert" className={`alert-${variant} ${className || ''}`}>{children}</div>,
+  FadeIn: ({ children }: any) => <div>{children}</div>,
+  SlideIn: ({ children }: any) => <div>{children}</div>,
 }))
 
 // Mock chart components
@@ -390,7 +400,7 @@ describe('AdminPage', () => {
       const { container } = render(<AdminPage />)
 
       await waitFor(() => {
-        const header = container.querySelector('.bg-purple-600')
+        const header = container.querySelector('.bg-primary-600')
         expect(header).toBeInTheDocument()
       })
     })

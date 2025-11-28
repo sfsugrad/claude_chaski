@@ -73,6 +73,8 @@ jest.mock('@/components/ui', () => ({
   DashboardSkeleton: () => (
     <div data-testid="dashboard-skeleton" className="animate-pulse">Loading skeleton...</div>
   ),
+  FadeIn: ({ children }: any) => <div>{children}</div>,
+  SlideIn: ({ children }: any) => <div>{children}</div>,
 }))
 
 describe('DashboardPage', () => {

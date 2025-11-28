@@ -24,8 +24,9 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
           'bg-white rounded-xl',
           'border border-surface-200',
           'shadow-card',
-          'transition-all duration-200',
-          hoverable && 'hover:shadow-card-hover hover:border-surface-300 cursor-pointer',
+          'transition-all duration-200 ease-out',
+          'transform-gpu',
+          hoverable && 'hover:shadow-card-hover hover:border-surface-300 hover:-translate-y-1 cursor-pointer active:translate-y-0 active:scale-[0.99]',
           paddingClasses[padding],
           className
         )}

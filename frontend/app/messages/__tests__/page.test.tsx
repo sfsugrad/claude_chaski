@@ -57,6 +57,16 @@ jest.mock('@/contexts/WebSocketContext', () => ({
   }),
 }))
 
+// Mock UI components
+jest.mock('@/components/ui', () => ({
+  Card: ({ children, className }: any) => <div className={className}>{children}</div>,
+  Alert: ({ children, variant, className }: any) => <div role="alert" className={`alert-${variant} ${className || ''}`}>{children}</div>,
+  Badge: ({ children, variant, size, className }: any) => <span className={`badge-${variant} ${className || ''}`}>{children}</span>,
+  FadeIn: ({ children }: any) => <div>{children}</div>,
+  SlideIn: ({ children }: any) => <div>{children}</div>,
+  MessagesSkeleton: () => <div data-testid="messages-skeleton" className="animate-pulse">Loading...</div>,
+}))
+
 describe('MessagesPage', () => {
   const mockRouter = {
     push: jest.fn(),
@@ -109,8 +119,8 @@ describe('MessagesPage', () => {
 
       const { container } = render(<MessagesPage />)
 
-      const spinner = container.querySelector('.animate-spin')
-      expect(spinner).toBeTruthy()
+      const skeleton = container.querySelector('.animate-pulse')
+      expect(skeleton).toBeTruthy()
     })
 
     it('shows loading text', () => {
@@ -119,7 +129,7 @@ describe('MessagesPage', () => {
 
       render(<MessagesPage />)
 
-      expect(screen.getByText(/loading messages/i)).toBeInTheDocument()
+      expect(screen.getByTestId('messages-skeleton')).toBeInTheDocument()
     })
   })
 

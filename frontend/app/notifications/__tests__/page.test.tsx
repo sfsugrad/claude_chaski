@@ -23,6 +23,18 @@ jest.mock('next/link', () => {
   )
 })
 
+// Mock UI components
+jest.mock('@/components/ui', () => ({
+  Card: ({ children, className }: any) => <div className={className}>{children}</div>,
+  Button: ({ children, onClick, disabled, className, variant, size }: any) => (
+    <button onClick={onClick} disabled={disabled} className={className}>{children}</button>
+  ),
+  Alert: ({ children, variant, className }: any) => <div role="alert" className={`alert-${variant} ${className || ''}`}>{children}</div>,
+  FadeIn: ({ children }: any) => <div>{children}</div>,
+  SlideIn: ({ children }: any) => <div>{children}</div>,
+  NotificationsSkeleton: () => <div data-testid="notifications-skeleton" className="animate-pulse">Loading...</div>,
+}))
+
 // Mock the API modules
 jest.mock('@/lib/api', () => ({
   notificationsAPI: {
@@ -73,7 +85,7 @@ describe('NotificationsPage', () => {
 
     it('shows loading state initially', () => {
       render(<NotificationsPage />)
-      expect(screen.getByText('Loading notifications...')).toBeInTheDocument()
+      expect(screen.getByTestId('notifications-skeleton')).toBeInTheDocument()
     })
 
     it('shows empty state when no notifications', async () => {

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { authAPI, notificationsAPI, UserResponse, NotificationType } from '@/lib/api'
 import Navbar from '@/components/Navbar'
+import { Card, Button, Alert, FadeIn, SlideIn, NotificationsSkeleton } from '@/components/ui'
 
 interface DisplayNotification {
   id: number
@@ -31,16 +32,16 @@ const NOTIFICATION_ICONS: Record<NotificationType, string> = {
 }
 
 const NOTIFICATION_COLORS: Record<NotificationType, string> = {
-  package_matched: 'bg-blue-50 border-blue-200',
-  package_picked_up: 'bg-purple-50 border-purple-200',
-  package_in_transit: 'bg-indigo-50 border-indigo-200',
-  package_delivered: 'bg-green-50 border-green-200',
-  package_cancelled: 'bg-red-50 border-red-200',
-  new_match_available: 'bg-yellow-50 border-yellow-200',
-  route_match_found: 'bg-teal-50 border-teal-200',
-  new_rating: 'bg-yellow-50 border-yellow-200',
-  package_match_found: 'bg-teal-50 border-teal-200',
-  system: 'bg-gray-50 border-gray-200',
+  package_matched: 'bg-primary-50 border-primary-200',
+  package_picked_up: 'bg-primary-50 border-primary-200',
+  package_in_transit: 'bg-info-50 border-info-200',
+  package_delivered: 'bg-success-50 border-success-200',
+  package_cancelled: 'bg-error-50 border-error-200',
+  new_match_available: 'bg-warning-50 border-warning-200',
+  route_match_found: 'bg-info-50 border-info-200',
+  new_rating: 'bg-warning-50 border-warning-200',
+  package_match_found: 'bg-info-50 border-info-200',
+  system: 'bg-surface-50 border-surface-200',
 }
 
 const NOTIFICATION_TITLES: Record<NotificationType, string> = {
@@ -155,160 +156,154 @@ export default function NotificationsPage() {
   const unreadCount = notifications.filter(n => !n.is_read).length
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading notifications...</p>
-        </div>
-      </div>
-    )
+    return <NotificationsSkeleton />
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface-50">
       <Navbar user={user} />
 
-      <div className="container mx-auto px-4 py-8 max-w-3xl">
+      <div className="page-container py-8 max-w-3xl">
         {/* Header */}
-        <div className="mb-8">
-          <Link
-            href="/dashboard"
-            className="text-blue-600 hover:text-blue-800 text-sm mb-4 inline-block"
-          >
-            &larr; Back to Dashboard
-          </Link>
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Notifications</h1>
-              <p className="text-gray-600 mt-1">
-                {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up!'}
-              </p>
+        <FadeIn duration={400}>
+          <div className="mb-8">
+            <Link
+              href="/dashboard"
+              className="text-primary-600 hover:text-primary-800 text-sm mb-4 inline-block"
+            >
+              &larr; Back to Dashboard
+            </Link>
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold text-surface-900">Notifications</h1>
+                <p className="text-surface-600 mt-1">
+                  {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up!'}
+                </p>
+              </div>
+              {unreadCount > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleMarkAllAsRead}
+                >
+                  Mark all as read
+                </Button>
+              )}
             </div>
-            {unreadCount > 0 && (
-              <button
-                onClick={handleMarkAllAsRead}
-                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-              >
-                Mark all as read
-              </button>
-            )}
           </div>
-        </div>
+        </FadeIn>
 
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+          <Alert variant="error" className="mb-6">
             {error}
-          </div>
+          </Alert>
         )}
 
         {/* Filter Tabs */}
-        <div className="flex gap-2 mb-6">
-          <button
-            onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filter === 'all'
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-            }`}
-          >
-            All
-          </button>
-          <button
-            onClick={() => setFilter('unread')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filter === 'unread'
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-            }`}
-          >
-            Unread
-          </button>
-        </div>
+        <SlideIn direction="up" delay={100}>
+          <div className="flex gap-2 mb-6">
+            <Button
+              variant={filter === 'all' ? 'primary' : 'outline'}
+              size="sm"
+              onClick={() => setFilter('all')}
+            >
+              All
+            </Button>
+            <Button
+              variant={filter === 'unread' ? 'primary' : 'outline'}
+              size="sm"
+              onClick={() => setFilter('unread')}
+            >
+              Unread
+            </Button>
+          </div>
+        </SlideIn>
 
         {/* Notifications List */}
-        <div className="bg-white rounded-lg shadow-md">
-          {notifications.length === 0 ? (
-            <div className="p-8 text-center">
-              <div className="text-4xl mb-4">🔔</div>
-              <p className="text-gray-600">
-                {filter === 'unread' ? 'No unread notifications' : 'No notifications yet'}
-              </p>
-              <p className="text-sm text-gray-500 mt-2">
-                You'll be notified when there's activity on your packages or routes.
-              </p>
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-200">
-              {notifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  className={`p-4 transition-colors ${
-                    !notification.is_read ? 'bg-blue-50/50' : ''
-                  }`}
-                >
-                  <div className="flex items-start gap-4">
-                    {/* Icon */}
-                    <div
-                      className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center text-xl border ${
-                        NOTIFICATION_COLORS[notification.type]
-                      }`}
-                    >
-                      {NOTIFICATION_ICONS[notification.type]}
-                    </div>
+        <SlideIn direction="up" delay={200}>
+          <Card>
+            {notifications.length === 0 ? (
+              <div className="p-8 text-center">
+                <div className="text-4xl mb-4">🔔</div>
+                <p className="text-surface-600">
+                  {filter === 'unread' ? 'No unread notifications' : 'No notifications yet'}
+                </p>
+                <p className="text-sm text-surface-500 mt-2">
+                  You'll be notified when there's activity on your packages or routes.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-surface-200">
+                {notifications.map((notification) => (
+                  <div
+                    key={notification.id}
+                    className={`p-4 transition-colors ${
+                      !notification.is_read ? 'bg-primary-50/50' : ''
+                    }`}
+                  >
+                    <div className="flex items-start gap-4">
+                      {/* Icon */}
+                      <div
+                        className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center text-xl border ${
+                          NOTIFICATION_COLORS[notification.type]
+                        }`}
+                      >
+                        {NOTIFICATION_ICONS[notification.type]}
+                      </div>
 
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-medium text-gray-900">
-                            {notification.title}
-                          </p>
-                          <p className="text-gray-600 mt-1">
-                            {notification.message}
-                          </p>
-                          <p className="text-sm text-gray-400 mt-2">
-                            {formatTimeAgo(notification.created_at)}
-                          </p>
-                        </div>
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="font-medium text-surface-900">
+                              {notification.title}
+                            </p>
+                            <p className="text-surface-600 mt-1">
+                              {notification.message}
+                            </p>
+                            <p className="text-sm text-surface-400 mt-2">
+                              {formatTimeAgo(notification.created_at)}
+                            </p>
+                          </div>
 
-                        {/* Actions */}
-                        <div className="flex items-center gap-2 ml-4">
-                          {getNotificationLink(notification) && (
-                            <Link
-                              href={getNotificationLink(notification)!}
-                              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                            >
-                              View
-                            </Link>
-                          )}
-                          {!notification.is_read && (
+                          {/* Actions */}
+                          <div className="flex items-center gap-2 ml-4">
+                            {getNotificationLink(notification) && (
+                              <Link
+                                href={getNotificationLink(notification)!}
+                                className="text-sm text-primary-600 hover:text-primary-800 font-medium"
+                              >
+                                View
+                              </Link>
+                            )}
+                            {!notification.is_read && (
+                              <button
+                                onClick={() => handleMarkAsRead(notification.id)}
+                                className="text-sm text-surface-500 hover:text-surface-700"
+                                title="Mark as read"
+                              >
+                                <span className="w-2 h-2 bg-primary-500 rounded-full inline-block"></span>
+                              </button>
+                            )}
                             <button
-                              onClick={() => handleMarkAsRead(notification.id)}
-                              className="text-sm text-gray-500 hover:text-gray-700"
-                              title="Mark as read"
+                              onClick={() => handleDelete(notification.id)}
+                              className="text-sm text-surface-400 hover:text-error-600 transition-colors"
+                              title="Delete notification"
                             >
-                              <span className="w-2 h-2 bg-blue-500 rounded-full inline-block"></span>
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
                             </button>
-                          )}
-                          <button
-                            onClick={() => handleDelete(notification.id)}
-                            className="text-sm text-gray-400 hover:text-red-600 transition-colors"
-                            title="Delete notification"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </SlideIn>
       </div>
     </div>
   )

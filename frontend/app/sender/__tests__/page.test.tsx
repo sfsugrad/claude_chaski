@@ -21,6 +21,22 @@ jest.mock('@/components/ui', () => ({
   SenderDashboardSkeleton: () => (
     <div data-testid="sender-dashboard-skeleton" className="animate-pulse">Loading skeleton...</div>
   ),
+  Card: ({ children, className }: any) => <div className={className}>{children}</div>,
+  CardBody: ({ children, className }: any) => <div className={className}>{children}</div>,
+  Button: ({ children, onClick, disabled, className, variant, size, leftIcon }: any) => (
+    <button onClick={onClick} disabled={disabled} className={className}>{leftIcon}{children}</button>
+  ),
+  Badge: ({ children, variant, size }: any) => <span className={`badge-${variant}`}>{children}</span>,
+  Alert: ({ children, variant, className }: any) => <div role="alert" className={`alert-${variant} ${className || ''}`}>{children}</div>,
+  EmptyPackages: ({ title, description, action }: any) => (
+    <div data-testid="empty-packages">
+      <h2>{title}</h2>
+      <p>{description}</p>
+      {action}
+    </div>
+  ),
+  FadeIn: ({ children }: any) => <div>{children}</div>,
+  SlideIn: ({ children }: any) => <div>{children}</div>,
 }))
 
 // Mock the API modules

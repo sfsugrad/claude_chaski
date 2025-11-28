@@ -6,7 +6,7 @@ import { authAPI, ratingsAPI, UserResponse, PendingRating } from '@/lib/api'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import RatingModal from '@/components/RatingModal'
-import { Card, CardBody, CardHeader, Button, Badge, Alert, DashboardSkeleton } from '@/components/ui'
+import { Card, CardBody, CardHeader, Button, Badge, Alert, DashboardSkeleton, FadeIn, SlideIn } from '@/components/ui'
 
 // Icons
 const PackageIcon = () => (
@@ -167,23 +167,26 @@ export default function DashboardPage() {
         )}
 
         {/* Welcome Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-surface-900">
-            Welcome back, {user.full_name}!
-          </h1>
-          <p className="mt-1 text-surface-500">
-            Here&apos;s an overview of your account and quick actions
-          </p>
-        </div>
+        <FadeIn duration={400}>
+          <div className="mb-8">
+            <h1 className="text-2xl sm:text-3xl font-bold text-surface-900">
+              Welcome back, {user.full_name}!
+            </h1>
+            <p className="mt-1 text-surface-500">
+              Here&apos;s an overview of your account and quick actions
+            </p>
+          </div>
+        </FadeIn>
 
         {/* User Info Card */}
-        <Card className="mb-8">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-surface-900">Account Details</h2>
-              <Badge variant="primary" className="capitalize">{user.role}</Badge>
-            </div>
-          </CardHeader>
+        <SlideIn direction="up" delay={100} duration={400}>
+          <Card className="mb-8">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-surface-900">Account Details</h2>
+                <Badge variant="primary" className="capitalize">{user.role}</Badge>
+              </div>
+            </CardHeader>
           <CardBody className="p-0">
             <dl className="divide-y divide-surface-100">
               <div className="flex items-center gap-4 px-6 py-4">
@@ -227,14 +230,18 @@ export default function DashboardPage() {
               </div>
             </dl>
           </CardBody>
-        </Card>
+          </Card>
+        </SlideIn>
 
         {/* Quick Actions */}
-        <h2 className="text-lg font-semibold text-surface-900 mb-4">Quick Actions</h2>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {isSender && (
-            <>
-              <Card hoverable className="group">
+        <SlideIn direction="up" delay={200} duration={400}>
+          <h2 className="text-lg font-semibold text-surface-900 mb-4">Quick Actions</h2>
+        </SlideIn>
+        <FadeIn delay={300} duration={500}>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {isSender && (
+              <>
+                <Card hoverable className="group">
                 <CardBody>
                   <div className="flex items-start gap-4">
                     <div className="flex-shrink-0 w-14 h-14 bg-primary-50 text-primary-600 rounded-xl flex items-center justify-center group-hover:bg-primary-100 transition-colors">
@@ -299,8 +306,9 @@ export default function DashboardPage() {
                 </div>
               </CardBody>
             </Card>
-          )}
-        </div>
+            )}
+          </div>
+        </FadeIn>
       </div>
     </div>
   )

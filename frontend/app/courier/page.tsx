@@ -6,7 +6,18 @@ import Link from 'next/link'
 import { couriersAPI, authAPI, ratingsAPI, packagesAPI, RouteResponse, UserResponse, PendingRating, PackageResponse } from '@/lib/api'
 import Navbar from '@/components/Navbar'
 import RatingModal from '@/components/RatingModal'
-import { CourierDashboardSkeleton } from '@/components/ui'
+import {
+  CourierDashboardSkeleton,
+  Card,
+  CardBody,
+  CardHeader,
+  Button,
+  Badge,
+  Alert,
+  EmptyRoutes,
+  FadeIn,
+  SlideIn
+} from '@/components/ui'
 
 export default function CourierDashboard() {
   const [routes, setRoutes] = useState<RouteResponse[]>([])
@@ -140,7 +151,7 @@ export default function CourierDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface-50">
       <Navbar user={user} />
 
       {/* Rating Modal */}
@@ -153,231 +164,268 @@ export default function CourierDashboard() {
         />
       )}
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Courier Dashboard</h1>
-          <Link
-            href="/courier/routes/create"
-            className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium"
-          >
-            Create New Route
-          </Link>
-        </div>
+      <div className="page-container py-8">
+        <FadeIn duration={400}>
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-2xl sm:text-3xl font-bold text-surface-900">Courier Dashboard</h1>
+            <Link href="/courier/routes/create">
+              <Button
+                variant="success"
+                leftIcon={
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                }
+              >
+                Create New Route
+              </Button>
+            </Link>
+          </div>
+        </FadeIn>
 
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <Alert variant="error" className="mb-4">
             {error}
-          </div>
+          </Alert>
         )}
 
         {/* Pending Ratings Banner */}
         {pendingRatings.length > 0 && !showRatingModal && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">⭐</span>
-              <div>
-                <p className="font-medium text-yellow-800">
-                  You have {pendingRatings.length} pending {pendingRatings.length === 1 ? 'review' : 'reviews'}
-                </p>
-                <p className="text-sm text-yellow-600">
-                  Rate your experience with senders whose packages you delivered
-                </p>
+          <SlideIn direction="down" duration={400}>
+            <Alert variant="warning" className="mb-6">
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">⭐</span>
+                  <div>
+                    <p className="font-medium">
+                      You have {pendingRatings.length} pending {pendingRatings.length === 1 ? 'review' : 'reviews'}
+                    </p>
+                    <p className="text-sm opacity-80">
+                      Rate your experience with senders whose packages you delivered
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setShowRatingModal(true)}
+                >
+                  Rate Now
+                </Button>
               </div>
-            </div>
-            <button
-              onClick={() => setShowRatingModal(true)}
-              className="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 transition-colors font-medium"
-            >
-              Rate Now
-            </button>
-          </div>
+            </Alert>
+          </SlideIn>
         )}
 
         {/* Active Route Section */}
         {activeRoute && (
-          <div className="bg-green-50 border-2 border-green-200 rounded-lg p-6 mb-8">
-            <div className="flex justify-between items-start">
-              <div>
-                <h2 className="text-xl font-bold text-green-800 mb-2">
-                  Active Route
-                </h2>
-                <div className="space-y-2">
-                  <p><strong>From:</strong> {activeRoute.start_address}</p>
-                  <p><strong>To:</strong> {activeRoute.end_address}</p>
-                  <p><strong>Max Deviation:</strong> {activeRoute.max_deviation_km} km</p>
-                  {activeRoute.departure_time && (
-                    <p><strong>Departure:</strong> {new Date(activeRoute.departure_time).toLocaleString()}</p>
-                  )}
-                  <p className="text-sm text-gray-600">Created: {new Date(activeRoute.created_at).toLocaleString()}</p>
+          <SlideIn direction="up" delay={100} duration={400}>
+            <Card className="border-2 border-success-200 bg-success-50 mb-8">
+              <CardBody>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Badge variant="success">Active Route</Badge>
+                    </div>
+                    <div className="space-y-2 text-surface-700">
+                      <p><strong className="text-surface-900">From:</strong> {activeRoute.start_address}</p>
+                      <p><strong className="text-surface-900">To:</strong> {activeRoute.end_address}</p>
+                      <p><strong className="text-surface-900">Max Deviation:</strong> {activeRoute.max_deviation_km} km</p>
+                      {activeRoute.departure_time && (
+                        <p><strong className="text-surface-900">Departure:</strong> {new Date(activeRoute.departure_time).toLocaleString()}</p>
+                      )}
+                      <p className="text-sm text-surface-500">Created: {new Date(activeRoute.created_at).toLocaleString()}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Link href={`/courier/routes/${activeRoute.id}/matches`}>
+                      <Button variant="primary" size="sm">
+                        View Matches
+                      </Button>
+                    </Link>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => deleteRoute(activeRoute.id)}
+                    >
+                      Deactivate
+                    </Button>
+                  </div>
                 </div>
-              </div>
-              <div className="space-x-2">
-                <Link
-                  href={`/courier/routes/${activeRoute.id}/matches`}
-                  className="inline-block bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
-                >
-                  View Matches
-                </Link>
-                <button
-                  onClick={() => deleteRoute(activeRoute.id)}
-                  className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors"
-                >
-                  Deactivate
-                </button>
-              </div>
-            </div>
-          </div>
+              </CardBody>
+            </Card>
+          </SlideIn>
         )}
 
         {/* Assigned Packages Section */}
         {assignedPackages.length > 0 && (
-          <div className="bg-white rounded-lg shadow p-6 mb-8">
-            <h2 className="text-xl font-bold mb-4">
-              Assigned Packages ({assignedPackages.length})
-            </h2>
-            <p className="text-gray-600 text-sm mb-4">
-              Packages you've accepted and need to deliver
-            </p>
-            <div className="space-y-4">
-              {assignedPackages.map((pkg) => (
-                <div
-                  key={pkg.id}
-                  className="border rounded-lg p-4 hover:border-green-300 transition-colors"
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="font-semibold">{pkg.description}</h3>
-                        <span className={`px-2 py-0.5 text-xs rounded-full ${
-                          pkg.status === 'matched' ? 'bg-blue-100 text-blue-800' :
-                          pkg.status === 'picked_up' ? 'bg-yellow-100 text-yellow-800' :
-                          pkg.status === 'in_transit' ? 'bg-purple-100 text-purple-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {pkg.status.replace('_', ' ')}
-                        </span>
-                      </div>
-                      <div className="grid md:grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <p className="text-gray-500">Pickup</p>
-                          <p className="text-gray-700">{pkg.pickup_address}</p>
-                          {pkg.pickup_contact_name && (
-                            <p className="text-gray-500 text-xs">Contact: {pkg.pickup_contact_name}</p>
-                          )}
+          <SlideIn direction="up" delay={150} duration={400}>
+            <Card className="mb-8">
+              <CardHeader
+                title={`Assigned Packages (${assignedPackages.length})`}
+                subtitle="Packages you've accepted and need to deliver"
+              />
+              <CardBody className="p-0">
+                <div className="divide-y divide-surface-100">
+                  {assignedPackages.map((pkg, index) => (
+                    <div
+                      key={pkg.id}
+                      className="p-4 hover:bg-surface-50 transition-colors"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h3 className="font-semibold text-surface-900">{pkg.description}</h3>
+                            <Badge
+                              variant={
+                                pkg.status === 'matched' ? 'info' :
+                                pkg.status === 'picked_up' ? 'warning' :
+                                pkg.status === 'in_transit' ? 'primary' :
+                                'secondary'
+                              }
+                              size="sm"
+                            >
+                              {pkg.status.replace('_', ' ')}
+                            </Badge>
+                          </div>
+                          <div className="grid md:grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <p className="text-surface-500">Pickup</p>
+                              <p className="text-surface-700">{pkg.pickup_address}</p>
+                              {pkg.pickup_contact_name && (
+                                <p className="text-surface-500 text-xs">Contact: {pkg.pickup_contact_name}</p>
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-surface-500">Dropoff</p>
+                              <p className="text-surface-700">{pkg.dropoff_address}</p>
+                              {pkg.dropoff_contact_name && (
+                                <p className="text-surface-500 text-xs">Contact: {pkg.dropoff_contact_name}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="mt-2 flex items-center gap-4 text-sm text-surface-600">
+                            <span>📦 {pkg.size}</span>
+                            <span>⚖️ {pkg.weight_kg} kg</span>
+                            {pkg.price && <span className="text-success-600 font-medium">${pkg.price.toFixed(2)}</span>}
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-gray-500">Dropoff</p>
-                          <p className="text-gray-700">{pkg.dropoff_address}</p>
-                          {pkg.dropoff_contact_name && (
-                            <p className="text-gray-500 text-xs">Contact: {pkg.dropoff_contact_name}</p>
-                          )}
+                        <div className="flex flex-col gap-2 ml-4">
+                          <Link href={`/packages/${pkg.id}`}>
+                            <Button variant="success" size="sm">
+                              View Details
+                            </Button>
+                          </Link>
+                          <Link href={`/messages?package=${pkg.id}`}>
+                            <Button variant="primary" size="sm">
+                              Message Sender
+                            </Button>
+                          </Link>
                         </div>
-                      </div>
-                      <div className="mt-2 flex items-center gap-4 text-sm text-gray-600">
-                        <span>📦 {pkg.size}</span>
-                        <span>⚖️ {pkg.weight_kg} kg</span>
-                        {pkg.price && <span className="text-green-600 font-medium">${pkg.price.toFixed(2)}</span>}
                       </div>
                     </div>
-                    <div className="flex flex-col gap-2 ml-4">
-                      <Link
-                        href={`/packages/${pkg.id}`}
-                        className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors text-sm text-center"
-                      >
-                        View Details
-                      </Link>
-                      <Link
-                        href={`/messages?package=${pkg.id}`}
-                        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors text-sm text-center"
-                      >
-                        Message Sender
-                      </Link>
-                    </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
+              </CardBody>
+            </Card>
+          </SlideIn>
         )}
 
         {/* No Active Route Message */}
         {!activeRoute && routes.length > 0 && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-8">
-            <p className="text-yellow-800">
-              You don't have an active route. Create a new route to start finding package matches!
+          <Alert variant="warning" className="mb-8">
+            <p>
+              You don't have an active route. Activate an existing route or create a new one to start finding package matches!
             </p>
-          </div>
+          </Alert>
         )}
 
         {/* First Time User Message */}
         {routes.length === 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
-            <h2 className="text-xl font-bold text-blue-800 mb-2">Welcome to Chaski!</h2>
-            <p className="text-blue-700">
-              Get started by creating your first route. We'll match you with packages along your way.
-            </p>
-          </div>
+          <FadeIn delay={200} duration={500}>
+            <EmptyRoutes
+              title="Welcome to Chaski!"
+              description="Get started by creating your first route. We'll match you with packages along your way."
+              action={
+                <Link href="/courier/routes/create">
+                  <Button variant="success">Create Your First Route</Button>
+                </Link>
+              }
+            />
+          </FadeIn>
         )}
 
         {/* Route History */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-bold mb-4">Route History</h2>
-          {routes.length === 0 ? (
-            <p className="text-gray-600">No routes yet. Create your first route to start earning!</p>
-          ) : (
-            <div className="space-y-4">
-              {routes.map((route) => (
-                <div
-                  key={route.id}
-                  className={`border rounded-lg p-4 ${
-                    route.is_active ? 'border-green-300 bg-green-50' : 'border-gray-200'
-                  }`}
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-semibold">{route.start_address} &rarr; {route.end_address}</p>
-                      <p className="text-sm text-gray-600">
-                        Created: {new Date(route.created_at).toLocaleDateString()}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Deviation: {route.max_deviation_km} km
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Status: {route.is_active ? '🟢 Active' : '⚫ Inactive'}
-                      </p>
+        {routes.length > 0 && (
+          <FadeIn delay={200} duration={500}>
+            <Card>
+              <CardHeader title="Route History" />
+              <CardBody className="p-0">
+                <div className="divide-y divide-surface-100">
+                  {routes.map((route) => (
+                    <div
+                      key={route.id}
+                      className={`p-4 transition-colors ${
+                        route.is_active ? 'bg-success-50' : 'hover:bg-surface-50'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-semibold text-surface-900">{route.start_address} → {route.end_address}</p>
+                          <div className="mt-1 space-y-0.5">
+                            <p className="text-sm text-surface-500">
+                              Created: {new Date(route.created_at).toLocaleDateString()}
+                            </p>
+                            <p className="text-sm text-surface-500">
+                              Deviation: {route.max_deviation_km} km
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <Badge
+                                variant={route.is_active ? 'success' : 'secondary'}
+                                size="sm"
+                              >
+                                {route.is_active ? 'Active' : 'Inactive'}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          {route.is_active && (
+                            <Link href={`/courier/routes/${route.id}/matches`}>
+                              <Button variant="ghost" size="sm">
+                                View Matches
+                              </Button>
+                            </Link>
+                          )}
+                          {!route.is_active && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => activateRoute(route.id)}
+                                className="text-success-600 hover:text-success-700"
+                              >
+                                Activate
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => deleteRoute(route.id)}
+                                className="text-error-600 hover:text-error-700"
+                              >
+                                Delete
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <div className="space-x-2">
-                      {route.is_active && (
-                        <Link
-                          href={`/courier/routes/${route.id}/matches`}
-                          className="inline-block text-blue-600 hover:text-blue-800 text-sm font-medium"
-                        >
-                          View Matches
-                        </Link>
-                      )}
-                      {!route.is_active && (
-                        <>
-                          <button
-                            onClick={() => activateRoute(route.id)}
-                            className="text-green-600 hover:text-green-800 text-sm font-medium"
-                          >
-                            Activate
-                          </button>
-                          <button
-                            onClick={() => deleteRoute(route.id)}
-                            className="text-red-600 hover:text-red-800 text-sm font-medium"
-                          >
-                            Delete
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+              </CardBody>
+            </Card>
+          </FadeIn>
+        )}
       </div>
     </div>
   )

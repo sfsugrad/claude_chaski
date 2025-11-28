@@ -55,3 +55,20 @@ export {
   ListSkeleton,
 } from './PageSkeletons';
 export { default as PageSkeletons } from './PageSkeletons';
+
+// Animation components
+export {
+  AnimatedContainer,
+  AnimatedList,
+  PageTransition,
+  FadeIn,
+  SlideIn,
+  ScaleIn,
+  Pulse,
+  HoverScale,
+  HoverLift,
+  Shimmer,
+  CountUp,
+  ProgressBar as AnimatedProgressBar,
+  useRipple,
+} from './Animations';
