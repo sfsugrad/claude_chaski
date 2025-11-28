@@ -158,8 +158,8 @@ test.describe('Authentication Tests', () => {
 
       await page.getByRole('button', { name: /create account/i }).click();
 
-      // Should show password length error
-      await expect(page.getByText(/at least 8 characters/i)).toBeVisible();
+      // Should show password length error (in alert, not helper text)
+      await expect(page.getByRole('alert').getByText(/at least 8 characters/i)).toBeVisible();
     });
 
     test('TC-AUTH-006: Registration rejects duplicate email', async ({ page }) => {

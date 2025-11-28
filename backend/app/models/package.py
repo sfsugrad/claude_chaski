@@ -49,11 +49,20 @@ class Package(Base):
     price = Column(Float)  # Price sender is willing to pay
     is_active = Column(Boolean, default=True)  # Soft delete flag
 
+    # Delivery proof configuration
+    requires_proof = Column(Boolean, default=True, nullable=False)
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     pickup_time = Column(DateTime(timezone=True), nullable=True)
     delivery_time = Column(DateTime(timezone=True), nullable=True)
+
+    # Status transition timestamps
+    status_changed_at = Column(DateTime(timezone=True), nullable=True)
+    matched_at = Column(DateTime(timezone=True), nullable=True)
+    picked_up_at = Column(DateTime(timezone=True), nullable=True)
+    in_transit_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     # sender = relationship("User", foreign_keys=[sender_id])

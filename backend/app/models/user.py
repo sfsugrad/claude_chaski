@@ -35,6 +35,9 @@ class User(Base):
     # Courier-specific fields
     max_deviation_km = Column(Integer, default=5)  # Default 5km deviation
 
+    # Stripe customer ID (for senders to save payment methods)
+    stripe_customer_id = Column(String(255), nullable=True, unique=True)
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

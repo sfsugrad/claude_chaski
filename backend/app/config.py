@@ -64,6 +64,29 @@ class Settings(BaseSettings):
     # Environment
     ENVIRONMENT: str = "development"
 
+    # Redis Configuration
+    REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_LOCATION_TTL: int = 60  # seconds for location cache
+
+    # AWS S3 Configuration
+    AWS_ACCESS_KEY_ID: Optional[str] = None
+    AWS_SECRET_ACCESS_KEY: Optional[str] = None
+    AWS_S3_BUCKET: str = "chaski-delivery-proofs"
+    AWS_S3_REGION: str = "us-east-1"
+    AWS_CLOUDFRONT_DOMAIN: Optional[str] = None
+    S3_PRESIGNED_URL_EXPIRY: int = 3600  # 1 hour
+
+    # Celery Configuration
+    CELERY_BROKER_URL: str = "redis://localhost:6379/1"
+    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/2"
+
+    # Stripe Configuration
+    STRIPE_SECRET_KEY: Optional[str] = None
+    STRIPE_PUBLISHABLE_KEY: Optional[str] = None
+    STRIPE_WEBHOOK_SECRET: Optional[str] = None
+    STRIPE_CONNECT_CLIENT_ID: Optional[str] = None
+    PLATFORM_FEE_PERCENT: float = 15.0  # 15% platform fee
+
     class Config:
         env_file = ".env"
 

@@ -20,8 +20,9 @@ test.describe('Courier Workflow Tests', () => {
       // Wait for dashboard to load
       await expect(page.getByRole('heading', { name: /courier dashboard/i })).toBeVisible();
 
-      // Should have active route section (heading) or "no active route" message
-      const hasActiveRoute = await page.getByRole('heading', { name: /active route/i }).isVisible();
+      // Should have active route section (text label) or "no active route" message
+      // "Active Route" is rendered as a div label, not a heading
+      const hasActiveRoute = await page.getByText('Active Route', { exact: true }).isVisible();
       const hasNoActiveRoute = await page.getByText(/no active route|don't have an active/i).isVisible();
 
       expect(hasActiveRoute || hasNoActiveRoute).toBeTruthy();
@@ -53,41 +54,39 @@ test.describe('Courier Workflow Tests', () => {
     test('TC-COUR-002: Create route form has required fields', async ({ page }) => {
       await page.goto('/courier/routes/create');
 
-      // Check form fields exist - use exact label text from page snapshot
-      await expect(page.getByText('Start Address *')).toBeVisible();
-      await expect(page.getByText('Destination Address *')).toBeVisible();
-      await expect(page.getByText('Maximum Deviation (km)')).toBeVisible();
+      // Check form fields exist - use actual label text from redesigned form
+      await expect(page.getByText('Starting Point *')).toBeVisible();
+      await expect(page.getByText('Destination *')).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Pickup Radius' })).toBeVisible();
     });
 
     test('TC-COUR-003: Create route validation - empty addresses', async ({ page }) => {
       await page.goto('/courier/routes/create');
 
-      // Fill only deviation, leave addresses empty - use spinbutton role since label isn't associated
-      await page.getByRole('spinbutton').fill('10');
-
+      // Leave addresses empty, just click submit
+      // Pickup radius has default value (5km) from preset buttons
       await page.getByRole('button', { name: /create route/i }).click();
 
       // Form should not submit - still on create page (validation prevents submission)
       await expect(page).toHaveURL('/courier/routes/create');
     });
 
-    test('TC-COUR-003: Create route validation - deviation range', async ({ page }) => {
+    test('TC-COUR-003: Pickup radius can be set via slider', async ({ page }) => {
       await page.goto('/courier/routes/create');
 
-      // Enter invalid deviation (too high) - use spinbutton role
-      await page.getByRole('spinbutton').fill('100');
+      // Verify slider exists for custom distance
+      await expect(page.getByRole('slider')).toBeVisible();
 
-      await page.getByRole('button', { name: /create route/i }).click();
-
-      // Form should not submit with invalid deviation - still on create page
-      await expect(page).toHaveURL('/courier/routes/create');
+      // Verify preset buttons exist
+      await expect(page.getByRole('button', { name: /2 km/i })).toBeVisible();
+      await expect(page.getByRole('button', { name: /10 km/i })).toBeVisible();
     });
 
     test('Departure time field is optional', async ({ page }) => {
       await page.goto('/courier/routes/create');
 
-      // Departure time field should exist - check by label text
-      await expect(page.getByText('Departure Time (Optional)')).toBeVisible();
+      // Departure time field should exist - check by heading text
+      await expect(page.getByRole('heading', { name: /when are you traveling/i })).toBeVisible();
 
       // Should be able to leave it empty
     });

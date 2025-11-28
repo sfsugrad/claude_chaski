@@ -16,6 +16,12 @@ class NotificationType(str, enum.Enum):
     ROUTE_MATCH_FOUND = "route_match_found"
     PACKAGE_MATCH_FOUND = "package_match_found"  # Notify courier about a package matching their route
     NEW_RATING = "new_rating"  # Notify user about receiving a new rating
+    DELIVERY_PROOF_SUBMITTED = "delivery_proof_submitted"  # Notify sender that proof was submitted
+    PAYMENT_RECEIVED = "payment_received"  # Payment processed successfully
+    PAYMENT_FAILED = "payment_failed"  # Payment processing failed
+    PAYOUT_SENT = "payout_sent"  # Courier payout initiated
+    PAYOUT_FAILED = "payout_failed"  # Courier payout failed
+    PACKAGE_REMINDER = "package_reminder"  # Reminder for stale MATCHED packages
     SYSTEM = "system"
 
 

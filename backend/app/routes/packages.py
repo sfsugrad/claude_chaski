@@ -18,6 +18,13 @@ from app.services.audit_service import (
     log_package_status_change,
     log_package_cancel,
 )
+from app.services.package_status import (
+    validate_transition,
+    get_allowed_next_statuses,
+    transition_package,
+    can_mark_delivered,
+    get_status_progress,
+)
 from pydantic import BaseModel, Field
 from typing import List
 from datetime import datetime
@@ -44,6 +51,7 @@ class PackageCreate(BaseModel):
     dropoff_contact_name: str | None = None
     dropoff_contact_phone: str | None = None
     price: float | None = Field(None, ge=0)
+    requires_proof: bool = True  # Whether delivery proof is required
     sender_id: int | None = None  # Admin only: specify sender user
 
 class PackageResponse(BaseModel):
@@ -67,8 +75,16 @@ class PackageResponse(BaseModel):
     dropoff_contact_name: str | None
     dropoff_contact_phone: str | None
     price: float | None
+    requires_proof: bool
     created_at: datetime
     updated_at: datetime | None
+    # Status transition timestamps
+    status_changed_at: datetime | None = None
+    matched_at: datetime | None = None
+    picked_up_at: datetime | None = None
+    in_transit_at: datetime | None = None
+    # Allowed next statuses for UI
+    allowed_next_statuses: List[str] = []
 
     class Config:
         from_attributes = True
@@ -102,8 +118,14 @@ def package_to_response(package: Package, db: Session) -> PackageResponse:
         dropoff_contact_name=package.dropoff_contact_name,
         dropoff_contact_phone=package.dropoff_contact_phone,
         price=package.price,
+        requires_proof=package.requires_proof if package.requires_proof is not None else True,
         created_at=package.created_at,
-        updated_at=package.updated_at
+        updated_at=package.updated_at,
+        status_changed_at=package.status_changed_at,
+        matched_at=package.matched_at,
+        picked_up_at=package.picked_up_at,
+        in_transit_at=package.in_transit_at,
+        allowed_next_statuses=get_allowed_next_statuses(package.status),
     )
 
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=PackageResponse)
@@ -169,6 +191,7 @@ async def create_package(
         dropoff_contact_name=package_data.dropoff_contact_name,
         dropoff_contact_phone=package_data.dropoff_contact_phone,
         price=package_data.price,
+        requires_proof=package_data.requires_proof,
         status=PackageStatus.PENDING
     )
 
@@ -382,9 +405,10 @@ async def update_package_status(
     db: Session = Depends(get_db)
 ):
     """
-    Update package status.
+    Update package status with strict transition validation.
 
     Only the assigned courier can update status.
+    Status must follow strict progression: MATCHED → PICKED_UP → IN_TRANSIT → DELIVERED
     """
     package = db.query(Package).filter(Package.id == package_id).first()
 
@@ -401,7 +425,7 @@ async def update_package_status(
             detail="Only the assigned courier can update package status"
         )
 
-    # Validate status
+    # Validate status value
     try:
         new_status = PackageStatus(status_update.status)
     except ValueError:
@@ -410,8 +434,38 @@ async def update_package_status(
             detail="Invalid status"
         )
 
+    # Validate transition is allowed
+    is_valid, error_message = validate_transition(package.status, new_status)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_message
+        )
+
+    # Special handling for DELIVERED status
+    if new_status == PackageStatus.DELIVERED:
+        can_deliver, result = can_mark_delivered(package)
+        if not can_deliver:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result
+            )
+        if result == "proof_required":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Delivery proof is required for this package. Please submit proof via the delivery proof endpoint."
+            )
+
     old_status = package.status
-    package.status = new_status
+
+    # Use the transition service to update status with timestamps
+    package, error = transition_package(db, package, new_status, current_user.id)
+    if error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error
+        )
+
     package.updated_at = datetime.utcnow()
     db.commit()
 

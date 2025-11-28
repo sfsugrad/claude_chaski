@@ -29,10 +29,10 @@ test.describe('Admin Tests', () => {
       // Click Overview tab
       await page.getByRole('button', { name: 'Overview', exact: true }).click();
 
-      // Should show user stats
-      await expect(page.getByText(/total users/i)).toBeVisible();
-      await expect(page.getByText(/senders/i)).toBeVisible();
-      await expect(page.getByText(/couriers/i)).toBeVisible();
+      // Should show user stats (use .first() since text appears in both stat cards and charts)
+      await expect(page.getByText(/total users/i).first()).toBeVisible();
+      await expect(page.getByText(/senders/i).first()).toBeVisible();
+      await expect(page.getByText(/couriers/i).first()).toBeVisible();
     });
 
     test('TC-ADMIN-001: Overview shows package stats', async ({ page }) => {

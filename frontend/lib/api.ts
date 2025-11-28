@@ -72,6 +72,7 @@ export interface PackageCreate {
   dropoff_contact_name?: string
   dropoff_contact_phone?: string
   price?: number
+  requires_proof?: boolean  // Whether delivery proof is required (default: true)
   sender_id?: number  // Admin only: specify sender user
 }
 
@@ -96,8 +97,16 @@ export interface PackageResponse {
   dropoff_contact_name: string | null
   dropoff_contact_phone: string | null
   price: number | null
+  requires_proof: boolean
   created_at: string
   updated_at: string | null
+  // Status transition timestamps
+  status_changed_at: string | null
+  matched_at: string | null
+  picked_up_at: string | null
+  in_transit_at: string | null
+  // Allowed next statuses for UI
+  allowed_next_statuses: string[]
 }
 
 export interface ForgotPasswordData {
@@ -476,4 +485,434 @@ export const verificationAPI = {
   verifyEmail: (token: string) => api.get(`/auth/verify-email/${token}`),
   resendVerification: (email: string) =>
     api.post(`/auth/resend-verification?email=${encodeURIComponent(email)}`),
+}
+
+// Delivery Proof Types
+export interface DeliveryProofCreate {
+  photo_s3_key?: string
+  signature_s3_key?: string
+  signature_data?: string  // Base64 encoded signature from canvas
+  recipient_name?: string
+  recipient_relationship?: string
+  notes?: string
+  latitude?: number
+  longitude?: number
+  location_accuracy_meters?: number
+  captured_at: string
+}
+
+export interface DeliveryProofResponse {
+  id: number
+  package_id: number
+  courier_id: number
+  photo_url: string | null
+  signature_url: string | null
+  recipient_name: string | null
+  recipient_relationship: string | null
+  notes: string | null
+  latitude: number | null
+  longitude: number | null
+  distance_from_dropoff_meters: number | null
+  is_verified: boolean
+  proof_type: 'photo' | 'signature' | 'both' | 'none'
+  captured_at: string
+  created_at: string
+}
+
+export interface UploadUrlResponse {
+  upload_url: string
+  key: string
+  fields: Record<string, string>
+}
+
+// Delivery Proof API
+export const proofAPI = {
+  getUploadUrl: (packageId: number, fileType: 'photo' | 'signature', contentType: string = 'image/jpeg') =>
+    api.post<UploadUrlResponse>(`/proof/upload-url/${packageId}`, {
+      file_type: fileType,
+      content_type: contentType,
+    }),
+
+  create: (packageId: number, data: DeliveryProofCreate) =>
+    api.post<DeliveryProofResponse>(`/proof/${packageId}`, data),
+
+  get: (packageId: number) =>
+    api.get<DeliveryProofResponse>(`/proof/${packageId}`),
+
+  getPhotoUrl: (packageId: number) =>
+    api.get<{ url: string; expires_in: number }>(`/proof/${packageId}/photo`),
+
+  getSignatureUrl: (packageId: number) =>
+    api.get<{ url: string; expires_in: number }>(`/proof/${packageId}/signature`),
+
+  uploadToS3: async (uploadUrl: string, fields: Record<string, string>, file: File): Promise<void> => {
+    const formData = new FormData()
+    Object.entries(fields).forEach(([key, value]) => {
+      formData.append(key, value)
+    })
+    formData.append('file', file)
+
+    await fetch(uploadUrl, {
+      method: 'POST',
+      body: formData,
+    })
+  },
+}
+
+// Payment Types
+export interface PaymentMethod {
+  id: number
+  stripe_payment_method_id: string
+  card_brand: string | null
+  card_last_four: string | null
+  card_exp_month: number | null
+  card_exp_year: number | null
+  is_default: boolean
+  created_at: string
+}
+
+export interface Transaction {
+  id: number
+  package_id: number
+  sender_id: number
+  courier_id: number | null
+  amount_cents: number
+  platform_fee_cents: number
+  courier_payout_cents: number
+  currency: string
+  status: 'pending' | 'requires_payment' | 'processing' | 'succeeded' | 'failed' | 'refunded'
+  refund_amount_cents: number
+  created_at: string
+  completed_at: string | null
+}
+
+export interface SetupIntentResponse {
+  client_secret: string
+  setup_intent_id: string
+}
+
+export interface ConnectAccount {
+  id: number
+  stripe_account_id: string
+  onboarding_complete: boolean
+  details_submitted: boolean
+  charges_enabled: boolean
+  payouts_enabled: boolean
+  created_at: string
+}
+
+export interface CourierBalance {
+  pending_cents: number
+  available_cents: number
+  pending_dollars: number
+  available_dollars: number
+}
+
+export interface EarningsSummary {
+  total_earnings_cents: number
+  total_deliveries: number
+  pending_payout_cents: number
+  last_payout_at: string | null
+}
+
+export interface Payout {
+  id: number
+  courier_id: number
+  amount_cents: number
+  currency: string
+  status: 'pending' | 'processing' | 'succeeded' | 'failed'
+  transaction_ids: number[]
+  created_at: string
+  completed_at: string | null
+}
+
+// Payments API
+export const paymentsAPI = {
+  // Setup Intent for saving cards
+  createSetupIntent: () =>
+    api.post<SetupIntentResponse>('/payments/setup-intent'),
+
+  // Payment Methods
+  addPaymentMethod: (paymentMethodId: string, setAsDefault: boolean = true) =>
+    api.post<PaymentMethod>('/payments/methods', {
+      payment_method_id: paymentMethodId,
+      set_as_default: setAsDefault,
+    }),
+
+  listPaymentMethods: () =>
+    api.get<PaymentMethod[]>('/payments/methods'),
+
+  deletePaymentMethod: (methodId: number) =>
+    api.delete(`/payments/methods/${methodId}`),
+
+  setDefaultPaymentMethod: (methodId: number) =>
+    api.put(`/payments/methods/${methodId}/default`),
+
+  // Transactions
+  chargeForDelivery: (packageId: number, paymentMethodId?: string) =>
+    api.post<Transaction>(`/payments/charge/${packageId}`, {
+      payment_method_id: paymentMethodId,
+    }),
+
+  listTransactions: (skip: number = 0, limit: number = 20) =>
+    api.get<Transaction[]>(`/payments/transactions?skip=${skip}&limit=${limit}`),
+
+  getTransaction: (transactionId: number) =>
+    api.get<Transaction>(`/payments/transactions/${transactionId}`),
+
+  refundTransaction: (transactionId: number, amountCents?: number, reason?: string) =>
+    api.post<Transaction>(`/payments/transactions/${transactionId}/refund`, {
+      amount_cents: amountCents,
+      reason: reason || '',
+    }),
+}
+
+// Payouts API (for couriers)
+export const payoutsAPI = {
+  // Connect Account
+  createConnectAccount: () =>
+    api.post<ConnectAccount>('/payouts/connect-account'),
+
+  getConnectAccount: () =>
+    api.get<ConnectAccount | null>('/payouts/connect-account'),
+
+  refreshConnectAccount: () =>
+    api.post<ConnectAccount>('/payouts/connect-account/refresh'),
+
+  getOnboardingLink: (returnUrl: string, refreshUrl: string) =>
+    api.post<{ url: string }>('/payouts/connect-onboarding', {
+      return_url: returnUrl,
+      refresh_url: refreshUrl,
+    }),
+
+  getDashboardLink: () =>
+    api.get<{ url: string }>('/payouts/connect-dashboard'),
+
+  // Balance & Earnings
+  getBalance: () =>
+    api.get<CourierBalance>('/payouts/balance'),
+
+  getEarnings: () =>
+    api.get<EarningsSummary>('/payouts/earnings'),
+
+  // Payouts
+  requestPayout: (transactionIds?: number[]) =>
+    api.post<Payout>('/payouts/request', {
+      transaction_ids: transactionIds,
+    }),
+
+  getPayoutHistory: (skip: number = 0, limit: number = 20) =>
+    api.get<Payout[]>(`/payouts/history?skip=${skip}&limit=${limit}`),
+
+  getPayout: (payoutId: number) =>
+    api.get<Payout>(`/payouts/history/${payoutId}`),
+}
+
+// Tracking Types
+export interface TrackingSession {
+  id: number
+  package_id: number
+  courier_id: number
+  is_active: boolean
+  started_at: string
+  ended_at: string | null
+  last_latitude: number | null
+  last_longitude: number | null
+  last_location_at: string | null
+  estimated_arrival: string | null
+  distance_remaining_meters: number | null
+  share_live_location: boolean
+}
+
+export interface LocationUpdate {
+  latitude: number
+  longitude: number
+  heading: number | null
+  speed_mps: number | null
+  timestamp: string
+  estimated_arrival: string | null
+  distance_remaining_meters: number | null
+}
+
+export interface LocationHistory {
+  id: number
+  latitude: number
+  longitude: number
+  accuracy_meters: number | null
+  heading: number | null
+  speed_mps: number | null
+  timestamp: string
+  source: string
+}
+
+export interface TrackingEvent {
+  id: number
+  event_type: string
+  description: string | null
+  latitude: number | null
+  longitude: number | null
+  created_at: string
+  extra_data: string | null
+}
+
+export interface LocationUpdateRequest {
+  latitude: number
+  longitude: number
+  accuracy_meters?: number
+  altitude_meters?: number
+  heading?: number
+  speed_mps?: number
+  battery_level?: number
+  source?: string
+}
+
+export interface StartTrackingRequest {
+  initial_latitude?: number
+  initial_longitude?: number
+  share_live_location?: boolean
+}
+
+export interface ReportDelayRequest {
+  reason: string
+  estimated_delay_minutes: number
+  latitude?: number
+  longitude?: number
+}
+
+// Tracking API
+export const trackingAPI = {
+  // Courier endpoints
+  startTracking: (packageId: number, data?: StartTrackingRequest) =>
+    api.post<TrackingSession>(`/tracking/sessions/${packageId}/start`, data || {}),
+
+  endTracking: (sessionId: number) =>
+    api.post<TrackingSession>(`/tracking/sessions/${sessionId}/end`),
+
+  updateLocation: (sessionId: number, data: LocationUpdateRequest) =>
+    api.post<LocationUpdate>(`/tracking/sessions/${sessionId}/location`, data),
+
+  reportDelay: (sessionId: number, data: ReportDelayRequest) =>
+    api.post<TrackingEvent>(`/tracking/sessions/${sessionId}/delay`, data),
+
+  // Public/sender endpoints
+  getCurrentLocation: (packageId: number) =>
+    api.get<LocationUpdate>(`/tracking/packages/${packageId}/location`),
+
+  getActiveSession: (packageId: number) =>
+    api.get<TrackingSession>(`/tracking/packages/${packageId}/session`),
+
+  getLocationHistory: (sessionId: number, limit: number = 100, since?: string) =>
+    api.get<LocationHistory[]>(
+      `/tracking/sessions/${sessionId}/history?limit=${limit}${since ? `&since=${since}` : ''}`
+    ),
+
+  getTrackingEvents: (sessionId: number) =>
+    api.get<TrackingEvent[]>(`/tracking/sessions/${sessionId}/events`),
+}
+
+// Analytics Types
+export interface PlatformOverview {
+  total_users: number
+  total_senders: number
+  total_couriers: number
+  total_packages: number
+  packages_delivered: number
+  packages_in_transit: number
+  total_revenue_cents: number
+  platform_fees_cents: number
+  average_rating: number | null
+}
+
+export interface DailyMetrics {
+  date: string
+  packages_created: number
+  packages_matched: number
+  packages_delivered: number
+  packages_cancelled: number
+  new_users: number
+  active_senders: number
+  active_couriers: number
+  total_transaction_amount: number
+  total_platform_fees: number
+  average_delivery_time_minutes: number | null
+  average_rating: number | null
+  successful_delivery_rate: number | null
+}
+
+export interface RevenueBreakdown {
+  total_cents: number
+  platform_fees_cents: number
+  courier_payouts_cents: number
+  refunds_cents: number
+  net_revenue_cents: number
+}
+
+export interface TopCourier {
+  courier_id: number
+  name: string
+  deliveries: number
+  rating: number | null
+  earnings_cents: number
+}
+
+export interface HourlyActivity {
+  hour: number
+  packages_created: number
+  packages_delivered: number
+  active_couriers: number
+}
+
+export interface CourierPerformance {
+  courier_id: number
+  courier_name: string | null
+  total_deliveries: number
+  successful_deliveries: number
+  on_time_deliveries: number
+  average_delivery_time: number | null
+  average_rating: number | null
+  total_earnings: number
+  earnings_this_month: number
+  current_streak: number
+  last_delivery_at: string | null
+}
+
+export interface TimeSeriesPoint {
+  date: string
+  value: number
+}
+
+// Analytics API
+export const analyticsAPI = {
+  // Admin endpoints
+  getOverview: () =>
+    api.get<PlatformOverview>('/analytics/overview'),
+
+  getDailyMetrics: (startDate?: string, endDate?: string, days: number = 30) =>
+    api.get<DailyMetrics[]>(
+      `/analytics/daily-metrics?days=${days}${startDate ? `&start_date=${startDate}` : ''}${endDate ? `&end_date=${endDate}` : ''}`
+    ),
+
+  getRevenue: (startDate?: string, endDate?: string) =>
+    api.get<RevenueBreakdown>(
+      `/analytics/revenue${startDate ? `?start_date=${startDate}` : ''}${endDate ? `${startDate ? '&' : '?'}end_date=${endDate}` : ''}`
+    ),
+
+  getTopCouriers: (limit: number = 10, periodDays: number = 30) =>
+    api.get<TopCourier[]>(`/analytics/top-couriers?limit=${limit}&period_days=${periodDays}`),
+
+  getHourlyActivity: (date?: string) =>
+    api.get<HourlyActivity[]>(`/analytics/hourly-activity${date ? `?date_str=${date}` : ''}`),
+
+  getPackagesTrend: (days: number = 30) =>
+    api.get<TimeSeriesPoint[]>(`/analytics/packages-trend?days=${days}`),
+
+  getRevenueTrend: (days: number = 30) =>
+    api.get<TimeSeriesPoint[]>(`/analytics/revenue-trend?days=${days}`),
+
+  // Courier endpoints
+  getMyPerformance: () =>
+    api.get<CourierPerformance>('/analytics/my-performance'),
+
+  getCourierLeaderboard: (metric: 'deliveries' | 'rating' | 'earnings' = 'deliveries', limit: number = 10) =>
+    api.get<CourierPerformance[]>(`/analytics/courier-leaderboard?metric=${metric}&limit=${limit}`),
 }
