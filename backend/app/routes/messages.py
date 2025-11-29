@@ -8,6 +8,7 @@ from app.models.user import User
 from app.models.package import Package, PackageStatus
 from app.models.message import Message
 from app.utils.dependencies import get_current_user
+from app.utils.input_sanitizer import sanitize_plain_text
 
 router = APIRouter()
 
@@ -310,11 +311,14 @@ async def send_message(
             detail="You don't have access to send messages for this package"
         )
 
+    # Sanitize message content to prevent XSS
+    sanitized_content = sanitize_plain_text(message_data.content)
+
     # Create the message
     message = Message(
         package_id=package.id,
         sender_id=current_user.id,
-        content=message_data.content
+        content=sanitized_content
     )
     db.add(message)
     db.commit()

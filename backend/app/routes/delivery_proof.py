@@ -22,6 +22,11 @@ from app.services.package_status import transition_package, validate_transition
 from app.services.stripe_service import get_stripe_service
 from app.routes.notifications import create_notification_with_broadcast
 from app.utils.geo import haversine_distance
+from app.services.audit_service import (
+    log_file_upload_success,
+    log_file_upload_failed,
+    log_file_validation_failed
+)
 import logging
 
 logger = logging.getLogger(__name__)
@@ -237,6 +242,52 @@ async def create_delivery_proof(
             detail="At least one proof type (photo or signature) is required"
         )
 
+    # Validate photo file if uploaded via pre-signed URL
+    if proof_data.photo_s3_key:
+        try:
+            storage = get_file_storage()
+            await storage.validate_uploaded_file(proof_data.photo_s3_key)
+
+            # Audit log successful file upload
+            log_file_upload_success(
+                db, current_user, "delivery_photo",
+                proof_data.photo_s3_key, package.id, request
+            )
+        except StorageError as e:
+            # Audit log file validation failure
+            log_file_validation_failed(
+                db, current_user, "delivery_photo",
+                None, str(e), package.id, request
+            )
+
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Photo validation failed: {str(e)}"
+            )
+
+    # Validate signature file if uploaded via pre-signed URL (not from canvas)
+    if proof_data.signature_s3_key and not proof_data.signature_data:
+        try:
+            storage = get_file_storage()
+            await storage.validate_uploaded_file(proof_data.signature_s3_key)
+
+            # Audit log successful file upload
+            log_file_upload_success(
+                db, current_user, "delivery_signature",
+                proof_data.signature_s3_key, package.id, request
+            )
+        except StorageError as e:
+            # Audit log file validation failure
+            log_file_validation_failed(
+                db, current_user, "delivery_signature",
+                None, str(e), package.id, request
+            )
+
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Signature validation failed: {str(e)}"
+            )
+
     # Handle signature data from canvas
     signature_s3_key = proof_data.signature_s3_key
     if proof_data.signature_data and not signature_s3_key:
@@ -254,7 +305,19 @@ async def create_delivery_proof(
                 file_type="signature",
                 content_type="image/png"
             )
+
+            # Audit log successful canvas signature upload
+            log_file_upload_success(
+                db, current_user, "delivery_signature_canvas",
+                signature_s3_key, package.id, request
+            )
         except Exception as e:
+            # Audit log file upload failure
+            log_file_upload_failed(
+                db, current_user, "delivery_signature_canvas",
+                str(e), package.id, request
+            )
+
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Failed to process signature: {str(e)}"

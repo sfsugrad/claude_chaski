@@ -31,6 +31,7 @@ from datetime import datetime
 from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut, GeocoderServiceError
 from app.utils.tracking_id import generate_tracking_id, is_valid_tracking_id
+from app.utils.input_sanitizer import sanitize_plain_text, sanitize_phone
 
 router = APIRouter()
 
@@ -200,23 +201,32 @@ async def create_package(
             )
         sender_id = package_data.sender_id
 
+    # Sanitize all text fields to prevent XSS
+    sanitized_description = sanitize_plain_text(package_data.description)
+    sanitized_pickup_address = sanitize_plain_text(package_data.pickup_address)
+    sanitized_dropoff_address = sanitize_plain_text(package_data.dropoff_address)
+    sanitized_pickup_contact_name = sanitize_plain_text(package_data.pickup_contact_name) if package_data.pickup_contact_name else None
+    sanitized_pickup_contact_phone = sanitize_phone(package_data.pickup_contact_phone) if package_data.pickup_contact_phone else None
+    sanitized_dropoff_contact_name = sanitize_plain_text(package_data.dropoff_contact_name) if package_data.dropoff_contact_name else None
+    sanitized_dropoff_contact_phone = sanitize_phone(package_data.dropoff_contact_phone) if package_data.dropoff_contact_phone else None
+
     # Create package with NEW status, then auto-transition to OPEN_FOR_BIDS
     new_package = Package(
         tracking_id=generate_tracking_id(),
         sender_id=sender_id,
-        description=package_data.description,
+        description=sanitized_description,
         size=package_size,
         weight_kg=package_data.weight_kg,
-        pickup_address=package_data.pickup_address,
+        pickup_address=sanitized_pickup_address,
         pickup_lat=package_data.pickup_lat,
         pickup_lng=package_data.pickup_lng,
-        pickup_contact_name=package_data.pickup_contact_name,
-        pickup_contact_phone=package_data.pickup_contact_phone,
-        dropoff_address=package_data.dropoff_address,
+        pickup_contact_name=sanitized_pickup_contact_name,
+        pickup_contact_phone=sanitized_pickup_contact_phone,
+        dropoff_address=sanitized_dropoff_address,
         dropoff_lat=package_data.dropoff_lat,
         dropoff_lng=package_data.dropoff_lng,
-        dropoff_contact_name=package_data.dropoff_contact_name,
-        dropoff_contact_phone=package_data.dropoff_contact_phone,
+        dropoff_contact_name=sanitized_dropoff_contact_name,
+        dropoff_contact_phone=sanitized_dropoff_contact_phone,
         price=package_data.price,
         requires_proof=package_data.requires_proof,
         status=PackageStatus.NEW
@@ -379,10 +389,11 @@ async def update_package(
     # Track changes for audit log
     changes = {}
 
-    # Update fields if provided
+    # Update fields if provided (with sanitization)
     if package_update.description is not None:
-        changes["description"] = {"old": package.description, "new": package_update.description}
-        package.description = package_update.description
+        sanitized_description = sanitize_plain_text(package_update.description)
+        changes["description"] = {"old": package.description, "new": sanitized_description}
+        package.description = sanitized_description
 
     if package_update.size is not None:
         try:
@@ -399,20 +410,24 @@ async def update_package(
         package.weight_kg = package_update.weight_kg
 
     if package_update.pickup_contact_name is not None:
-        changes["pickup_contact_name"] = {"old": package.pickup_contact_name, "new": package_update.pickup_contact_name}
-        package.pickup_contact_name = package_update.pickup_contact_name
+        sanitized_name = sanitize_plain_text(package_update.pickup_contact_name)
+        changes["pickup_contact_name"] = {"old": package.pickup_contact_name, "new": sanitized_name}
+        package.pickup_contact_name = sanitized_name
 
     if package_update.pickup_contact_phone is not None:
-        changes["pickup_contact_phone"] = {"old": package.pickup_contact_phone, "new": package_update.pickup_contact_phone}
-        package.pickup_contact_phone = package_update.pickup_contact_phone
+        sanitized_phone_pickup = sanitize_phone(package_update.pickup_contact_phone)
+        changes["pickup_contact_phone"] = {"old": package.pickup_contact_phone, "new": sanitized_phone_pickup}
+        package.pickup_contact_phone = sanitized_phone_pickup
 
     if package_update.dropoff_contact_name is not None:
-        changes["dropoff_contact_name"] = {"old": package.dropoff_contact_name, "new": package_update.dropoff_contact_name}
-        package.dropoff_contact_name = package_update.dropoff_contact_name
+        sanitized_dropoff_name = sanitize_plain_text(package_update.dropoff_contact_name)
+        changes["dropoff_contact_name"] = {"old": package.dropoff_contact_name, "new": sanitized_dropoff_name}
+        package.dropoff_contact_name = sanitized_dropoff_name
 
     if package_update.dropoff_contact_phone is not None:
-        changes["dropoff_contact_phone"] = {"old": package.dropoff_contact_phone, "new": package_update.dropoff_contact_phone}
-        package.dropoff_contact_phone = package_update.dropoff_contact_phone
+        sanitized_phone_dropoff = sanitize_phone(package_update.dropoff_contact_phone)
+        changes["dropoff_contact_phone"] = {"old": package.dropoff_contact_phone, "new": sanitized_phone_dropoff}
+        package.dropoff_contact_phone = sanitized_phone_dropoff
 
     if package_update.price is not None:
         changes["price"] = {"old": package.price, "new": package_update.price}

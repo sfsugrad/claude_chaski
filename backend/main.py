@@ -15,6 +15,7 @@ from app.middleware.logging_middleware import (
     PerformanceMonitoringMiddleware,
     UserActivityLoggingMiddleware
 )
+from app.middleware.csrf import CSRFMiddleware
 
 # Initialize logging system
 setup_logging()
@@ -30,15 +31,29 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             return response
 
         # Content Security Policy
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
-            "style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data: https:; "
-            "font-src 'self' data:; "
-            "connect-src 'self'; "
-            "frame-ancestors 'none';"
-        )
+        # Note: 'unsafe-inline' and 'unsafe-eval' should be removed in future iterations
+        # by implementing nonces/hashes for inline scripts and refactoring eval usage
+        csp_directives = [
+            "default-src 'self'",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'",  # TODO: Remove unsafe-* with nonces
+            "style-src 'self' 'unsafe-inline'",  # TODO: Use nonces for inline styles
+            "img-src 'self' data: https:",
+            "font-src 'self' data:",
+            "connect-src 'self'",
+            "frame-ancestors 'none'",
+            "base-uri 'self'",  # Prevent <base> tag injection
+            "form-action 'self'",  # Restrict form submissions to same origin
+            "object-src 'none'",  # Block plugins (Flash, Java, etc.)
+            "media-src 'self'",  # Restrict audio/video sources
+            "worker-src 'self'",  # Restrict web workers
+            "manifest-src 'self'",  # Restrict web app manifests
+        ]
+
+        # Add upgrade-insecure-requests in production to force HTTPS
+        if settings.ENVIRONMENT == "production":
+            csp_directives.append("upgrade-insecure-requests")
+
+        response.headers["Content-Security-Policy"] = "; ".join(csp_directives) + ";"
 
         # Strict Transport Security (HSTS) - only in production
         if settings.ENVIRONMENT == "production":
@@ -119,9 +134,14 @@ app.add_middleware(
         "DNT",
         "Cache-Control",
         "X-Requested-With",
+        "X-CSRF-Token",  # Allow CSRF token header
     ],  # Specific headers only
+    expose_headers=["X-CSRF-Token"],  # Expose CSRF token to frontend
     max_age=600,  # Cache preflight requests for 10 minutes
 )
+
+# CSRF protection middleware (after CORS, before logging)
+app.add_middleware(CSRFMiddleware)
 
 # Logging middleware
 app.add_middleware(UserActivityLoggingMiddleware)

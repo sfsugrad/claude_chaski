@@ -1,0 +1,36 @@
+# ZAP Scan Rules Configuration for Chaski
+# Format: RULE_ID	ACTION	NOTES
+#
+# RULE_ID: ZAP alert/scanner ID
+# ACTION: IGNORE (suppress), WARN (demote to warning), FAIL (treat as failure)
+# NOTES: Explanation for why rule is configured this way
+#
+# Reference: https://www.zaproxy.org/docs/alerts/
+
+# Expected configurations (not security issues)
+10011	IGNORE	Cookie Without Secure Flag - Expected in development (HTTPS in production)
+10015	IGNORE	Incomplete or No Cache-control - API responses should not be cached
+10096	WARN	Timestamp Disclosure - Unix timestamps in responses are not sensitive
+
+# Already implemented security controls
+10021	WARN	X-Content-Type-Options Header Missing - Implemented in main.py
+10020	WARN	X-Frame-Options Header Missing - Implemented in main.py
+10098	WARN	Cross-Domain Misconfiguration - CORS properly configured for frontend
+
+# CSP-related (Next.js requirements)
+10055	WARN	CSP: Wildcard Directive - Required for Google Maps, OAuth
+10056	WARN	CSP: script-src unsafe-inline - Required for Next.js (nonce planned)
+10094	WARN	CSP: style-src unsafe-inline - Required for Next.js styling
+
+# Information disclosure (low priority)
+10027	WARN	Information Disclosure - Suspicious Comments - Code comments reviewed
+10109	WARN	Modern Web Application - Not a vulnerability
+
+# Session management (false positives with JWT cookies)
+10112	WARN	Session Fixation - Not applicable with JWT token rotation
+
+# Rate limiting (may not be detected)
+10110	IGNORE	Dangerous JS Functions - Validated and sanitized input
+
+# Authentication endpoints (expected behavior)
+# logout endpoint excluded from scan to prevent session termination

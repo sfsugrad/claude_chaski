@@ -1,0 +1,2200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chaski API Documentation</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --secondary: #64748b;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #06b6d4;
+            --bg: #f8fafc;
+            --bg-card: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --code-bg: #1e293b;
+            --sidebar-width: 280px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        /* Layout */
+        .container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--bg-card);
+            border-right: 1px solid var(--border);
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+            z-index: 100;
+        }
+
+        .sidebar-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border);
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+        }
+
+        .sidebar-header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .sidebar-header p {
+            font-size: 0.875rem;
+            opacity: 0.9;
+            margin-top: 0.25rem;
+        }
+
+        .sidebar-nav {
+            padding: 1rem 0;
+        }
+
+        .nav-section {
+            margin-bottom: 0.5rem;
+        }
+
+        .nav-section-title {
+            padding: 0.5rem 1.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+        }
+
+        .nav-link {
+            display: block;
+            padding: 0.5rem 1.5rem;
+            color: var(--text);
+            text-decoration: none;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        .nav-link:hover {
+            background: var(--bg);
+            border-left-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .nav-link.active {
+            background: #eff6ff;
+            border-left-color: var(--primary);
+            color: var(--primary);
+            font-weight: 500;
+        }
+
+        /* Main Content */
+        .main {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            padding: 2rem 3rem;
+            max-width: 1200px;
+        }
+
+        /* Sections */
+        section {
+            margin-bottom: 3rem;
+        }
+
+        h2 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--primary);
+            color: var(--text);
+        }
+
+        h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 1.5rem 0 0.75rem;
+            color: var(--text);
+        }
+
+        h4 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin: 1rem 0 0.5rem;
+            color: var(--secondary);
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: var(--text);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Method badges */
+        .method {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .method-get { background: #dbeafe; color: #1d4ed8; }
+        .method-post { background: #dcfce7; color: #16a34a; }
+        .method-put { background: #fef3c7; color: #d97706; }
+        .method-delete { background: #fee2e2; color: #dc2626; }
+        .method-patch { background: #f3e8ff; color: #9333ea; }
+
+        /* Endpoint path */
+        .endpoint-path {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.875rem;
+            color: var(--text);
+            font-weight: 500;
+        }
+
+        .endpoint-desc {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        /* Auth badge */
+        .auth-badge {
+            display: inline-block;
+            padding: 0.125rem 0.5rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .auth-required { background: #fef3c7; color: #92400e; }
+        .auth-none { background: #e2e8f0; color: #475569; }
+        .auth-admin { background: #fee2e2; color: #991b1b; }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.875rem;
+        }
+
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background: var(--bg);
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        tr:hover {
+            background: var(--bg);
+        }
+
+        /* Code blocks */
+        pre {
+            background: var(--code-bg);
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.8125rem;
+            line-height: 1.5;
+            margin: 1rem 0;
+        }
+
+        code {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            background: #f1f5f9;
+            padding: 0.125rem 0.375rem;
+            border-radius: 0.25rem;
+            font-size: 0.8125rem;
+            color: #be185d;
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            color: inherit;
+        }
+
+        /* Syntax highlighting */
+        .keyword { color: #c084fc; }
+        .string { color: #86efac; }
+        .number { color: #fcd34d; }
+        .comment { color: #64748b; }
+        .property { color: #7dd3fc; }
+
+        /* Lists */
+        ul, ol {
+            margin: 0.5rem 0 1rem 1.5rem;
+        }
+
+        li {
+            margin-bottom: 0.25rem;
+        }
+
+        /* Status colors */
+        .status-new { color: #64748b; }
+        .status-open { color: #2563eb; }
+        .status-selected { color: #7c3aed; }
+        .status-pending { color: #f59e0b; }
+        .status-transit { color: #06b6d4; }
+        .status-delivered { color: #22c55e; }
+        .status-canceled { color: #ef4444; }
+        .status-failed { color: #dc2626; }
+
+        /* Diagram */
+        .state-diagram {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.8125rem;
+            white-space: pre;
+            overflow-x: auto;
+            line-height: 1.8;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 1rem;
+        }
+
+        .tab {
+            padding: 0.75rem 1.25rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            color: var(--primary);
+        }
+
+        .tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Accordion */
+        .accordion {
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            margin-bottom: 0.5rem;
+            overflow: hidden;
+        }
+
+        .accordion-header {
+            padding: 1rem;
+            background: var(--bg-card);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transition: background 0.2s;
+        }
+
+        .accordion-header:hover {
+            background: var(--bg);
+        }
+
+        .accordion-body {
+            padding: 1rem;
+            border-top: 1px solid var(--border);
+            display: none;
+        }
+
+        .accordion.open .accordion-body {
+            display: block;
+        }
+
+        .accordion-icon {
+            transition: transform 0.2s;
+        }
+
+        .accordion.open .accordion-icon {
+            transform: rotate(90deg);
+        }
+
+        /* Feature grid */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1.25rem;
+        }
+
+        .feature-card h4 {
+            margin: 0 0 0.5rem;
+            color: var(--text);
+        }
+
+        .feature-card p {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin: 0;
+        }
+
+        /* Alert boxes */
+        .alert {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin: 1rem 0;
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .alert-info {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1e40af;
+        }
+
+        .alert-warning {
+            background: #fffbeb;
+            border: 1px solid #fde68a;
+            color: #92400e;
+        }
+
+        .alert-danger {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+        }
+
+        .alert-success {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #166534;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s;
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .main {
+                margin-left: 0;
+                padding: 1rem;
+            }
+        }
+
+        /* Schema definition */
+        .schema-def {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin: 0.5rem 0;
+        }
+
+        .schema-field {
+            display: flex;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .schema-field:last-child {
+            border-bottom: none;
+        }
+
+        .field-name {
+            font-family: monospace;
+            font-weight: 600;
+            color: var(--primary);
+            min-width: 200px;
+        }
+
+        .field-type {
+            font-family: monospace;
+            color: var(--success);
+            min-width: 150px;
+        }
+
+        .field-desc {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        .required {
+            color: var(--danger);
+            font-size: 0.75rem;
+            margin-left: 0.25rem;
+        }
+
+        /* Role badges */
+        .role-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .role-sender { background: #dbeafe; color: #1d4ed8; }
+        .role-courier { background: #dcfce7; color: #16a34a; }
+        .role-both { background: #f3e8ff; color: #9333ea; }
+        .role-admin { background: #fee2e2; color: #dc2626; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>📦 Chaski</h1>
+                <p>API Documentation v1.0</p>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">Getting Started</div>
+                    <a href="#overview" class="nav-link active">Overview</a>
+                    <a href="#architecture" class="nav-link">Architecture</a>
+                    <a href="#authentication" class="nav-link">Authentication</a>
+                    <a href="#quickstart" class="nav-link">Quick Start</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">API Reference</div>
+                    <a href="#auth-api" class="nav-link">Auth Endpoints</a>
+                    <a href="#packages-api" class="nav-link">Packages</a>
+                    <a href="#couriers-api" class="nav-link">Courier Routes</a>
+                    <a href="#matching-api" class="nav-link">Matching</a>
+                    <a href="#bids-api" class="nav-link">Bidding</a>
+                    <a href="#ratings-api" class="nav-link">Ratings</a>
+                    <a href="#messages-api" class="nav-link">Messages</a>
+                    <a href="#notes-api" class="nav-link">Package Notes</a>
+                    <a href="#delivery-proof-api" class="nav-link">Delivery Proof</a>
+                    <a href="#payments-api" class="nav-link">Payments</a>
+                    <a href="#admin-api" class="nav-link">Admin</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Data Models</div>
+                    <a href="#models" class="nav-link">Database Models</a>
+                    <a href="#enums" class="nav-link">Enums & Status</a>
+                    <a href="#state-machine" class="nav-link">Package States</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Features</div>
+                    <a href="#realtime" class="nav-link">Real-time Updates</a>
+                    <a href="#i18n" class="nav-link">Internationalization</a>
+                    <a href="#security" class="nav-link">Security</a>
+                    <a href="#logging" class="nav-link">Logging</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Development</div>
+                    <a href="#setup" class="nav-link">Environment Setup</a>
+                    <a href="#testing" class="nav-link">Testing</a>
+                    <a href="#migrations" class="nav-link">Migrations</a>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main">
+            <!-- Overview Section -->
+            <section id="overview">
+                <h2>Overview</h2>
+                <p>
+                    Chaski is a logistics platform connecting package senders with couriers traveling along the same route.
+                    Named after the Inca messengers, Chaski enables efficient package delivery by matching packages with travelers going the same way.
+                </p>
+
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>🔐 Secure Authentication</h4>
+                        <p>JWT tokens in httpOnly cookies, CSRF protection, account lockout, and OAuth support.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>📦 Package Management</h4>
+                        <p>Full CRUD operations, status tracking, bidding system, and delivery proof.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🗺️ Smart Matching</h4>
+                        <p>Geospatial matching algorithm using haversine distance calculations.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>💳 Stripe Payments</h4>
+                        <p>Integrated payment processing with escrow and courier payouts.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🔔 Real-time Updates</h4>
+                        <p>WebSocket notifications for instant updates on packages and messages.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🌐 Multi-language</h4>
+                        <p>Internationalization support for English, French, and Spanish.</p>
+                    </div>
+                </div>
+
+                <h3>Tech Stack</h3>
+                <table>
+                    <tr>
+                        <th>Backend</th>
+                        <td>FastAPI, PostgreSQL + PostGIS, SQLAlchemy, Redis, Stripe, AWS S3, Twilio</td>
+                    </tr>
+                    <tr>
+                        <th>Frontend</th>
+                        <td>Next.js 14, TypeScript, Tailwind CSS, Axios, next-intl</td>
+                    </tr>
+                    <tr>
+                        <th>Testing</th>
+                        <td>Pytest (backend), Jest + React Testing Library (frontend), Playwright (E2E)</td>
+                    </tr>
+                </table>
+            </section>
+
+            <!-- Architecture Section -->
+            <section id="architecture">
+                <h2>Architecture</h2>
+
+                <h3>Backend Structure</h3>
+                <pre><code>backend/
+├── main.py                 <span class="comment"># FastAPI app with middleware stack</span>
+├── app/
+│   ├── config.py          <span class="comment"># Environment settings (pydantic-settings)</span>
+│   ├── database.py        <span class="comment"># SQLAlchemy connection</span>
+│   ├── models/            <span class="comment"># SQLAlchemy models</span>
+│   │   ├── user.py        <span class="comment"># User, roles, lockout, verification</span>
+│   │   ├── package.py     <span class="comment"># Package, CourierRoute</span>
+│   │   ├── bid.py         <span class="comment"># CourierBid</span>
+│   │   ├── rating.py      <span class="comment"># Rating</span>
+│   │   ├── message.py     <span class="comment"># Message</span>
+│   │   └── ...
+│   ├── routes/            <span class="comment"># API endpoints</span>
+│   │   ├── auth.py        <span class="comment"># Authentication</span>
+│   │   ├── packages.py    <span class="comment"># Package CRUD</span>
+│   │   ├── couriers.py    <span class="comment"># Route management</span>
+│   │   ├── bids.py        <span class="comment"># Bidding system</span>
+│   │   ├── admin.py       <span class="comment"># Admin operations</span>
+│   │   └── ...
+│   ├── services/          <span class="comment"># Business logic</span>
+│   │   ├── package_status.py   <span class="comment"># State machine</span>
+│   │   ├── auth_security.py    <span class="comment"># Login tracking</span>
+│   │   ├── stripe_service.py   <span class="comment"># Payments</span>
+│   │   └── ...
+│   ├── utils/             <span class="comment"># Shared utilities</span>
+│   │   ├── auth.py        <span class="comment"># JWT, password hashing</span>
+│   │   ├── csrf.py        <span class="comment"># CSRF protection</span>
+│   │   ├── encryption.py  <span class="comment"># PII encryption</span>
+│   │   └── ...
+│   └── middleware/        <span class="comment"># CSRF, logging, performance</span>
+├── migrations/            <span class="comment"># Database migrations</span>
+└── tests/                 <span class="comment"># Pytest tests</span></code></pre>
+
+                <h3>Frontend Structure</h3>
+                <pre><code>frontend/
+├── app/
+│   └── [locale]/          <span class="comment"># i18n locale routing</span>
+│       ├── page.tsx       <span class="comment"># Home page</span>
+│       ├── login/         <span class="comment"># Login page</span>
+│       ├── register/      <span class="comment"># Registration</span>
+│       ├── dashboard/     <span class="comment"># User dashboard</span>
+│       ├── packages/      <span class="comment"># Package management</span>
+│       ├── admin/         <span class="comment"># Admin dashboard</span>
+│       └── ...
+├── components/            <span class="comment"># Reusable components</span>
+├── lib/
+│   ├── api.ts            <span class="comment"># Centralized API client</span>
+│   └── logger.ts         <span class="comment"># Error logging</span>
+├── hooks/                <span class="comment"># Custom React hooks</span>
+├── contexts/             <span class="comment"># React contexts</span>
+└── messages/             <span class="comment"># i18n translations</span></code></pre>
+            </section>
+
+            <!-- Authentication Section -->
+            <section id="authentication">
+                <h2>Authentication</h2>
+
+                <p>Chaski uses JWT tokens stored in httpOnly cookies with CSRF protection for secure authentication.</p>
+
+                <h3>Authentication Flow</h3>
+                <div class="card">
+                    <ol>
+                        <li><strong>Login:</strong> POST credentials to <code>/api/auth/login</code></li>
+                        <li><strong>Token Storage:</strong> JWT set in httpOnly cookie by server</li>
+                        <li><strong>CSRF Token:</strong> Returned in <code>X-CSRF-Token</code> header and cookie</li>
+                        <li><strong>Authenticated Requests:</strong> Include <code>X-CSRF-Token</code> header for state-changing requests</li>
+                        <li><strong>Token Refresh:</strong> Automatic via cookie on each request</li>
+                    </ol>
+                </div>
+
+                <h3>User Roles</h3>
+                <table>
+                    <tr>
+                        <th>Role</th>
+                        <th>Description</th>
+                        <th>Capabilities</th>
+                    </tr>
+                    <tr>
+                        <td><span class="role-badge role-sender">sender</span></td>
+                        <td>Package sender</td>
+                        <td>Create packages, select bids, rate couriers</td>
+                    </tr>
+                    <tr>
+                        <td><span class="role-badge role-courier">courier</span></td>
+                        <td>Package courier</td>
+                        <td>Create routes, place bids, deliver packages</td>
+                    </tr>
+                    <tr>
+                        <td><span class="role-badge role-both">both</span></td>
+                        <td>Sender + Courier</td>
+                        <td>All sender and courier capabilities</td>
+                    </tr>
+                    <tr>
+                        <td><span class="role-badge role-admin">admin</span></td>
+                        <td>Administrator</td>
+                        <td>Full platform management, audit logs</td>
+                    </tr>
+                </table>
+
+                <h3>Security Features</h3>
+                <div class="alert alert-info">
+                    <span>ℹ️</span>
+                    <div>
+                        <strong>Account Lockout:</strong> After 5 failed login attempts, account is locked for 15 minutes.
+                    </div>
+                </div>
+                <ul>
+                    <li><strong>CSRF Protection:</strong> Double-submit cookie pattern</li>
+                    <li><strong>Password Hashing:</strong> Bcrypt with salt</li>
+                    <li><strong>JWT Blacklisting:</strong> Tokens invalidated on logout</li>
+                    <li><strong>PII Encryption:</strong> Fernet encryption for sensitive fields</li>
+                    <li><strong>Rate Limiting:</strong> Registration (5/min), Login (100/min), Password reset (3/min)</li>
+                </ul>
+            </section>
+
+            <!-- Quick Start Section -->
+            <section id="quickstart">
+                <h2>Quick Start</h2>
+
+                <h3>Backend Setup</h3>
+                <pre><code><span class="comment"># Navigate to backend</span>
+cd backend
+
+<span class="comment"># Create virtual environment</span>
+python3 -m venv venv
+source venv/bin/activate
+
+<span class="comment"># Install dependencies</span>
+pip install -r requirements.txt
+
+<span class="comment"># Copy environment file</span>
+cp .env.example .env
+<span class="comment"># Edit .env with your configuration</span>
+
+<span class="comment"># Run development server</span>
+uvicorn main:app --reload --port 8000</code></pre>
+
+                <h3>Frontend Setup</h3>
+                <pre><code><span class="comment"># Navigate to frontend</span>
+cd frontend
+
+<span class="comment"># Install dependencies</span>
+npm install
+
+<span class="comment"># Copy environment file</span>
+cp .env.example .env.local
+
+<span class="comment"># Run development server</span>
+npm run dev</code></pre>
+
+                <h3>Environment Variables</h3>
+                <h4>Backend (.env)</h4>
+                <pre><code><span class="comment"># Database</span>
+DATABASE_URL=postgresql://user:pass@localhost:5432/chaski_db
+
+<span class="comment"># JWT</span>
+SECRET_KEY=your-secret-key
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+<span class="comment"># Encryption</span>
+ENCRYPTION_KEY=your-fernet-key
+
+<span class="comment"># Email</span>
+MAIL_USERNAME=your-email@gmail.com
+MAIL_PASSWORD=your-app-password
+MAIL_SERVER=smtp.gmail.com
+
+<span class="comment"># Frontend URL</span>
+FRONTEND_URL=http://localhost:3000</code></pre>
+
+                <h4>Frontend (.env.local)</h4>
+                <pre><code>NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_GOOGLE_PLACES_API_KEY=your-key</code></pre>
+            </section>
+
+            <!-- Auth API Section -->
+            <section id="auth-api">
+                <h2>Auth Endpoints</h2>
+                <p>Authentication and user management endpoints.</p>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-post">POST</span>
+                        <span class="endpoint-path">/api/auth/register</span>
+                        <span class="auth-badge auth-none">No Auth</span>
+                    </div>
+                    <p class="endpoint-desc">Register a new user account.</p>
+                    <h4>Request Body</h4>
+                    <div class="schema-def">
+                        <div class="schema-field">
+                            <span class="field-name">email<span class="required">*</span></span>
+                            <span class="field-type">string</span>
+                            <span class="field-desc">Valid email address</span>
+                        </div>
+                        <div class="schema-field">
+                            <span class="field-name">password<span class="required">*</span></span>
+                            <span class="field-type">string</span>
+                            <span class="field-desc">Min 8 characters</span>
+                        </div>
+                        <div class="schema-field">
+                            <span class="field-name">full_name<span class="required">*</span></span>
+                            <span class="field-type">string</span>
+                            <span class="field-desc">User's full name</span>
+                        </div>
+                        <div class="schema-field">
+                            <span class="field-name">role<span class="required">*</span></span>
+                            <span class="field-type">enum</span>
+                            <span class="field-desc">sender | courier | both</span>
+                        </div>
+                        <div class="schema-field">
+                            <span class="field-name">phone_number<span class="required">*</span></span>
+                            <span class="field-type">string</span>
+                            <span class="field-desc">E.164 format (+1234567890)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-post">POST</span>
+                        <span class="endpoint-path">/api/auth/login</span>
+                        <span class="auth-badge auth-none">No Auth</span>
+                    </div>
+                    <p class="endpoint-desc">Login and receive JWT token in httpOnly cookie.</p>
+                    <h4>Request Body</h4>
+                    <div class="schema-def">
+                        <div class="schema-field">
+                            <span class="field-name">email<span class="required">*</span></span>
+                            <span class="field-type">string</span>
+                            <span class="field-desc">User email</span>
+                        </div>
+                        <div class="schema-field">
+                            <span class="field-name">password<span class="required">*</span></span>
+                            <span class="field-type">string</span>
+                            <span class="field-desc">User password</span>
+                        </div>
+                        <div class="schema-field">
+                            <span class="field-name">remember_me</span>
+                            <span class="field-type">boolean</span>
+                            <span class="field-desc">Extend token to 7 days</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/auth/me</span>
+                        <span class="auth-badge auth-required">Auth Required</span>
+                    </div>
+                    <p class="endpoint-desc">Get current authenticated user profile.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-put">PUT</span>
+                        <span class="endpoint-path">/api/auth/me</span>
+                        <span class="auth-badge auth-required">Auth Required</span>
+                    </div>
+                    <p class="endpoint-desc">Update current user profile.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-post">POST</span>
+                        <span class="endpoint-path">/api/auth/logout</span>
+                        <span class="auth-badge auth-required">Auth Required</span>
+                    </div>
+                    <p class="endpoint-desc">Logout and blacklist current token.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/auth/verify-email/{token}</span>
+                        <span class="auth-badge auth-none">No Auth</span>
+                    </div>
+                    <p class="endpoint-desc">Verify email address with token from registration email.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-post">POST</span>
+                        <span class="endpoint-path">/api/auth/forgot-password</span>
+                        <span class="auth-badge auth-none">No Auth</span>
+                    </div>
+                    <p class="endpoint-desc">Request password reset email.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-post">POST</span>
+                        <span class="endpoint-path">/api/auth/reset-password</span>
+                        <span class="auth-badge auth-none">No Auth</span>
+                    </div>
+                    <p class="endpoint-desc">Reset password with token.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-post">POST</span>
+                        <span class="endpoint-path">/api/auth/phone/send-code</span>
+                        <span class="auth-badge auth-required">Auth Required</span>
+                    </div>
+                    <p class="endpoint-desc">Send SMS verification code. Rate limited: 3/minute.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-post">POST</span>
+                        <span class="endpoint-path">/api/auth/phone/verify</span>
+                        <span class="auth-badge auth-required">Auth Required</span>
+                    </div>
+                    <p class="endpoint-desc">Verify phone with 6-digit code.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/auth/google/login</span>
+                        <span class="auth-badge auth-none">No Auth</span>
+                    </div>
+                    <p class="endpoint-desc">Initiate Google OAuth flow.</p>
+                </div>
+            </section>
+
+            <!-- Packages API Section -->
+            <section id="packages-api">
+                <h2>Package Endpoints</h2>
+                <p>Package creation and management for senders.</p>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-post">POST</span>
+                        <span class="endpoint-path">/api/packages</span>
+                        <span class="auth-badge auth-required">Sender/Both/Admin</span>
+                    </div>
+                    <p class="endpoint-desc">Create a new package.</p>
+                    <h4>Request Body</h4>
+                    <div class="schema-def">
+                        <div class="schema-field">
+                            <span class="field-name">description<span class="required">*</span></span>
+                            <span class="field-type">string</span>
+                            <span class="field-desc">Package description (max 500 chars)</span>
+                        </div>
+                        <div class="schema-field">
+                            <span class="field-name">size<span class="required">*</span></span>
+                            <span class="field-type">enum</span>
+                            <span class="field-desc">small | medium | large | extra_large</span>
+                        </div>
+                        <div class="schema-field">
+                            <span class="field-name">weight_kg<span class="required">*</span></span>
+                            <span class="field-type">float</span>
+                            <span class="field-desc">Weight in kg (0-1000)</span>
+                        </div>
+                        <div class="schema-field">
+                            <span class="field-name">pickup_address<span class="required">*</span></span>
+                            <span class="field-type">string</span>
+                            <span class="field-desc">Full pickup address</span>
+                        </div>
+                        <div class="schema-field">
+                            <span class="field-name">pickup_lat, pickup_lng<span class="required">*</span></span>
+                            <span class="field-type">float</span>
+                            <span class="field-desc">Pickup coordinates</span>
+                        </div>
+                        <div class="schema-field">
+                            <span class="field-name">dropoff_address<span class="required">*</span></span>
+                            <span class="field-type">string</span>
+                            <span class="field-desc">Full dropoff address</span>
+                        </div>
+                        <div class="schema-field">
+                            <span class="field-name">dropoff_lat, dropoff_lng<span class="required">*</span></span>
+                            <span class="field-type">float</span>
+                            <span class="field-desc">Dropoff coordinates</span>
+                        </div>
+                        <div class="schema-field">
+                            <span class="field-name">price</span>
+                            <span class="field-type">float</span>
+                            <span class="field-desc">Offered price (optional)</span>
+                        </div>
+                        <div class="schema-field">
+                            <span class="field-name">requires_proof</span>
+                            <span class="field-type">boolean</span>
+                            <span class="field-desc">Require delivery proof (default: true)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/packages</span>
+                        <span class="auth-badge auth-required">Auth Required</span>
+                    </div>
+                    <p class="endpoint-desc">Get all packages. Senders see their packages, couriers see assigned packages.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/packages/{tracking_id}</span>
+                        <span class="auth-badge auth-required">Auth Required</span>
+                    </div>
+                    <p class="endpoint-desc">Get specific package by tracking ID.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-put">PUT</span>
+                        <span class="endpoint-path">/api/packages/{tracking_id}</span>
+                        <span class="auth-badge auth-required">Sender Only</span>
+                    </div>
+                    <p class="endpoint-desc">Update package details. Only allowed for NEW or OPEN_FOR_BIDS status.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-put">PUT</span>
+                        <span class="endpoint-path">/api/packages/{tracking_id}/status</span>
+                        <span class="auth-badge auth-required">Assigned Courier</span>
+                    </div>
+                    <p class="endpoint-desc">Update package status. Only assigned courier can update.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-put">PUT</span>
+                        <span class="endpoint-path">/api/packages/{tracking_id}/cancel</span>
+                        <span class="auth-badge auth-required">Sender/Admin</span>
+                    </div>
+                    <p class="endpoint-desc">Cancel a package. Cannot cancel IN_TRANSIT or terminal status.</p>
+                </div>
+            </section>
+
+            <!-- Courier Routes API Section -->
+            <section id="couriers-api">
+                <h2>Courier Route Endpoints</h2>
+                <p>Route management for couriers.</p>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-post">POST</span>
+                        <span class="endpoint-path">/api/couriers/routes</span>
+                        <span class="auth-badge auth-required">Courier/Both</span>
+                    </div>
+                    <p class="endpoint-desc">Create a new courier route.</p>
+                    <h4>Request Body</h4>
+                    <div class="schema-def">
+                        <div class="schema-field">
+                            <span class="field-name">start_address<span class="required">*</span></span>
+                            <span class="field-type">string</span>
+                            <span class="field-desc">Starting point address</span>
+                        </div>
+                        <div class="schema-field">
+                            <span class="field-name">start_lat, start_lng<span class="required">*</span></span>
+                            <span class="field-type">float</span>
+                            <span class="field-desc">Start coordinates</span>
+                        </div>
+                        <div class="schema-field">
+                            <span class="field-name">end_address<span class="required">*</span></span>
+                            <span class="field-type">string</span>
+                            <span class="field-desc">Destination address</span>
+                        </div>
+                        <div class="schema-field">
+                            <span class="field-name">end_lat, end_lng<span class="required">*</span></span>
+                            <span class="field-type">float</span>
+                            <span class="field-desc">End coordinates</span>
+                        </div>
+                        <div class="schema-field">
+                            <span class="field-name">max_deviation_km</span>
+                            <span class="field-type">integer</span>
+                            <span class="field-desc">Max detour distance (default: 5km)</span>
+                        </div>
+                        <div class="schema-field">
+                            <span class="field-name">departure_time</span>
+                            <span class="field-type">datetime</span>
+                            <span class="field-desc">Planned departure time</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/couriers/routes</span>
+                        <span class="auth-badge auth-required">Courier/Both</span>
+                    </div>
+                    <p class="endpoint-desc">Get all routes for current courier. Use <code>?active_only=true</code> to filter.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/couriers/routes/{route_id}</span>
+                        <span class="auth-badge auth-required">Courier/Both</span>
+                    </div>
+                    <p class="endpoint-desc">Get specific route details.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-put">PUT</span>
+                        <span class="endpoint-path">/api/couriers/routes/{route_id}</span>
+                        <span class="auth-badge auth-required">Courier/Both</span>
+                    </div>
+                    <p class="endpoint-desc">Update route details.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-delete">DELETE</span>
+                        <span class="endpoint-path">/api/couriers/routes/{route_id}</span>
+                        <span class="auth-badge auth-required">Courier/Both</span>
+                    </div>
+                    <p class="endpoint-desc">Deactivate a route (soft delete).</p>
+                </div>
+            </section>
+
+            <!-- Matching API Section -->
+            <section id="matching-api">
+                <h2>Matching Endpoints</h2>
+                <p>Package-courier matching algorithm endpoints.</p>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/couriers/matching/packages-along-route/{route_id}</span>
+                        <span class="auth-badge auth-required">Courier/Both</span>
+                    </div>
+                    <p class="endpoint-desc">Find packages that match the courier's route based on geospatial proximity.</p>
+                    <h4>Response includes:</h4>
+                    <ul>
+                        <li>Package details with sender info</li>
+                        <li><code>distance_from_route_km</code> - How far the package is from the route</li>
+                        <li><code>estimated_detour_km</code> - Additional distance for pickup/dropoff</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/couriers/matching/optimized-route/{route_id}</span>
+                        <span class="auth-badge auth-required">Courier/Both</span>
+                    </div>
+                    <p class="endpoint-desc">Get optimized order for picking up and delivering multiple packages.</p>
+                </div>
+            </section>
+
+            <!-- Bidding API Section -->
+            <section id="bids-api">
+                <h2>Bidding Endpoints</h2>
+                <p>Courier bid submission and selection system.</p>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-post">POST</span>
+                        <span class="endpoint-path">/api/bids</span>
+                        <span class="auth-badge auth-required">Courier/Both</span>
+                    </div>
+                    <p class="endpoint-desc">Submit a bid on a package.</p>
+                    <h4>Request Body</h4>
+                    <div class="schema-def">
+                        <div class="schema-field">
+                            <span class="field-name">tracking_id<span class="required">*</span></span>
+                            <span class="field-type">string</span>
+                            <span class="field-desc">Package tracking ID</span>
+                        </div>
+                        <div class="schema-field">
+                            <span class="field-name">proposed_price<span class="required">*</span></span>
+                            <span class="field-type">float</span>
+                            <span class="field-desc">Proposed delivery price (> 0)</span>
+                        </div>
+                        <div class="schema-field">
+                            <span class="field-name">estimated_delivery_hours</span>
+                            <span class="field-type">integer</span>
+                            <span class="field-desc">Estimated delivery time</span>
+                        </div>
+                        <div class="schema-field">
+                            <span class="field-name">message</span>
+                            <span class="field-type">string</span>
+                            <span class="field-desc">Message to sender (max 500 chars)</span>
+                        </div>
+                        <div class="schema-field">
+                            <span class="field-name">route_id</span>
+                            <span class="field-type">integer</span>
+                            <span class="field-desc">Associated route (optional)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/bids/my-bids</span>
+                        <span class="auth-badge auth-required">Courier/Both</span>
+                    </div>
+                    <p class="endpoint-desc">Get all bids placed by current courier. Filter with <code>?status=pending</code>.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/bids/package/{tracking_id}</span>
+                        <span class="auth-badge auth-required">Auth Required</span>
+                    </div>
+                    <p class="endpoint-desc">Get all bids for a package. Senders see all bids, couriers see only their own.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-post">POST</span>
+                        <span class="endpoint-path">/api/bids/{bid_id}/select</span>
+                        <span class="auth-badge auth-required">Package Sender</span>
+                    </div>
+                    <p class="endpoint-desc">Select winning bid. Package status changes to BID_SELECTED.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-delete">DELETE</span>
+                        <span class="endpoint-path">/api/bids/{bid_id}</span>
+                        <span class="auth-badge auth-required">Bid Owner</span>
+                    </div>
+                    <p class="endpoint-desc">Withdraw a pending bid.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-post">POST</span>
+                        <span class="endpoint-path">/api/bids/{bid_id}/confirm-pickup</span>
+                        <span class="auth-badge auth-required">Bid Owner</span>
+                    </div>
+                    <p class="endpoint-desc">Confirm package pickup. Status changes to PENDING_PICKUP.</p>
+                </div>
+            </section>
+
+            <!-- Ratings API Section -->
+            <section id="ratings-api">
+                <h2>Rating Endpoints</h2>
+                <p>Post-delivery rating and review system.</p>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-post">POST</span>
+                        <span class="endpoint-path">/api/ratings</span>
+                        <span class="auth-badge auth-required">Auth Required</span>
+                    </div>
+                    <p class="endpoint-desc">Create a rating for a delivered package.</p>
+                    <h4>Request Body</h4>
+                    <div class="schema-def">
+                        <div class="schema-field">
+                            <span class="field-name">tracking_id<span class="required">*</span></span>
+                            <span class="field-type">string</span>
+                            <span class="field-desc">Package tracking ID</span>
+                        </div>
+                        <div class="schema-field">
+                            <span class="field-name">score<span class="required">*</span></span>
+                            <span class="field-type">integer</span>
+                            <span class="field-desc">Rating score (1-5)</span>
+                        </div>
+                        <div class="schema-field">
+                            <span class="field-name">comment</span>
+                            <span class="field-type">string</span>
+                            <span class="field-desc">Review comment (max 1000 chars)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/ratings/user/{user_id}</span>
+                        <span class="auth-badge auth-required">Auth Required</span>
+                    </div>
+                    <p class="endpoint-desc">Get paginated ratings for a user.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/ratings/user/{user_id}/summary</span>
+                        <span class="auth-badge auth-required">Auth Required</span>
+                    </div>
+                    <p class="endpoint-desc">Get rating summary with average, total count, and breakdown by score.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/ratings/my-pending</span>
+                        <span class="auth-badge auth-required">Auth Required</span>
+                    </div>
+                    <p class="endpoint-desc">Get delivered packages that haven't been rated yet.</p>
+                </div>
+            </section>
+
+            <!-- Messages API Section -->
+            <section id="messages-api">
+                <h2>Message Endpoints</h2>
+                <p>In-app messaging between sender and courier.</p>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/messages/conversations</span>
+                        <span class="auth-badge auth-required">Auth Required</span>
+                    </div>
+                    <p class="endpoint-desc">Get all conversations with last message and unread count.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/messages/unread-count</span>
+                        <span class="auth-badge auth-required">Auth Required</span>
+                    </div>
+                    <p class="endpoint-desc">Get total unread message count.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/messages/package/{tracking_id}</span>
+                        <span class="auth-badge auth-required">Auth Required</span>
+                    </div>
+                    <p class="endpoint-desc">Get messages for a specific package conversation.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-post">POST</span>
+                        <span class="endpoint-path">/api/messages/package/{tracking_id}</span>
+                        <span class="auth-badge auth-required">Auth Required</span>
+                    </div>
+                    <p class="endpoint-desc">Send a message in package conversation.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-put">PUT</span>
+                        <span class="endpoint-path">/api/messages/{message_id}/read</span>
+                        <span class="auth-badge auth-required">Auth Required</span>
+                    </div>
+                    <p class="endpoint-desc">Mark a message as read.</p>
+                </div>
+            </section>
+
+            <!-- Notes API Section -->
+            <section id="notes-api">
+                <h2>Package Notes Endpoints</h2>
+                <p>Notes attached to packages for sender-courier communication.</p>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/notes/{tracking_id}/notes</span>
+                        <span class="auth-badge auth-required">Sender/Courier/Admin</span>
+                    </div>
+                    <p class="endpoint-desc">Get all notes for a package.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-post">POST</span>
+                        <span class="endpoint-path">/api/notes/{tracking_id}/notes</span>
+                        <span class="auth-badge auth-required">Sender Only</span>
+                    </div>
+                    <p class="endpoint-desc">Add a note to a package.</p>
+                </div>
+            </section>
+
+            <!-- Delivery Proof API Section -->
+            <section id="delivery-proof-api">
+                <h2>Delivery Proof Endpoints</h2>
+                <p>Photo and signature proof of delivery.</p>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-post">POST</span>
+                        <span class="endpoint-path">/api/delivery-proof/upload-url</span>
+                        <span class="auth-badge auth-required">Auth Required</span>
+                    </div>
+                    <p class="endpoint-desc">Get pre-signed S3 URL for file upload.</p>
+                    <h4>Request Body</h4>
+                    <div class="schema-def">
+                        <div class="schema-field">
+                            <span class="field-name">file_type<span class="required">*</span></span>
+                            <span class="field-type">enum</span>
+                            <span class="field-desc">photo | signature</span>
+                        </div>
+                        <div class="schema-field">
+                            <span class="field-name">content_type<span class="required">*</span></span>
+                            <span class="field-type">string</span>
+                            <span class="field-desc">MIME type (image/jpeg, image/png)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-post">POST</span>
+                        <span class="endpoint-path">/api/delivery-proof/{tracking_id}</span>
+                        <span class="auth-badge auth-required">Assigned Courier</span>
+                    </div>
+                    <p class="endpoint-desc">Submit delivery proof with photo/signature.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/delivery-proof/{tracking_id}</span>
+                        <span class="auth-badge auth-required">Auth Required</span>
+                    </div>
+                    <p class="endpoint-desc">Get delivery proof for a package.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-post">POST</span>
+                        <span class="endpoint-path">/api/delivery-proof/{tracking_id}/verify</span>
+                        <span class="auth-badge auth-admin">Admin Only</span>
+                    </div>
+                    <p class="endpoint-desc">Verify delivery proof.</p>
+                </div>
+            </section>
+
+            <!-- Payments API Section -->
+            <section id="payments-api">
+                <h2>Payment Endpoints</h2>
+                <p>Stripe payment integration for package delivery.</p>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-post">POST</span>
+                        <span class="endpoint-path">/api/payments/setup-intent</span>
+                        <span class="auth-badge auth-required">Auth Required</span>
+                    </div>
+                    <p class="endpoint-desc">Create Stripe SetupIntent for saving payment method.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-post">POST</span>
+                        <span class="endpoint-path">/api/payments/payment-methods</span>
+                        <span class="auth-badge auth-required">Auth Required</span>
+                    </div>
+                    <p class="endpoint-desc">Save a payment method.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/payments/payment-methods</span>
+                        <span class="auth-badge auth-required">Auth Required</span>
+                    </div>
+                    <p class="endpoint-desc">Get saved payment methods.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-post">POST</span>
+                        <span class="endpoint-path">/api/payments/charge/{tracking_id}</span>
+                        <span class="auth-badge auth-required">Sender</span>
+                    </div>
+                    <p class="endpoint-desc">Charge for package delivery.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-post">POST</span>
+                        <span class="endpoint-path">/api/payments/refund/{tracking_id}</span>
+                        <span class="auth-badge auth-required">Admin/Sender</span>
+                    </div>
+                    <p class="endpoint-desc">Refund a payment.</p>
+                </div>
+            </section>
+
+            <!-- Admin API Section -->
+            <section id="admin-api">
+                <h2>Admin Endpoints</h2>
+                <p>Administrative operations. All endpoints require admin role.</p>
+
+                <h3>User Management</h3>
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/admin/users</span>
+                        <span class="auth-badge auth-admin">Admin Only</span>
+                    </div>
+                    <p class="endpoint-desc">Get all users with pagination. Supports search and role filter.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-post">POST</span>
+                        <span class="endpoint-path">/api/admin/users</span>
+                        <span class="auth-badge auth-admin">Admin Only</span>
+                    </div>
+                    <p class="endpoint-desc">Create a new user with any role.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-put">PUT</span>
+                        <span class="endpoint-path">/api/admin/users/{user_id}</span>
+                        <span class="auth-badge auth-admin">Admin Only</span>
+                    </div>
+                    <p class="endpoint-desc">Update user role.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-put">PUT</span>
+                        <span class="endpoint-path">/api/admin/users/{user_id}/toggle-active</span>
+                        <span class="auth-badge auth-admin">Admin Only</span>
+                    </div>
+                    <p class="endpoint-desc">Activate or deactivate user account.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-delete">DELETE</span>
+                        <span class="endpoint-path">/api/admin/users/{user_id}</span>
+                        <span class="auth-badge auth-admin">Admin Only</span>
+                    </div>
+                    <p class="endpoint-desc">Delete a user. Cannot delete self.</p>
+                </div>
+
+                <h3>Package Management</h3>
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/admin/packages</span>
+                        <span class="auth-badge auth-admin">Admin Only</span>
+                    </div>
+                    <p class="endpoint-desc">Get all packages with pagination. Filter by status and active state.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-post">POST</span>
+                        <span class="endpoint-path">/api/admin/packages/{package_id}/fail</span>
+                        <span class="auth-badge auth-admin">Admin Only</span>
+                    </div>
+                    <p class="endpoint-desc">Mark package as failed.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-post">POST</span>
+                        <span class="endpoint-path">/api/admin/packages/{package_id}/retry</span>
+                        <span class="auth-badge auth-admin">Admin Only</span>
+                    </div>
+                    <p class="endpoint-desc">Retry a failed package (returns to OPEN_FOR_BIDS).</p>
+                </div>
+
+                <h3>Analytics & Audit</h3>
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/admin/stats</span>
+                        <span class="auth-badge auth-admin">Admin Only</span>
+                    </div>
+                    <p class="endpoint-desc">Get platform statistics (users, packages, revenue).</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/admin/audit-logs</span>
+                        <span class="auth-badge auth-admin">Admin Only</span>
+                    </div>
+                    <p class="endpoint-desc">Get audit logs with filtering by action, user, resource.</p>
+                </div>
+            </section>
+
+            <!-- Database Models Section -->
+            <section id="models">
+                <h2>Database Models</h2>
+
+                <h3>User</h3>
+                <div class="schema-def">
+                    <div class="schema-field">
+                        <span class="field-name">id</span>
+                        <span class="field-type">integer (PK)</span>
+                        <span class="field-desc">Auto-increment primary key</span>
+                    </div>
+                    <div class="schema-field">
+                        <span class="field-name">email</span>
+                        <span class="field-type">string (unique)</span>
+                        <span class="field-desc">User email address</span>
+                    </div>
+                    <div class="schema-field">
+                        <span class="field-name">hashed_password</span>
+                        <span class="field-type">string</span>
+                        <span class="field-desc">Bcrypt hashed password</span>
+                    </div>
+                    <div class="schema-field">
+                        <span class="field-name">full_name</span>
+                        <span class="field-type">string</span>
+                        <span class="field-desc">User's full name</span>
+                    </div>
+                    <div class="schema-field">
+                        <span class="field-name">phone_number</span>
+                        <span class="field-type">string</span>
+                        <span class="field-desc">E.164 format</span>
+                    </div>
+                    <div class="schema-field">
+                        <span class="field-name">role</span>
+                        <span class="field-type">enum</span>
+                        <span class="field-desc">SENDER, COURIER, BOTH, ADMIN</span>
+                    </div>
+                    <div class="schema-field">
+                        <span class="field-name">is_active</span>
+                        <span class="field-type">boolean</span>
+                        <span class="field-desc">Account active status</span>
+                    </div>
+                    <div class="schema-field">
+                        <span class="field-name">is_verified</span>
+                        <span class="field-type">boolean</span>
+                        <span class="field-desc">Email verification status</span>
+                    </div>
+                    <div class="schema-field">
+                        <span class="field-name">phone_verified</span>
+                        <span class="field-type">boolean</span>
+                        <span class="field-desc">Phone verification status</span>
+                    </div>
+                    <div class="schema-field">
+                        <span class="field-name">account_locked_until</span>
+                        <span class="field-type">datetime</span>
+                        <span class="field-desc">Lockout expiration (nullable)</span>
+                    </div>
+                    <div class="schema-field">
+                        <span class="field-name">max_deviation_km</span>
+                        <span class="field-type">integer</span>
+                        <span class="field-desc">Default route deviation (couriers)</span>
+                    </div>
+                </div>
+
+                <h3>Package</h3>
+                <div class="schema-def">
+                    <div class="schema-field">
+                        <span class="field-name">id</span>
+                        <span class="field-type">integer (PK)</span>
+                        <span class="field-desc">Auto-increment primary key</span>
+                    </div>
+                    <div class="schema-field">
+                        <span class="field-name">tracking_id</span>
+                        <span class="field-type">string (unique)</span>
+                        <span class="field-desc">Format: xxxx-xxxx-xxxx-xxxx</span>
+                    </div>
+                    <div class="schema-field">
+                        <span class="field-name">sender_id</span>
+                        <span class="field-type">integer (FK)</span>
+                        <span class="field-desc">Reference to User</span>
+                    </div>
+                    <div class="schema-field">
+                        <span class="field-name">courier_id</span>
+                        <span class="field-type">integer (FK, nullable)</span>
+                        <span class="field-desc">Assigned courier</span>
+                    </div>
+                    <div class="schema-field">
+                        <span class="field-name">description</span>
+                        <span class="field-type">text</span>
+                        <span class="field-desc">Package description</span>
+                    </div>
+                    <div class="schema-field">
+                        <span class="field-name">size</span>
+                        <span class="field-type">enum</span>
+                        <span class="field-desc">SMALL, MEDIUM, LARGE, EXTRA_LARGE</span>
+                    </div>
+                    <div class="schema-field">
+                        <span class="field-name">weight_kg</span>
+                        <span class="field-type">float</span>
+                        <span class="field-desc">Weight in kilograms</span>
+                    </div>
+                    <div class="schema-field">
+                        <span class="field-name">status</span>
+                        <span class="field-type">enum</span>
+                        <span class="field-desc">Package status (see state machine)</span>
+                    </div>
+                    <div class="schema-field">
+                        <span class="field-name">pickup_address, pickup_lat, pickup_lng</span>
+                        <span class="field-type">string, float, float</span>
+                        <span class="field-desc">Pickup location</span>
+                    </div>
+                    <div class="schema-field">
+                        <span class="field-name">dropoff_address, dropoff_lat, dropoff_lng</span>
+                        <span class="field-type">string, float, float</span>
+                        <span class="field-desc">Dropoff location</span>
+                    </div>
+                    <div class="schema-field">
+                        <span class="field-name">price</span>
+                        <span class="field-type">float (nullable)</span>
+                        <span class="field-desc">Delivery price</span>
+                    </div>
+                    <div class="schema-field">
+                        <span class="field-name">requires_proof</span>
+                        <span class="field-type">boolean</span>
+                        <span class="field-desc">Requires delivery proof</span>
+                    </div>
+                    <div class="schema-field">
+                        <span class="field-name">is_active</span>
+                        <span class="field-type">boolean</span>
+                        <span class="field-desc">Soft delete flag</span>
+                    </div>
+                </div>
+
+                <h3>CourierBid</h3>
+                <div class="schema-def">
+                    <div class="schema-field">
+                        <span class="field-name">id</span>
+                        <span class="field-type">integer (PK)</span>
+                        <span class="field-desc">Auto-increment primary key</span>
+                    </div>
+                    <div class="schema-field">
+                        <span class="field-name">package_id</span>
+                        <span class="field-type">integer (FK)</span>
+                        <span class="field-desc">Reference to Package</span>
+                    </div>
+                    <div class="schema-field">
+                        <span class="field-name">courier_id</span>
+                        <span class="field-type">integer (FK)</span>
+                        <span class="field-desc">Reference to User</span>
+                    </div>
+                    <div class="schema-field">
+                        <span class="field-name">proposed_price</span>
+                        <span class="field-type">float</span>
+                        <span class="field-desc">Proposed delivery price</span>
+                    </div>
+                    <div class="schema-field">
+                        <span class="field-name">status</span>
+                        <span class="field-type">enum</span>
+                        <span class="field-desc">PENDING, SELECTED, REJECTED, WITHDRAWN, EXPIRED</span>
+                    </div>
+                    <div class="schema-field">
+                        <span class="field-name">message</span>
+                        <span class="field-type">text</span>
+                        <span class="field-desc">Message to sender</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Enums Section -->
+            <section id="enums">
+                <h2>Enums & Status Values</h2>
+
+                <h3>UserRole</h3>
+                <table>
+                    <tr><th>Value</th><th>Description</th></tr>
+                    <tr><td><code>sender</code></td><td>Can create and manage packages</td></tr>
+                    <tr><td><code>courier</code></td><td>Can create routes and deliver packages</td></tr>
+                    <tr><td><code>both</code></td><td>Combined sender and courier capabilities</td></tr>
+                    <tr><td><code>admin</code></td><td>Full platform administration</td></tr>
+                </table>
+
+                <h3>PackageStatus</h3>
+                <table>
+                    <tr><th>Value</th><th>Description</th></tr>
+                    <tr><td class="status-new"><code>NEW</code></td><td>Just created, auto-transitions to OPEN_FOR_BIDS</td></tr>
+                    <tr><td class="status-open"><code>OPEN_FOR_BIDS</code></td><td>Accepting courier bids</td></tr>
+                    <tr><td class="status-selected"><code>BID_SELECTED</code></td><td>Sender selected a winning bid</td></tr>
+                    <tr><td class="status-pending"><code>PENDING_PICKUP</code></td><td>Courier confirmed, awaiting pickup</td></tr>
+                    <tr><td class="status-transit"><code>IN_TRANSIT</code></td><td>Package picked up, in delivery</td></tr>
+                    <tr><td class="status-delivered"><code>DELIVERED</code></td><td>Successfully delivered (terminal)</td></tr>
+                    <tr><td class="status-canceled"><code>CANCELED</code></td><td>Canceled by sender (terminal)</td></tr>
+                    <tr><td class="status-failed"><code>FAILED</code></td><td>Delivery failed (admin can retry)</td></tr>
+                </table>
+
+                <h3>PackageSize</h3>
+                <table>
+                    <tr><th>Value</th><th>Description</th></tr>
+                    <tr><td><code>small</code></td><td>Fits in a pocket or small bag</td></tr>
+                    <tr><td><code>medium</code></td><td>Fits in a backpack</td></tr>
+                    <tr><td><code>large</code></td><td>Requires vehicle trunk</td></tr>
+                    <tr><td><code>extra_large</code></td><td>Requires cargo vehicle</td></tr>
+                </table>
+
+                <h3>BidStatus</h3>
+                <table>
+                    <tr><th>Value</th><th>Description</th></tr>
+                    <tr><td><code>PENDING</code></td><td>Awaiting sender decision</td></tr>
+                    <tr><td><code>SELECTED</code></td><td>Chosen as winning bid</td></tr>
+                    <tr><td><code>REJECTED</code></td><td>Not selected (another bid won)</td></tr>
+                    <tr><td><code>WITHDRAWN</code></td><td>Withdrawn by courier</td></tr>
+                    <tr><td><code>EXPIRED</code></td><td>Deadline passed without selection</td></tr>
+                </table>
+            </section>
+
+            <!-- State Machine Section -->
+            <section id="state-machine">
+                <h2>Package Status State Machine</h2>
+                <p>Package status transitions are strictly enforced. Use <code>validate_transition()</code> or <code>transition_package()</code> from <code>package_status.py</code>.</p>
+
+                <div class="state-diagram">
+NEW ──────► OPEN_FOR_BIDS ──────► BID_SELECTED ──────► PENDING_PICKUP ──────► IN_TRANSIT ──────► DELIVERED
+                  │                     │                    │                    │
+                  │                     ▼                    ▼                    ▼
+                  │              OPEN_FOR_BIDS*           FAILED              FAILED
+                  │              (bid not confirmed)
+                  │
+                  └────────────────────────────────────────────────────────► CANCELED
+                                    (from any non-terminal state, except IN_TRANSIT)
+
+FAILED ──────► OPEN_FOR_BIDS (admin only retry)
+
+Terminal states: DELIVERED, CANCELED, FAILED
+                </div>
+
+                <div class="alert alert-warning">
+                    <span>⚠️</span>
+                    <div>
+                        <strong>Important:</strong> Never update package status directly in the database.
+                        Always use the state machine functions to ensure valid transitions.
+                    </div>
+                </div>
+            </section>
+
+            <!-- Real-time Section -->
+            <section id="realtime">
+                <h2>Real-time Updates</h2>
+                <p>WebSocket connection for instant notifications and updates.</p>
+
+                <h3>Connection</h3>
+                <pre><code><span class="keyword">const</span> ws = <span class="keyword">new</span> WebSocket(<span class="string">'ws://localhost:8000/api/ws?token=JWT_TOKEN'</span>);
+
+ws.onmessage = (event) => {
+    <span class="keyword">const</span> data = JSON.parse(event.data);
+    console.log(data.type, data.payload);
+};</code></pre>
+
+                <h3>Event Types</h3>
+                <table>
+                    <tr><th>Event</th><th>Payload</th><th>Description</th></tr>
+                    <tr>
+                        <td><code>notification_created</code></td>
+                        <td>Notification object</td>
+                        <td>New notification received</td>
+                    </tr>
+                    <tr>
+                        <td><code>unread_count_updated</code></td>
+                        <td><code>{ count: number }</code></td>
+                        <td>Unread notification count changed</td>
+                    </tr>
+                    <tr>
+                        <td><code>message_received</code></td>
+                        <td>Message object</td>
+                        <td>New message in conversation</td>
+                    </tr>
+                    <tr>
+                        <td><code>package_status_changed</code></td>
+                        <td>Package object</td>
+                        <td>Package status updated</td>
+                    </tr>
+                    <tr>
+                        <td><code>bid_received</code></td>
+                        <td>Bid object</td>
+                        <td>New bid on sender's package</td>
+                    </tr>
+                    <tr>
+                        <td><code>ping</code></td>
+                        <td>—</td>
+                        <td>Keepalive ping (respond with pong)</td>
+                    </tr>
+                </table>
+            </section>
+
+            <!-- i18n Section -->
+            <section id="i18n">
+                <h2>Internationalization</h2>
+                <p>Multi-language support using <code>next-intl</code>.</p>
+
+                <h3>Supported Languages</h3>
+                <ul>
+                    <li><strong>English (en)</strong> - Default</li>
+                    <li><strong>French (fr)</strong></li>
+                    <li><strong>Spanish (es)</strong></li>
+                </ul>
+
+                <h3>URL Structure</h3>
+                <pre><code>http://localhost:3000/en/dashboard   <span class="comment"># English</span>
+http://localhost:3000/fr/dashboard   <span class="comment"># French</span>
+http://localhost:3000/es/dashboard   <span class="comment"># Spanish</span></code></pre>
+
+                <h3>Usage in Components</h3>
+                <pre><code><span class="comment">// Client Components</span>
+<span class="string">'use client'</span>;
+<span class="keyword">import</span> { useTranslations } <span class="keyword">from</span> <span class="string">'next-intl'</span>;
+
+<span class="keyword">export default function</span> Component() {
+    <span class="keyword">const</span> t = useTranslations(<span class="string">'namespace'</span>);
+    <span class="keyword">return</span> &lt;h1&gt;{t(<span class="string">'key'</span>)}&lt;/h1&gt;;
+}
+
+<span class="comment">// Server Components</span>
+<span class="keyword">import</span> { getTranslations } <span class="keyword">from</span> <span class="string">'next-intl/server'</span>;
+
+<span class="keyword">export default async function</span> Page() {
+    <span class="keyword">const</span> t = <span class="keyword">await</span> getTranslations(<span class="string">'namespace'</span>);
+    <span class="keyword">return</span> &lt;h1&gt;{t(<span class="string">'key'</span>)}&lt;/h1&gt;;
+}</code></pre>
+
+                <p>Translation files are located in <code>frontend/messages/{en,fr,es}.json</code>.</p>
+            </section>
+
+            <!-- Security Section -->
+            <section id="security">
+                <h2>Security</h2>
+
+                <h3>Authentication Security</h3>
+                <ul>
+                    <li><strong>JWT Tokens:</strong> Stored in httpOnly cookies, 24-hour expiry (7 days with remember_me)</li>
+                    <li><strong>Account Lockout:</strong> 5 failed attempts → 15-minute lockout</li>
+                    <li><strong>Password Hashing:</strong> Bcrypt with automatic salt</li>
+                    <li><strong>JWT Blacklisting:</strong> Tokens invalidated on logout</li>
+                </ul>
+
+                <h3>Request Security</h3>
+                <ul>
+                    <li><strong>CSRF Protection:</strong> Double-submit cookie pattern for all state-changing requests</li>
+                    <li><strong>Rate Limiting:</strong> Per-endpoint limits to prevent abuse</li>
+                    <li><strong>Input Sanitization:</strong> XSS prevention on all user inputs</li>
+                    <li><strong>File Validation:</strong> Type and size limits on uploads</li>
+                </ul>
+
+                <h3>Data Security</h3>
+                <ul>
+                    <li><strong>PII Encryption:</strong> Fernet encryption for sensitive fields (phone, addresses)</li>
+                    <li><strong>SQL Injection Protection:</strong> SQLAlchemy ORM parameterization</li>
+                    <li><strong>Audit Logging:</strong> All sensitive operations tracked with IP and user agent</li>
+                </ul>
+
+                <h3>CSRF Token Usage</h3>
+                <pre><code><span class="comment">// Get CSRF token from cookie</span>
+<span class="keyword">const</span> csrfToken = document.cookie
+    .split(<span class="string">'; '</span>)
+    .find(row => row.startsWith(<span class="string">'csrf_token='</span>))
+    ?.split(<span class="string">'='</span>)[<span class="number">1</span>];
+
+<span class="comment">// Include in request headers</span>
+fetch(<span class="string">'/api/packages'</span>, {
+    method: <span class="string">'POST'</span>,
+    headers: {
+        <span class="string">'Content-Type'</span>: <span class="string">'application/json'</span>,
+        <span class="string">'X-CSRF-Token'</span>: csrfToken
+    },
+    credentials: <span class="string">'include'</span>,
+    body: JSON.stringify(data)
+});</code></pre>
+            </section>
+
+            <!-- Logging Section -->
+            <section id="logging">
+                <h2>Logging</h2>
+
+                <h3>Backend Logs</h3>
+                <p>Structured JSON logging with automatic rotation (10MB, 5 backups).</p>
+                <table>
+                    <tr><th>File</th><th>Content</th></tr>
+                    <tr><td><code>logs/app.log</code></td><td>All application logs (DEBUG+)</td></tr>
+                    <tr><td><code>logs/error.log</code></td><td>Error logs only (ERROR+)</td></tr>
+                    <tr><td><code>logs/requests.log</code></td><td>HTTP request/response logs</td></tr>
+                    <tr><td><code>logs/performance.log</code></td><td>Slow request warnings (>1s)</td></tr>
+                    <tr><td><code>logs/frontend.log</code></td><td>Frontend errors from browser</td></tr>
+                </table>
+
+                <h3>Viewing Logs</h3>
+                <pre><code><span class="comment"># View all logs</span>
+tail -f backend/logs/app.log
+
+<span class="comment"># View with JSON formatting</span>
+tail -f backend/logs/requests.log | jq .
+
+<span class="comment"># Filter slow requests</span>
+tail -f backend/logs/performance.log | jq <span class="string">'select(.duration_ms > 100)'</span></code></pre>
+
+                <h3>Frontend Logging</h3>
+                <pre><code><span class="keyword">import</span> { logError, logWarn, logInfo } <span class="keyword">from</span> <span class="string">'@/lib/logger'</span>;
+
+<span class="keyword">try</span> {
+    <span class="comment">// code that might fail</span>
+} <span class="keyword">catch</span> (error) {
+    logError(<span class="string">'Failed to process payment'</span>, error, { userId, packageId });
+}</code></pre>
+            </section>
+
+            <!-- Setup Section -->
+            <section id="setup">
+                <h2>Environment Setup</h2>
+
+                <h3>Required Services</h3>
+                <ul>
+                    <li><strong>PostgreSQL 14+</strong> with PostGIS extension</li>
+                    <li><strong>Redis</strong> for WebSocket pub/sub and caching</li>
+                    <li><strong>SMTP server</strong> for email verification (Gmail recommended)</li>
+                </ul>
+
+                <h3>Optional Services</h3>
+                <ul>
+                    <li><strong>Stripe</strong> - Payment processing with Connect for payouts</li>
+                    <li><strong>AWS S3</strong> - Delivery proof image storage</li>
+                    <li><strong>Twilio</strong> - SMS verification (falls back to console logging)</li>
+                    <li><strong>Google OAuth</strong> - Social login</li>
+                    <li><strong>Google Places API</strong> - Address autocomplete</li>
+                </ul>
+
+                <h3>Database Setup</h3>
+                <pre><code><span class="comment"># Create database</span>
+createdb chaski_db
+
+<span class="comment"># Enable PostGIS</span>
+psql chaski_db -c "CREATE EXTENSION postgis;"</code></pre>
+            </section>
+
+            <!-- Testing Section -->
+            <section id="testing">
+                <h2>Testing</h2>
+
+                <h3>Backend (Pytest)</h3>
+                <pre><code><span class="comment"># Run all tests</span>
+pytest
+
+<span class="comment"># Single test file</span>
+pytest tests/test_packages.py -v
+
+<span class="comment"># Single test function</span>
+pytest tests/test_packages.py::test_create_package_success -v
+
+<span class="comment"># With coverage</span>
+pytest --cov=app tests/</code></pre>
+
+                <h4>Test Fixtures</h4>
+                <p>Available in <code>tests/conftest.py</code>:</p>
+                <ul>
+                    <li><code>client</code> - TestClient with database override</li>
+                    <li><code>authenticated_sender</code>, <code>authenticated_courier</code>, <code>authenticated_admin</code> - Pre-authenticated tokens</li>
+                    <li><code>test_package_data</code>, <code>test_user_data</code> - Sample data fixtures</li>
+                </ul>
+
+                <h3>Frontend (Jest)</h3>
+                <pre><code><span class="comment"># Run tests</span>
+npm test
+
+<span class="comment"># Watch mode</span>
+npm run test:watch
+
+<span class="comment"># With coverage</span>
+npm run test:coverage</code></pre>
+
+                <h3>E2E (Playwright)</h3>
+                <pre><code><span class="comment"># Run all E2E tests</span>
+npm run test:e2e
+
+<span class="comment"># Interactive UI</span>
+npm run test:e2e:ui
+
+<span class="comment"># Debug mode</span>
+npm run test:e2e:debug</code></pre>
+            </section>
+
+            <!-- Migrations Section -->
+            <section id="migrations">
+                <h2>Database Migrations</h2>
+                <p>Run migrations from the backend directory:</p>
+                <pre><code>cd backend
+source venv/bin/activate
+PYTHONPATH=. python migrations/&lt;migration_name&gt;.py</code></pre>
+
+                <h3>Available Migrations</h3>
+                <table>
+                    <tr><th>Migration</th><th>Description</th></tr>
+                    <tr><td><code>add_package_is_active.py</code></td><td>Soft delete for packages</td></tr>
+                    <tr><td><code>create_notifications_table.py</code></td><td>Notification system</td></tr>
+                    <tr><td><code>create_bidding_system.py</code></td><td>Courier bidding</td></tr>
+                    <tr><td><code>add_phone_verification_fields.py</code></td><td>Phone verification</td></tr>
+                    <tr><td><code>add_account_lockout_column.py</code></td><td>Account lockout</td></tr>
+                    <tr><td><code>add_encrypted_pii_columns.py</code></td><td>PII encryption fields</td></tr>
+                    <tr><td><code>add_login_attempts_table.py</code></td><td>Login attempt tracking</td></tr>
+                    <tr><td><code>add_tracking_id.py</code></td><td>Package tracking IDs</td></tr>
+                </table>
+            </section>
+
+            <!-- Footer -->
+            <footer style="margin-top: 4rem; padding-top: 2rem; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted);">
+                <p>Chaski API Documentation v1.0</p>
+                <p style="font-size: 0.875rem;">Built with FastAPI and Next.js • Named after the Inca messenger system</p>
+            </footer>
+        </main>
+    </div>
+
+    <script>
+        // Smooth scrolling for navigation links
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetId = link.getAttribute('href').slice(1);
+                const target = document.getElementById(targetId);
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+                    // Update active state
+                    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                    link.classList.add('active');
+                }
+            });
+        });
+
+        // Update active nav link on scroll
+        const sections = document.querySelectorAll('section[id]');
+        const navLinks = document.querySelectorAll('.nav-link');
+
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                if (window.scrollY >= sectionTop - 100) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === `#${current}`) {
+                    link.classList.add('active');
+                }
+            });
+        });
+
+        // Accordion functionality
+        document.querySelectorAll('.accordion-header').forEach(header => {
+            header.addEventListener('click', () => {
+                header.parentElement.classList.toggle('open');
+            });
+        });
+
+        // Tab functionality
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabGroup = tab.parentElement;
+                const contentGroup = tabGroup.nextElementSibling;
+                const targetId = tab.dataset.tab;
+
+                tabGroup.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+
+                contentGroup.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                contentGroup.querySelector(`#${targetId}`).classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>

@@ -13,14 +13,24 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
+
+    # PII fields - dual storage during migration (plain text + encrypted)
     email = Column(String, unique=True, index=True, nullable=False)
+    email_encrypted = Column(String, nullable=True)  # Encrypted version
+
     hashed_password = Column(String, nullable=False)
+
     full_name = Column(String, nullable=False)
+    full_name_encrypted = Column(String, nullable=True)  # Encrypted version
+
     phone_number = Column(String)
+    phone_number_encrypted = Column(String, nullable=True)  # Encrypted version
+
     role = Column(SQLEnum(UserRole), nullable=False)
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
     verification_token = Column(String, nullable=True)
+    verification_token_hash = Column(String, nullable=True)  # Hashed version for security
     verification_token_expires_at = Column(DateTime(timezone=True), nullable=True)
 
     # Phone verification fields
@@ -30,7 +40,11 @@ class User(Base):
 
     # Password reset fields
     password_reset_token = Column(String, nullable=True)
+    password_reset_token_hash = Column(String, nullable=True)  # Hashed version for security
     password_reset_token_expires_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Account lockout fields
+    account_locked_until = Column(DateTime(timezone=True), nullable=True)  # NULL = not locked
 
     # Default address fields (optional)
     default_address = Column(String, nullable=True)

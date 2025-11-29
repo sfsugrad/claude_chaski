@@ -618,6 +618,310 @@ def log_rating_create(
     )
 
 
+# Security Event Logging
+
+def log_account_locked(
+    db: Session,
+    user: User,
+    reason: str,
+    request: Optional[Request] = None,
+) -> AuditLog:
+    """Log account lockout due to failed login attempts."""
+    return create_audit_log(
+        db=db,
+        action=AuditAction.ACCOUNT_LOCKED,
+        user=user,
+        resource_type="user",
+        resource_id=user.id,
+        details={"reason": reason},
+        request=request,
+        success="failed",
+    )
+
+
+def log_session_created(
+    db: Session,
+    user: User,
+    session_id: str,
+    request: Optional[Request] = None,
+) -> AuditLog:
+    """Log new session creation."""
+    return create_audit_log(
+        db=db,
+        action=AuditAction.SESSION_CREATED,
+        user=user,
+        resource_type="session",
+        details={"session_id": session_id},
+        request=request,
+    )
+
+
+def log_session_terminated(
+    db: Session,
+    user: User,
+    session_id: str,
+    reason: str,
+    request: Optional[Request] = None,
+) -> AuditLog:
+    """Log session termination (logout, timeout, forced logout)."""
+    return create_audit_log(
+        db=db,
+        action=AuditAction.SESSION_TERMINATED,
+        user=user,
+        resource_type="session",
+        details={"session_id": session_id, "reason": reason},
+        request=request,
+    )
+
+
+def log_session_deleted(
+    db: Session,
+    user: User,
+    session_id: str,
+    request: Optional[Request] = None,
+) -> AuditLog:
+    """Log session deletion (logout from other devices)."""
+    return create_audit_log(
+        db=db,
+        action=AuditAction.SESSION_DELETED,
+        user=user,
+        resource_type="session",
+        details={"session_id": session_id},
+        request=request,
+    )
+
+
+def log_password_changed(
+    db: Session,
+    user: User,
+    request: Optional[Request] = None,
+) -> AuditLog:
+    """Log password change."""
+    return create_audit_log(
+        db=db,
+        action=AuditAction.PASSWORD_CHANGED,
+        user=user,
+        resource_type="user",
+        resource_id=user.id,
+        request=request,
+    )
+
+
+def log_profile_updated(
+    db: Session,
+    user: User,
+    changes: dict,
+    request: Optional[Request] = None,
+) -> AuditLog:
+    """Log user profile update."""
+    return create_audit_log(
+        db=db,
+        action=AuditAction.PROFILE_UPDATED,
+        user=user,
+        resource_type="user",
+        resource_id=user.id,
+        details={"changes": list(changes.keys())},  # Log field names, not values
+        request=request,
+    )
+
+
+# Access Control Logging
+
+def log_unauthorized_access(
+    db: Session,
+    user: Optional[User] = None,
+    user_email: Optional[str] = None,
+    resource_type: Optional[str] = None,
+    resource_id: Optional[int] = None,
+    details: Optional[dict] = None,
+    request: Optional[Request] = None,
+) -> AuditLog:
+    """Log unauthorized access attempt."""
+    return create_audit_log(
+        db=db,
+        action=AuditAction.UNAUTHORIZED_ACCESS,
+        user=user,
+        user_email=user_email,
+        resource_type=resource_type,
+        resource_id=resource_id,
+        details=details,
+        request=request,
+        success="denied",
+    )
+
+
+def log_permission_denied(
+    db: Session,
+    user: User,
+    resource_type: str,
+    resource_id: Optional[int] = None,
+    required_permission: Optional[str] = None,
+    request: Optional[Request] = None,
+) -> AuditLog:
+    """Log permission denied event."""
+    return create_audit_log(
+        db=db,
+        action=AuditAction.PERMISSION_DENIED,
+        user=user,
+        resource_type=resource_type,
+        resource_id=resource_id,
+        details={"required_permission": required_permission} if required_permission else None,
+        request=request,
+        success="denied",
+    )
+
+
+def log_token_blacklisted(
+    db: Session,
+    user: User,
+    token_jti: str,
+    reason: str,
+    request: Optional[Request] = None,
+) -> AuditLog:
+    """Log JWT token blacklisting."""
+    return create_audit_log(
+        db=db,
+        action=AuditAction.TOKEN_BLACKLISTED,
+        user=user,
+        resource_type="token",
+        details={"jti": token_jti, "reason": reason},
+        request=request,
+    )
+
+
+# File Upload Security Logging
+
+def log_file_upload_success(
+    db: Session,
+    user: User,
+    file_type: str,
+    file_key: str,
+    package_id: Optional[int] = None,
+    request: Optional[Request] = None,
+) -> AuditLog:
+    """Log successful file upload."""
+    return create_audit_log(
+        db=db,
+        action=AuditAction.FILE_UPLOAD_SUCCESS,
+        user=user,
+        resource_type="file",
+        resource_id=package_id,
+        details={"file_type": file_type, "file_key": file_key},
+        request=request,
+    )
+
+
+def log_file_upload_failed(
+    db: Session,
+    user: User,
+    file_type: str,
+    reason: str,
+    package_id: Optional[int] = None,
+    request: Optional[Request] = None,
+) -> AuditLog:
+    """Log failed file upload."""
+    return create_audit_log(
+        db=db,
+        action=AuditAction.FILE_UPLOAD_FAILED,
+        user=user,
+        resource_type="file",
+        resource_id=package_id,
+        details={"file_type": file_type, "reason": reason},
+        request=request,
+        success="failed",
+        error_message=reason,
+    )
+
+
+def log_file_validation_failed(
+    db: Session,
+    user: User,
+    file_type: str,
+    detected_mime: Optional[str],
+    reason: str,
+    package_id: Optional[int] = None,
+    request: Optional[Request] = None,
+) -> AuditLog:
+    """Log file validation failure (security check)."""
+    return create_audit_log(
+        db=db,
+        action=AuditAction.FILE_VALIDATION_FAILED,
+        user=user,
+        resource_type="file",
+        resource_id=package_id,
+        details={
+            "file_type": file_type,
+            "detected_mime": detected_mime,
+            "reason": reason,
+        },
+        request=request,
+        success="failed",
+        error_message=reason,
+    )
+
+
+def log_suspicious_file_upload(
+    db: Session,
+    user: User,
+    file_type: str,
+    detected_mime: str,
+    package_id: Optional[int] = None,
+    request: Optional[Request] = None,
+) -> AuditLog:
+    """Log suspicious file upload attempt (potential attack)."""
+    return create_audit_log(
+        db=db,
+        action=AuditAction.SUSPICIOUS_FILE_UPLOAD,
+        user=user,
+        resource_type="file",
+        resource_id=package_id,
+        details={
+            "file_type": file_type,
+            "detected_mime": detected_mime,
+            "severity": "high",
+        },
+        request=request,
+        success="denied",
+        error_message="Suspicious file type detected",
+    )
+
+
+# Data Privacy Logging (GDPR)
+
+def log_data_export_request(
+    db: Session,
+    user: User,
+    request: Optional[Request] = None,
+) -> AuditLog:
+    """Log GDPR data export request."""
+    return create_audit_log(
+        db=db,
+        action=AuditAction.DATA_EXPORT_REQUEST,
+        user=user,
+        resource_type="user",
+        resource_id=user.id,
+        request=request,
+    )
+
+
+def log_data_export_completed(
+    db: Session,
+    user: User,
+    export_size_kb: Optional[int] = None,
+    request: Optional[Request] = None,
+) -> AuditLog:
+    """Log GDPR data export completion."""
+    return create_audit_log(
+        db=db,
+        action=AuditAction.DATA_EXPORT_COMPLETED,
+        user=user,
+        resource_type="user",
+        resource_id=user.id,
+        details={"export_size_kb": export_size_kb} if export_size_kb else None,
+        request=request,
+    )
+
+
 def log_audit(
     db: Session,
     user_id: int,

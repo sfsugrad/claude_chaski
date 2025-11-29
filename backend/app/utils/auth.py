@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+import hashlib
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from app.config import settings
@@ -40,3 +41,33 @@ def verify_token(token: str) -> Optional[dict]:
         return payload
     except JWTError:
         return None
+
+
+def hash_token(token: str) -> str:
+    """
+    Hash a token using SHA-256 for secure storage.
+
+    Used for verification tokens, password reset tokens, and phone verification codes.
+    The plain token is sent to the user, but only the hash is stored in the database.
+
+    Args:
+        token: The plain text token to hash
+
+    Returns:
+        str: The SHA-256 hash of the token as a hexadecimal string
+    """
+    return hashlib.sha256(token.encode('utf-8')).hexdigest()
+
+
+def verify_token_hash(plain_token: str, hashed_token: str) -> bool:
+    """
+    Verify a plain token against a hashed token.
+
+    Args:
+        plain_token: The plain text token to verify
+        hashed_token: The stored hash to compare against
+
+    Returns:
+        bool: True if the token matches the hash, False otherwise
+    """
+    return hash_token(plain_token) == hashed_token

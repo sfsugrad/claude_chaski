@@ -10,6 +10,29 @@ const api = axios.create({
   withCredentials: true, // Send cookies with requests
 })
 
+// Helper function to get cookie value
+function getCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; ${name}=`)
+  if (parts.length === 2) return parts.pop()?.split(';').shift() || null
+  return null
+}
+
+// Add request interceptor to include CSRF token in state-changing requests
+api.interceptors.request.use((config) => {
+  // Add CSRF token to POST, PUT, DELETE, PATCH requests
+  if (['post', 'put', 'delete', 'patch'].includes(config.method?.toLowerCase() || '')) {
+    const csrfToken = getCookie('csrf_token')
+    if (csrfToken) {
+      config.headers['X-CSRF-Token'] = csrfToken
+    }
+  }
+  return config
+}, (error) => {
+  return Promise.reject(error)
+})
+
 export default api
 
 // Types

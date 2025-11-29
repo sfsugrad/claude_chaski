@@ -13,11 +13,13 @@ from app.config import settings
 from app.database import get_db
 from app.models.user import User, UserRole
 from app.models.rating import Rating
-from app.utils.auth import get_password_hash, verify_password, create_access_token
+from app.utils.auth import get_password_hash, verify_password, create_access_token, hash_token, verify_token_hash, verify_token
 from app.utils.dependencies import get_current_user
 from app.utils.email import send_verification_email, send_welcome_email, send_password_reset_email, generate_verification_token
 from app.utils.oauth import oauth
 from app.utils.sms import send_verification_code
+from app.utils.encryption import get_encryption_service
+from app.utils.password_validator import validate_password
 from app.services.audit_service import (
     log_login_success,
     log_login_failed,
@@ -26,7 +28,24 @@ from app.services.audit_service import (
     log_password_reset_complete,
     log_email_verification,
     log_oauth_login,
+    log_account_locked,
+    log_session_created,
+    log_session_terminated,
+    log_session_deleted,
+    log_password_changed,
+    log_profile_updated,
+    log_token_blacklisted,
 )
+from app.services.auth_security import (
+    record_login_attempt,
+    is_account_locked,
+    lock_account,
+    should_lock_account,
+    get_time_until_unlock,
+)
+from app.services.jwt_blacklist import JWTBlacklistService
+from app.services.session_tracker import SessionTracker
+from app.utils.input_sanitizer import sanitize_plain_text, sanitize_email, sanitize_phone
 from pydantic import BaseModel, EmailStr, Field
 
 logger = logging.getLogger(__name__)
@@ -65,7 +84,7 @@ def clear_auth_cookie(response: Response) -> None:
 # Request/Response Models
 class UserRegister(BaseModel):
     email: EmailStr
-    password: str = Field(..., min_length=8, description="Password must be at least 8 characters")
+    password: str = Field(..., description="Password with enhanced security requirements")
     full_name: str = Field(..., min_length=1)
     role: str = Field(..., pattern="^(sender|courier|both)$")
     phone_number: str | None = None
@@ -124,7 +143,7 @@ class ForgotPasswordRequest(BaseModel):
 
 class ResetPasswordRequest(BaseModel):
     token: str
-    new_password: str = Field(..., min_length=8, description="Password must be at least 8 characters")
+    new_password: str = Field(..., description="New password with enhanced security requirements")
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED, response_model=UserResponse)
@@ -148,6 +167,17 @@ async def register(request: Request, user_data: UserRegister, db: Session = Depe
             detail="Email already registered"
         )
 
+    # Validate password strength
+    is_valid, password_errors = validate_password(user_data.password)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Password does not meet security requirements",
+                "errors": password_errors
+            }
+        )
+
     # Validate role
     try:
         user_role = UserRole(user_data.role)
@@ -162,21 +192,38 @@ async def register(request: Request, user_data: UserRegister, db: Session = Depe
 
     # Generate verification token (expires in 24 hours)
     verification_token = generate_verification_token()
+    verification_token_hash_value = hash_token(verification_token)
     verification_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+
+    # Sanitize all user inputs to prevent XSS
+    sanitized_email = sanitize_email(user_data.email)
+    sanitized_full_name = sanitize_plain_text(user_data.full_name)
+    sanitized_phone = sanitize_phone(user_data.phone_number) if user_data.phone_number else None
+    sanitized_default_address = sanitize_plain_text(user_data.default_address) if user_data.default_address else None
+
+    # Encrypt PII data (dual-write: store both plain text and encrypted)
+    encryption_service = get_encryption_service()
+    encrypted_email = encryption_service.encrypt(sanitized_email) if encryption_service else None
+    encrypted_full_name = encryption_service.encrypt(sanitized_full_name) if encryption_service else None
+    encrypted_phone = encryption_service.encrypt(sanitized_phone) if encryption_service and sanitized_phone else None
 
     # Create new user
     new_user = User(
-        email=user_data.email,
+        email=sanitized_email,
+        email_encrypted=encrypted_email,
         hashed_password=hashed_password,
-        full_name=user_data.full_name,
+        full_name=sanitized_full_name,
+        full_name_encrypted=encrypted_full_name,
         role=user_role,
-        phone_number=user_data.phone_number,
+        phone_number=sanitized_phone,
+        phone_number_encrypted=encrypted_phone,
         max_deviation_km=user_data.max_deviation_km or 5,
-        default_address=user_data.default_address,
+        default_address=sanitized_default_address,
         default_address_lat=user_data.default_address_lat,
         default_address_lng=user_data.default_address_lng,
         preferred_language=user_data.preferred_language,
-        verification_token=verification_token,
+        verification_token=verification_token,  # Store plain text for transition period
+        verification_token_hash=verification_token_hash_value,  # Store hash for security
         verification_token_expires_at=verification_token_expires_at
     )
 
@@ -204,11 +251,46 @@ async def login(request: Request, response: Response, credentials: UserLogin, db
     - **remember_me**: If true, extends session to 7 days (default: false)
 
     Sets JWT token in httpOnly cookie valid for 24 hours (default) or 7 days (remember me).
+
+    Security features:
+    - Account lockout after 5 failed login attempts
+    - Lockout duration: 15 minutes
+    - Login attempts tracked per email and IP
     """
+    # Get request context
+    ip_address = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "unknown")
+
     # Find user by email
     user = db.query(User).filter(User.email == credentials.email).first()
+
+    # Check if account is locked (even if user doesn't exist, to prevent enumeration)
+    if user and is_account_locked(user):
+        time_until_unlock = get_time_until_unlock(user)
+        minutes_remaining = int(time_until_unlock.total_seconds() / 60) if time_until_unlock else 0
+
+        # Record failed attempt
+        record_login_attempt(
+            db, credentials.email, ip_address, user_agent,
+            successful=False, failure_reason="account_locked", user_id=user.id
+        )
+
+        log_login_failed(db, credentials.email, request, "account_locked")
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Account is locked due to too many failed login attempts. Please try again in {minutes_remaining} minutes.",
+        )
+
     if not user:
+        # Record failed attempt for non-existent user (helps track brute force)
+        record_login_attempt(
+            db, credentials.email, ip_address, user_agent,
+            successful=False, failure_reason="user_not_found"
+        )
+
         log_login_failed(db, credentials.email, request, "user_not_found")
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
@@ -217,7 +299,26 @@ async def login(request: Request, response: Response, credentials: UserLogin, db
 
     # Verify password
     if not verify_password(credentials.password, user.hashed_password):
+        # Record failed attempt
+        record_login_attempt(
+            db, credentials.email, ip_address, user_agent,
+            successful=False, failure_reason="invalid_password", user_id=user.id
+        )
+
         log_login_failed(db, credentials.email, request, "invalid_password")
+
+        # Check if account should be locked
+        if should_lock_account(db, credentials.email):
+            lock_account(db, user)
+
+            # Audit log account lockout
+            log_account_locked(db, user, "Exceeded failed login attempts threshold", request)
+
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Too many failed login attempts. Your account has been locked for 15 minutes.",
+            )
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
@@ -226,11 +327,23 @@ async def login(request: Request, response: Response, credentials: UserLogin, db
 
     # Check if user is active
     if not user.is_active:
+        record_login_attempt(
+            db, credentials.email, ip_address, user_agent,
+            successful=False, failure_reason="account_inactive", user_id=user.id
+        )
+
         log_login_failed(db, credentials.email, request, "account_inactive")
+
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is inactive"
         )
+
+    # Successful login - record attempt
+    record_login_attempt(
+        db, credentials.email, ip_address, user_agent,
+        successful=True, user_id=user.id
+    )
 
     # Determine token expiration based on remember_me
     if credentials.remember_me:
@@ -238,10 +351,28 @@ async def login(request: Request, response: Response, credentials: UserLogin, db
     else:
         expire_minutes = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
-    # Create access token
+    # Create session in Redis (tracks active sessions across devices)
+    ttl_seconds = expire_minutes * 60
+    session_id = await SessionTracker.create_session(
+        user_id=user.id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        ttl_seconds=ttl_seconds
+    )
+
+    # Audit log session creation
+    log_session_created(db, user, session_id, request)
+
+    # Create access token with session_id and issued-at time
     access_token_expires = timedelta(minutes=expire_minutes)
+    now = int(datetime.now(timezone.utc).timestamp())
     access_token = create_access_token(
-        data={"sub": user.email, "role": user.role.value},
+        data={
+            "sub": user.email,
+            "role": user.role.value,
+            "session_id": session_id,
+            "iat": now  # Issued-at time for token revocation
+        },
         expires_delta=access_token_expires
     )
 
@@ -308,22 +439,43 @@ async def update_current_user(
     - **default_address_lat**: Latitude of default address
     - **default_address_lng**: Longitude of default address
     """
-    # Update only provided fields
+    # Get encryption service for PII dual-write
+    encryption_service = get_encryption_service()
+
+    # Track changes for audit log
+    changes = {}
+
+    # Update only provided fields (with sanitization and dual-write for PII)
     if user_data.full_name is not None:
-        current_user.full_name = user_data.full_name
+        sanitized_name = sanitize_plain_text(user_data.full_name)
+        changes["full_name"] = {"old": current_user.full_name, "new": sanitized_name}
+        current_user.full_name = sanitized_name
+        current_user.full_name_encrypted = encryption_service.encrypt(sanitized_name) if encryption_service else None
     if user_data.phone_number is not None:
-        current_user.phone_number = user_data.phone_number
+        sanitized_phone_update = sanitize_phone(user_data.phone_number)
+        changes["phone_number"] = {"old": current_user.phone_number, "new": sanitized_phone_update}
+        current_user.phone_number = sanitized_phone_update
+        current_user.phone_number_encrypted = encryption_service.encrypt(sanitized_phone_update) if encryption_service else None
     if user_data.max_deviation_km is not None:
+        changes["max_deviation_km"] = {"old": current_user.max_deviation_km, "new": user_data.max_deviation_km}
         current_user.max_deviation_km = user_data.max_deviation_km
     if user_data.default_address is not None:
-        current_user.default_address = user_data.default_address
+        sanitized_address = sanitize_plain_text(user_data.default_address)
+        changes["default_address"] = {"old": current_user.default_address, "new": sanitized_address}
+        current_user.default_address = sanitized_address
     if user_data.default_address_lat is not None:
+        changes["default_address_lat"] = {"old": current_user.default_address_lat, "new": user_data.default_address_lat}
         current_user.default_address_lat = user_data.default_address_lat
     if user_data.default_address_lng is not None:
+        changes["default_address_lng"] = {"old": current_user.default_address_lng, "new": user_data.default_address_lng}
         current_user.default_address_lng = user_data.default_address_lng
 
     db.commit()
     db.refresh(current_user)
+
+    # Audit log profile update if any changes were made
+    if changes:
+        log_profile_updated(db, current_user, changes)
 
     # Calculate average rating for the user
     avg_result = db.query(func.avg(Rating.score)).filter(
@@ -358,8 +510,15 @@ async def verify_email(token: str, db: Session = Depends(get_db)):
 
     - **token**: Verification token sent to user's email
     """
-    # Find user by verification token
-    user = db.query(User).filter(User.verification_token == token).first()
+    # Hash the incoming token for secure comparison
+    token_hash_value = hash_token(token)
+
+    # Find user by verification token hash (preferred) or plain token (fallback for transition)
+    user = db.query(User).filter(User.verification_token_hash == token_hash_value).first()
+
+    if not user:
+        # Fallback to plain text token for users created before migration
+        user = db.query(User).filter(User.verification_token == token).first()
 
     if not user:
         raise HTTPException(
@@ -380,9 +539,10 @@ async def verify_email(token: str, db: Session = Depends(get_db)):
             detail="Verification token has expired. Please request a new verification email."
         )
 
-    # Mark user as verified and clear the token
+    # Mark user as verified and clear the token and hash
     user.is_verified = True
     user.verification_token = None
+    user.verification_token_hash = None
     user.verification_token_expires_at = None
     db.commit()
 
@@ -424,7 +584,8 @@ async def resend_verification_email(request: Request, email: EmailStr, db: Sessi
 
     # Generate new verification token (expires in 24 hours)
     verification_token = generate_verification_token()
-    user.verification_token = verification_token
+    user.verification_token = verification_token  # Store plain text for transition period
+    user.verification_token_hash = hash_token(verification_token)  # Store hash for security
     user.verification_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
     db.commit()
 
@@ -495,10 +656,19 @@ async def google_callback(request: Request, state: str = 'en', db: Session = Dep
             # Default role is 'sender', user can change it later
             # Use locale from OAuth state for new user's preferred language
             user_locale = state if state in ['en', 'fr', 'es'] else 'en'
+
+            # Encrypt PII data (dual-write: store both plain text and encrypted)
+            encryption_service = get_encryption_service()
+            full_name_value = full_name or email.split('@')[0]
+            encrypted_email = encryption_service.encrypt(email) if encryption_service else None
+            encrypted_full_name = encryption_service.encrypt(full_name_value) if encryption_service else None
+
             user = User(
                 email=email,
+                email_encrypted=encrypted_email,
                 hashed_password=get_password_hash(secrets.token_urlsafe(32)),  # Random password
-                full_name=full_name or email.split('@')[0],
+                full_name=full_name_value,
+                full_name_encrypted=encrypted_full_name,
                 role=UserRole.SENDER,
                 is_verified=True,  # Google emails are already verified
                 verification_token=None,
@@ -514,10 +684,33 @@ async def google_callback(request: Request, state: str = 'en', db: Session = Dep
                 user.is_verified = True
                 db.commit()
 
-        # Create access token
-        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        # Get client info for session tracking
+        ip_address = request.client.host if request.client else "unknown"
+        user_agent = request.headers.get("user-agent", "unknown")
+
+        # Create session in Redis (tracks active sessions across devices)
+        expire_minutes = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+        ttl_seconds = expire_minutes * 60
+        session_id = await SessionTracker.create_session(
+            user_id=user.id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            ttl_seconds=ttl_seconds
+        )
+
+        # Audit log session creation
+        log_session_created(db, user, session_id, request)
+
+        # Create access token with session_id and issued-at time
+        access_token_expires = timedelta(minutes=expire_minutes)
+        now = int(datetime.now(timezone.utc).timestamp())
         access_token = create_access_token(
-            data={"sub": user.email, "role": user.role.value},
+            data={
+                "sub": user.email,
+                "role": user.role.value,
+                "session_id": session_id,
+                "iat": now  # Issued-at time for token revocation
+            },
             expires_delta=access_token_expires
         )
 
@@ -560,7 +753,8 @@ async def forgot_password(request: Request, data: ForgotPasswordRequest, db: Ses
 
     # Generate password reset token (expires in 1 hour)
     reset_token = generate_verification_token()
-    user.password_reset_token = reset_token
+    user.password_reset_token = reset_token  # Store plain text for transition period
+    user.password_reset_token_hash = hash_token(reset_token)  # Store hash for security
     user.password_reset_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
     db.commit()
 
@@ -582,10 +776,28 @@ async def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_d
     Reset password using the reset token.
 
     - **token**: Password reset token from email
-    - **new_password**: New password (minimum 8 characters)
+    - **new_password**: New password meeting enhanced security requirements
     """
-    # Find user by reset token
-    user = db.query(User).filter(User.password_reset_token == data.token).first()
+    # Validate new password strength
+    is_valid, password_errors = validate_password(data.new_password)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Password does not meet security requirements",
+                "errors": password_errors
+            }
+        )
+
+    # Hash the incoming token for secure comparison
+    token_hash_value = hash_token(data.token)
+
+    # Find user by reset token hash (preferred) or plain token (fallback for transition)
+    user = db.query(User).filter(User.password_reset_token_hash == token_hash_value).first()
+
+    if not user:
+        # Fallback to plain text token for users with tokens created before migration
+        user = db.query(User).filter(User.password_reset_token == data.token).first()
 
     if not user:
         raise HTTPException(
@@ -605,24 +817,73 @@ async def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_d
                 detail="Password reset token has expired. Please request a new one."
             )
 
-    # Update password and clear reset token
+    # Update password and clear reset token and hash
     user.hashed_password = get_password_hash(data.new_password)
     user.password_reset_token = None
+    user.password_reset_token_hash = None
     user.password_reset_token_expires_at = None
     db.commit()
 
+    # Audit log password change
+    log_password_changed(db, user)
+
+    # Revoke all existing tokens for this user (security: password change = logout all sessions)
+    await JWTBlacklistService.revoke_all_user_tokens(
+        user.id,
+        revoke_before=datetime.now(timezone.utc)
+    )
+
     # Audit log password reset completion
     log_password_reset_complete(db, user)
+
+    logger.info(f"Password reset completed for user {user.id}, all existing sessions revoked")
 
     return {"message": "Password has been reset successfully. You can now log in with your new password."}
 
 
 @router.post("/logout", response_model=LoginResponse)
-async def logout(response: Response):
+async def logout(
+    request: Request,
+    response: Response,
+    current_user: User = Depends(get_current_user)
+):
     """
-    Logout user by clearing the authentication cookie.
+    Logout user by blacklisting their token and clearing the authentication cookie.
+
+    Security features:
+    - Token is added to Redis blacklist with TTL matching token expiration
+    - Session is deleted from Redis session tracking
+    - Cookie is cleared from browser
+    - Token cannot be reused even if intercepted
     """
+    # Get token from request
+    token = request.cookies.get(COOKIE_NAME)
+
+    session_id = None
+    if token:
+        # Extract session_id from token (if present)
+        try:
+            payload = verify_token(token)
+            if payload:
+                session_id = payload.get("session_id")
+                if session_id:
+                    # Delete the session from Redis
+                    await SessionTracker.delete_session(session_id, current_user.id)
+
+                    # Audit log session termination
+                    log_session_terminated(db, current_user, session_id, "user_logout", request)
+        except Exception:
+            # Ignore errors during session deletion
+            pass
+
+        # Blacklist the token so it cannot be reused
+        await JWTBlacklistService.blacklist_token(token, reason="logout")
+
+    # Clear the authentication cookie
     clear_auth_cookie(response)
+
+    logger.info(f"User {current_user.id} logged out successfully")
+
     return {"message": "Logged out successfully"}
 
 
@@ -660,12 +921,12 @@ async def send_phone_verification_code(
     # Set expiration time (10 minutes)
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
 
-    # Update user with verification code
-    current_user.phone_verification_code = code
+    # Update user with hashed verification code (for security)
+    current_user.phone_verification_code = hash_token(code)
     current_user.phone_verification_code_expires_at = expires_at
     db.commit()
 
-    # Send SMS with verification code
+    # Send SMS with plain text code (user needs to see it)
     await send_verification_code(current_user.phone_number, code)
 
     logger.info(f"Phone verification code sent to user {current_user.id}")
@@ -705,8 +966,9 @@ async def verify_phone_number(
             detail="Verification code has expired. Please request a new code."
         )
 
-    # Verify code
-    if current_user.phone_verification_code != verify_data.code:
+    # Verify code by comparing hashes
+    code_hash = hash_token(verify_data.code)
+    if current_user.phone_verification_code != code_hash:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid verification code"
@@ -755,12 +1017,12 @@ async def resend_phone_verification_code(
     # Set expiration time (10 minutes)
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
 
-    # Update user with new verification code
-    current_user.phone_verification_code = code
+    # Update user with hashed verification code (for security)
+    current_user.phone_verification_code = hash_token(code)
     current_user.phone_verification_code_expires_at = expires_at
     db.commit()
 
-    # Send SMS with verification code
+    # Send SMS with plain text code (user needs to see it)
     await send_verification_code(current_user.phone_number, code)
 
     logger.info(f"Phone verification code resent to user {current_user.id}")
@@ -768,4 +1030,126 @@ async def resend_phone_verification_code(
     return {
         "message": "Verification code resent to your phone number",
         "expires_in_minutes": 10
+    }
+
+
+# Session Management Endpoints
+
+@router.get("/sessions")
+async def get_active_sessions(
+    request: Request,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get all active sessions for the current user.
+
+    Shows sessions across all devices with:
+    - Device information (browser, OS)
+    - IP address
+    - Login time
+    - Last activity time
+    - Current session indicator
+    """
+    # Extract current session_id from token
+    token = request.cookies.get(COOKIE_NAME)
+    current_session_id = None
+
+    if token:
+        try:
+            payload = verify_token(token)
+            if payload:
+                current_session_id = payload.get("session_id")
+        except Exception:
+            pass
+
+    # Get all sessions for user
+    sessions = await SessionTracker.get_user_sessions(
+        user_id=current_user.id,
+        current_session_id=current_session_id
+    )
+
+    return {
+        "sessions": [session.to_dict() for session in sessions],
+        "total": len(sessions)
+    }
+
+
+@router.delete("/sessions/{session_id}")
+async def delete_specific_session(
+    request: Request,
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete a specific session (logout from a specific device).
+
+    This allows users to remotely logout from other devices.
+    """
+    # Attempt to delete the session
+    success = await SessionTracker.delete_session(session_id, current_user.id)
+
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found or does not belong to you"
+        )
+
+    # Audit log session deletion
+    log_session_deleted(db, current_user, session_id, request)
+
+    logger.info(f"User {current_user.id} deleted session {session_id}")
+
+    return {"message": "Session deleted successfully"}
+
+
+@router.delete("/sessions/others")
+async def delete_other_sessions(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete all sessions except the current one.
+
+    Useful for "logout from all other devices" functionality.
+    """
+    # Extract current session_id from token
+    token = request.cookies.get(COOKIE_NAME)
+    current_session_id = None
+
+    if token:
+        try:
+            payload = verify_token(token)
+            if payload:
+                current_session_id = payload.get("session_id")
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Could not identify current session"
+            )
+
+    if not current_session_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No active session found"
+        )
+
+    # Delete all sessions except current
+    deleted_count = await SessionTracker.delete_all_sessions_except_current(
+        user_id=current_user.id,
+        current_session_id=current_session_id
+    )
+
+    # Audit log batch session deletion
+    if deleted_count > 0:
+        log_session_deleted(
+            db, current_user, f"batch_{deleted_count}_sessions", request
+        )
+
+    logger.info(f"User {current_user.id} deleted {deleted_count} other sessions")
+
+    return {
+        "message": f"Successfully logged out from {deleted_count} other device(s)",
+        "deleted_count": deleted_count
     }

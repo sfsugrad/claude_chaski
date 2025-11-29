@@ -9,6 +9,8 @@ from app.models.message import Message
 from app.models.package_note import PackageNote, NoteAuthorType
 from app.models.audit_log import AuditLog, AuditAction
 from app.utils.dependencies import get_current_admin_user
+from app.utils.encryption import get_encryption_service
+from app.utils.password_validator import validate_password
 from app.services.audit_service import (
     log_user_create,
     log_user_update,
@@ -188,20 +190,33 @@ async def create_user(
             detail=f"Invalid role. Must be one of: SENDER, COURIER, BOTH, ADMIN"
         )
 
-    # Validate password length
-    if len(user_data.password) < 8:
+    # Validate password strength
+    is_valid, password_errors = validate_password(user_data.password)
+    if not is_valid:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password must be at least 8 characters long"
+            detail={
+                "message": "Password does not meet security requirements",
+                "errors": password_errors
+            }
         )
+
+    # Encrypt PII data (dual-write: store both plain text and encrypted)
+    encryption_service = get_encryption_service()
+    encrypted_email = encryption_service.encrypt(user_data.email) if encryption_service else None
+    encrypted_full_name = encryption_service.encrypt(user_data.full_name) if encryption_service else None
+    encrypted_phone = encryption_service.encrypt(user_data.phone_number) if encryption_service and user_data.phone_number else None
 
     # Create new user
     new_user = User(
         email=user_data.email,
+        email_encrypted=encrypted_email,
         hashed_password=get_password_hash(user_data.password),
         full_name=user_data.full_name,
+        full_name_encrypted=encrypted_full_name,
         role=user_role,
         phone_number=user_data.phone_number,
+        phone_number_encrypted=encrypted_phone,
         max_deviation_km=user_data.max_deviation_km,
         is_verified=True,  # Admin-created users are auto-verified
         is_active=True
@@ -354,14 +369,19 @@ async def update_user_profile(
     # Track changes for audit log
     changes = {}
 
-    # Update fields if provided
+    # Get encryption service for PII dual-write
+    encryption_service = get_encryption_service()
+
+    # Update fields if provided (dual-write for PII)
     if profile_update.full_name is not None:
         changes["full_name"] = {"old": user.full_name, "new": profile_update.full_name}
         user.full_name = profile_update.full_name
+        user.full_name_encrypted = encryption_service.encrypt(profile_update.full_name) if encryption_service else None
 
     if profile_update.phone_number is not None:
         changes["phone_number"] = {"old": user.phone_number, "new": profile_update.phone_number}
         user.phone_number = profile_update.phone_number
+        user.phone_number_encrypted = encryption_service.encrypt(profile_update.phone_number) if encryption_service else None
 
     if profile_update.max_deviation_km is not None:
         # Validate max_deviation_km range

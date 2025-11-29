@@ -19,6 +19,9 @@ itsdangerous==2.2.0
 # Email
 fastapi-mail==1.4.1
 
+# SMS (optional - for Twilio integration)
+twilio==9.0.4
+
 # Geospatial
 geopy==2.4.1
 shapely==2.0.6
@@ -31,6 +34,7 @@ pydantic-settings==2.7.0
 # Security
 slowapi==0.1.9
 bleach==6.1.0
+filetype==1.2.0
 
 # Redis and WebSockets
 redis==5.0.1
@@ -39,3 +43,4 @@ websockets==12.0
 # Testing (optional)
 pytest==7.4.4
 httpx==0.26.0
+user-agents==2.2.0

@@ -11,6 +11,7 @@ from botocore.exceptions import ClientError
 from botocore.config import Config
 
 from app.config import settings
+from app.utils.file_validator import validate_image_file, FileValidationError
 
 
 class FileStorageService:
@@ -37,10 +38,34 @@ class FileStorageService:
         return self._client
 
     def _generate_key(self, folder: str, package_id: int, file_type: str) -> str:
-        """Generate unique S3 key with date-based partitioning."""
-        now = datetime.utcnow()
-        unique_id = uuid.uuid4().hex[:12]
-        return f"{folder}/{now.year}/{now.month:02d}/{now.day:02d}/{package_id}/{file_type}_{unique_id}"
+        """
+        Generate cryptographically random S3 key to prevent enumeration attacks.
+
+        Security: Uses full UUIDs to make file paths unpredictable. This prevents
+        attackers from guessing file URLs by enumerating package IDs or dates.
+
+        Structure: folder/xx/yy/file_type_<uuid>_<uuid>
+        - xx/yy: First 4 chars of UUID for S3 performance (bucketing)
+        - Rest: Fully random, no package ID or date exposure
+
+        Example: photos/a7/3f/photo_b8c9d1e2f3a4b5c6d7e8f9_a1b2c3d4e5f6
+
+        Args:
+            folder: Folder name (photos or signatures)
+            package_id: Package ID (not exposed in key for security)
+            file_type: Type of file (photo or signature)
+
+        Returns:
+            Unpredictable S3 key
+        """
+        # Generate cryptographically random UUID
+        random_id = uuid.uuid4().hex  # 32 characters
+        # Add second UUID for additional entropy
+        random_suffix = uuid.uuid4().hex[:16]  # 16 characters
+
+        # Use first 4 chars for directory bucketing (S3 performance optimization)
+        # Rest is completely random - no package ID or date exposure
+        return f"{folder}/{random_id[:2]}/{random_id[2:4]}/{file_type}_{random_id[4:]}_{random_suffix}"
 
     async def generate_presigned_upload_url(
         self,
@@ -171,6 +196,8 @@ class FileStorageService:
         """
         Upload file directly from server (for signature canvas data).
 
+        Security: Validates file type by magic number before uploading.
+
         Args:
             file_data: File bytes
             package_id: Package ID for key generation
@@ -179,20 +206,71 @@ class FileStorageService:
 
         Returns:
             S3 key of uploaded file
+
+        Raises:
+            StorageError: If upload fails or file validation fails
         """
+        # Validate file type by magic number (security check)
+        try:
+            detected_mime = validate_image_file(file_data)
+        except FileValidationError as e:
+            raise StorageError(f"File validation failed: {str(e)}")
+
         folder = "photos" if file_type == "photo" else "signatures"
         key = self._generate_key(folder, package_id, file_type)
 
         try:
+            # Use detected MIME type instead of trusting client-provided content_type
             self.client.upload_fileobj(
                 BytesIO(file_data),
                 settings.AWS_S3_BUCKET,
                 key,
-                ExtraArgs={"ContentType": content_type}
+                ExtraArgs={"ContentType": detected_mime}
             )
             return key
         except ClientError as e:
             raise StorageError(f"Failed to upload file: {str(e)}")
+
+    async def validate_uploaded_file(self, key: str) -> bool:
+        """
+        Validate a file that was uploaded via pre-signed URL.
+
+        Downloads the first 8KB of the file to check magic number without
+        downloading the entire file.
+
+        Args:
+            key: S3 object key to validate
+
+        Returns:
+            True if file is valid
+
+        Raises:
+            StorageError: If file validation fails or file doesn't exist
+        """
+        try:
+            # Download first 8KB (enough to detect file type)
+            response = self.client.get_object(
+                Bucket=settings.AWS_S3_BUCKET,
+                Key=key,
+                Range="bytes=0-8191"  # First 8KB
+            )
+
+            # Read the bytes
+            file_data = response["Body"].read()
+
+            # Validate file type
+            try:
+                validate_image_file(file_data)
+                return True
+            except FileValidationError as e:
+                # Invalid file - delete it
+                await self.delete_file(key)
+                raise StorageError(f"Uploaded file validation failed: {str(e)}")
+
+        except ClientError as e:
+            if e.response["Error"]["Code"] == "404":
+                raise StorageError(f"File not found: {key}")
+            raise StorageError(f"Failed to validate file: {str(e)}")
 
     async def get_file_metadata(self, key: str) -> Optional[dict]:
         """

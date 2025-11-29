@@ -5,6 +5,8 @@ from typing import Optional
 from app.database import get_db
 from app.models.user import User
 from app.utils.auth import verify_token
+from app.services.jwt_blacklist import JWTBlacklistService
+from app.services.session_tracker import SessionTracker
 
 # Security scheme for JWT bearer token (kept for backward compatibility)
 security = HTTPBearer(auto_error=False)
@@ -38,7 +40,7 @@ def get_token_from_request(
     )
 
 
-def get_current_user(
+async def get_current_user(
     request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db)
@@ -47,6 +49,12 @@ def get_current_user(
     Dependency to get the current authenticated user from JWT token.
 
     Reads token from httpOnly cookie or Authorization header.
+
+    Security checks:
+    - Token signature and expiration validation
+    - Token blacklist check (logout/revoked tokens)
+    - User-level token revocation (password changes)
+    - User active status
 
     Raises:
         HTTPException: If token is invalid or user not found
@@ -63,6 +71,14 @@ def get_current_user(
     # Extract token from cookie or header
     token = get_token_from_request(request, credentials)
 
+    # Check if token is blacklisted (logout or explicit revocation)
+    if await JWTBlacklistService.is_token_blacklisted(token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     # Verify and decode token
     payload = verify_token(token)
     if payload is None:
@@ -78,12 +94,30 @@ def get_current_user(
     if user is None:
         raise credentials_exception
 
+    # Check if token is valid for this user (not revoked globally for password change)
+    if not await JWTBlacklistService.is_token_valid_for_user(token, user.id):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked due to password change",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     # Check if user is active
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Inactive user"
         )
+
+    # Update session last activity (if session tracking is enabled)
+    session_id = payload.get("session_id")
+    if session_id:
+        # Update last activity timestamp (non-blocking, ignore errors)
+        try:
+            await SessionTracker.update_last_activity(session_id)
+        except Exception:
+            # Don't fail authentication if session update fails
+            pass
 
     return user
 

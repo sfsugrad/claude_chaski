@@ -13,6 +13,7 @@ from app.models.package import Package
 from app.models.package_note import PackageNote, NoteAuthorType
 from app.models.notification import Notification, NotificationType
 from app.utils.dependencies import get_current_user
+from app.utils.input_sanitizer import sanitize_plain_text
 
 router = APIRouter()
 
@@ -171,12 +172,15 @@ async def add_package_note(
             detail="Note content cannot exceed 1000 characters"
         )
 
+    # Sanitize note content to prevent XSS
+    sanitized_content = sanitize_plain_text(note_data.content)
+
     # Create note
     note = PackageNote(
         package_id=package.id,
         author_id=current_user.id,
         author_type=author_type,
-        content=note_data.content.strip()
+        content=sanitized_content
     )
 
     db.add(note)
@@ -227,11 +231,14 @@ def add_system_note(db: Session, package_id: int, content: str):
     Helper function to add a system-generated note.
     Can be called from other modules when status changes occur.
     """
+    # Sanitize even system notes for consistency
+    sanitized_content = sanitize_plain_text(content)
+
     note = PackageNote(
         package_id=package_id,
         author_id=None,
         author_type=NoteAuthorType.SYSTEM,
-        content=content
+        content=sanitized_content
     )
     db.add(note)
     db.commit()

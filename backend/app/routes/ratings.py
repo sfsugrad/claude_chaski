@@ -10,6 +10,7 @@ from app.models.rating import Rating
 from app.models.notification import NotificationType
 from app.utils.dependencies import get_current_user
 from app.routes.notifications import create_notification_with_broadcast
+from app.utils.input_sanitizer import sanitize_rich_text
 
 router = APIRouter()
 
@@ -119,13 +120,18 @@ async def create_rating(
             detail="You have already rated this package"
         )
 
+    # Sanitize rating comment (allow safe HTML for basic formatting)
+    sanitized_comment = None
+    if rating_data.comment:
+        sanitized_comment = sanitize_rich_text(rating_data.comment)
+
     # Create the rating
     new_rating = Rating(
         rater_id=current_user.id,
         rated_user_id=rated_user_id,
         package_id=package.id,
         score=rating_data.score,
-        comment=rating_data.comment
+        comment=sanitized_comment
     )
 
     db.add(new_rating)
