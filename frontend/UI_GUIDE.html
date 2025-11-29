@@ -1,0 +1,1769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chaski UI Guide</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --color-primary-50: #EFF6FF;
+      --color-primary-100: #DBEAFE;
+      --color-primary-500: #3B82F6;
+      --color-primary-600: #2563EB;
+      --color-primary-700: #1D4ED8;
+      --color-primary-900: #1E3A8A;
+
+      --color-secondary-50: #ECFDF5;
+      --color-secondary-100: #D1FAE5;
+      --color-secondary-500: #10B981;
+      --color-secondary-600: #059669;
+
+      --color-success: #22C55E;
+      --color-warning: #F59E0B;
+      --color-error: #EF4444;
+      --color-info: #3B82F6;
+
+      --color-surface-50: #FAFAFA;
+      --color-surface-100: #F5F5F5;
+      --color-surface-200: #E5E5E5;
+      --color-surface-300: #D4D4D4;
+      --color-surface-600: #525252;
+      --color-surface-700: #404040;
+      --color-surface-800: #262626;
+      --color-surface-900: #171717;
+
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', Menlo, Monaco, monospace;
+
+      --shadow-card: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+      --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      font-size: 16px;
+      line-height: 1.6;
+      color: var(--color-surface-800);
+      background: var(--color-surface-50);
+    }
+
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, var(--color-primary-600) 0%, var(--color-secondary-500) 100%);
+      color: white;
+      padding: 3rem 2rem;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .header p {
+      font-size: 1.125rem;
+      opacity: 0.9;
+    }
+
+    /* Navigation */
+    .nav {
+      background: white;
+      border-bottom: 1px solid var(--color-surface-200);
+      padding: 1rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 99;
+      box-shadow: var(--shadow-card);
+    }
+
+    .nav-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .nav a {
+      color: var(--color-surface-600);
+      text-decoration: none;
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .nav a:hover {
+      background: var(--color-primary-50);
+      color: var(--color-primary-600);
+    }
+
+    .nav a.active {
+      background: var(--color-primary-500);
+      color: white;
+    }
+
+    /* Main Content */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    /* Sections */
+    .section {
+      background: white;
+      border-radius: 1rem;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: var(--shadow-card);
+    }
+
+    .section-header {
+      border-bottom: 2px solid var(--color-primary-100);
+      padding-bottom: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    h2 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--color-primary-700);
+      margin-bottom: 0.5rem;
+    }
+
+    h3 {
+      font-size: 1.375rem;
+      font-weight: 600;
+      color: var(--color-surface-800);
+      margin: 1.5rem 0 1rem;
+    }
+
+    h4 {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: var(--color-surface-700);
+      margin: 1.25rem 0 0.75rem;
+    }
+
+    p {
+      margin-bottom: 1rem;
+    }
+
+    /* Lists */
+    ul, ol {
+      margin: 1rem 0;
+      padding-left: 1.5rem;
+    }
+
+    li {
+      margin-bottom: 0.5rem;
+    }
+
+    li strong {
+      color: var(--color-primary-700);
+    }
+
+    /* Tables */
+    .table-wrapper {
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9375rem;
+    }
+
+    th {
+      background: var(--color-primary-50);
+      color: var(--color-primary-700);
+      font-weight: 600;
+      text-align: left;
+      padding: 0.75rem 1rem;
+      border-bottom: 2px solid var(--color-primary-200);
+    }
+
+    td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--color-surface-200);
+    }
+
+    tr:hover td {
+      background: var(--color-surface-50);
+    }
+
+    /* Code Blocks */
+    pre {
+      background: var(--color-surface-900);
+      color: #e5e5e5;
+      border-radius: 0.5rem;
+      padding: 1.25rem;
+      overflow-x: auto;
+      margin: 1rem 0;
+      font-family: var(--font-mono);
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.875em;
+    }
+
+    :not(pre) > code {
+      background: var(--color-primary-50);
+      color: var(--color-primary-700);
+      padding: 0.125rem 0.375rem;
+      border-radius: 0.25rem;
+    }
+
+    /* Syntax Highlighting */
+    .keyword { color: #c792ea; }
+    .string { color: #c3e88d; }
+    .comment { color: #676e95; }
+    .function { color: #82aaff; }
+    .variable { color: #f78c6c; }
+    .tag { color: #f07178; }
+    .attr { color: #ffcb6b; }
+
+    /* Cards */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    .card {
+      background: var(--color-surface-50);
+      border: 1px solid var(--color-surface-200);
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      transition: all 0.2s;
+    }
+
+    .card:hover {
+      box-shadow: var(--shadow-lg);
+      transform: translateY(-2px);
+    }
+
+    .card-icon {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, var(--color-primary-500), var(--color-secondary-500));
+      border-radius: 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .card h4 {
+      margin: 0 0 0.5rem;
+      color: var(--color-surface-800);
+    }
+
+    .card p {
+      color: var(--color-surface-600);
+      font-size: 0.9375rem;
+      margin: 0;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.025em;
+    }
+
+    .badge-primary { background: var(--color-primary-100); color: var(--color-primary-700); }
+    .badge-success { background: #dcfce7; color: #166534; }
+    .badge-warning { background: #fef3c7; color: #92400e; }
+    .badge-error { background: #fee2e2; color: #991b1b; }
+    .badge-info { background: #dbeafe; color: #1e40af; }
+
+    /* Status Table */
+    .status-table td:first-child {
+      font-weight: 500;
+    }
+
+    /* Alert Boxes */
+    .alert {
+      padding: 1rem 1.25rem;
+      border-radius: 0.5rem;
+      margin: 1rem 0;
+      border-left: 4px solid;
+    }
+
+    .alert-info {
+      background: var(--color-primary-50);
+      border-color: var(--color-primary-500);
+      color: var(--color-primary-800);
+    }
+
+    .alert-warning {
+      background: #fffbeb;
+      border-color: var(--color-warning);
+      color: #92400e;
+    }
+
+    .alert-success {
+      background: #f0fdf4;
+      border-color: var(--color-success);
+      color: #166534;
+    }
+
+    /* Two Column Layout */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+    }
+
+    @media (max-width: 768px) {
+      .two-col {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Part Headers */
+    .part-header {
+      background: linear-gradient(135deg, var(--color-primary-600) 0%, var(--color-primary-700) 100%);
+      color: white;
+      padding: 2rem;
+      border-radius: 1rem;
+      margin: 3rem 0 2rem;
+      text-align: center;
+    }
+
+    .part-header.developer {
+      background: linear-gradient(135deg, var(--color-secondary-500) 0%, var(--color-secondary-600) 100%);
+    }
+
+    .part-header h2 {
+      color: white;
+      font-size: 2rem;
+      margin: 0;
+    }
+
+    .part-header p {
+      opacity: 0.9;
+      margin: 0.5rem 0 0;
+    }
+
+    /* Component Examples */
+    .component-example {
+      background: var(--color-surface-100);
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      margin: 1rem 0;
+    }
+
+    .component-example h5 {
+      font-size: 0.875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--color-surface-600);
+      margin-bottom: 1rem;
+    }
+
+    /* Button Examples */
+    .btn-example {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.625rem 1.25rem;
+      border-radius: 0.5rem;
+      font-weight: 500;
+      font-size: 0.9375rem;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin: 0.25rem;
+    }
+
+    .btn-primary { background: var(--color-primary-500); color: white; }
+    .btn-secondary { background: var(--color-secondary-500); color: white; }
+    .btn-outline { background: transparent; border: 2px solid var(--color-primary-500); color: var(--color-primary-500); }
+    .btn-danger { background: var(--color-error); color: white; }
+
+    /* Color Swatches */
+    .color-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+
+    .color-swatch {
+      border-radius: 0.5rem;
+      overflow: hidden;
+      box-shadow: var(--shadow-card);
+    }
+
+    .color-swatch-preview {
+      height: 60px;
+    }
+
+    .color-swatch-info {
+      padding: 0.75rem;
+      background: white;
+      font-size: 0.8125rem;
+    }
+
+    .color-swatch-name {
+      font-weight: 600;
+      color: var(--color-surface-800);
+    }
+
+    .color-swatch-value {
+      color: var(--color-surface-600);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+    }
+
+    /* File Tree */
+    .file-tree {
+      font-family: var(--font-mono);
+      font-size: 0.875rem;
+      background: var(--color-surface-900);
+      color: #e5e5e5;
+      padding: 1.25rem;
+      border-radius: 0.5rem;
+      line-height: 1.6;
+    }
+
+    .file-tree .folder { color: #82aaff; }
+    .file-tree .file { color: #c3e88d; }
+    .file-tree .comment { color: #676e95; }
+
+    /* Divider */
+    hr {
+      border: none;
+      height: 1px;
+      background: var(--color-surface-200);
+      margin: 2rem 0;
+    }
+
+    /* Steps */
+    .steps {
+      counter-reset: step;
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .steps li {
+      position: relative;
+      padding-left: 3rem;
+      margin-bottom: 1rem;
+    }
+
+    .steps li::before {
+      counter-increment: step;
+      content: counter(step);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 2rem;
+      height: 2rem;
+      background: var(--color-primary-500);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 0.875rem;
+    }
+
+    /* TOC */
+    .toc {
+      background: var(--color-surface-100);
+      border-radius: 0.75rem;
+      padding: 1.5rem 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .toc h3 {
+      margin-top: 0;
+      color: var(--color-surface-700);
+    }
+
+    .toc ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      columns: 2;
+    }
+
+    .toc li {
+      margin-bottom: 0.5rem;
+    }
+
+    .toc a {
+      color: var(--color-primary-600);
+      text-decoration: none;
+    }
+
+    .toc a:hover {
+      text-decoration: underline;
+    }
+
+    @media (max-width: 600px) {
+      .toc ul {
+        columns: 1;
+      }
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--color-surface-600);
+      border-top: 1px solid var(--color-surface-200);
+      margin-top: 2rem;
+    }
+
+    /* Back to top */
+    .back-to-top {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      width: 48px;
+      height: 48px;
+      background: var(--color-primary-500);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      box-shadow: var(--shadow-lg);
+      transition: all 0.2s;
+    }
+
+    .back-to-top:hover {
+      background: var(--color-primary-600);
+      transform: translateY(-2px);
+    }
+
+    /* Flowchart Styles */
+    .flowchart-container {
+      overflow-x: auto;
+      padding: 1rem 0;
+    }
+
+    .flowchart {
+      min-width: 900px;
+      margin: 0 auto;
+    }
+
+    .flowchart-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      margin-top: 1.5rem;
+      padding: 1rem;
+      background: var(--color-surface-100);
+      border-radius: 0.5rem;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.875rem;
+    }
+
+    .legend-line {
+      width: 30px;
+      height: 3px;
+    }
+
+    .legend-line.normal { background: var(--color-primary-500); }
+    .legend-line.cancel { background: var(--color-error); stroke-dasharray: 5,5; }
+    .legend-line.admin { background: var(--color-warning); }
+    .legend-line.fallback { background: var(--color-surface-400); }
+
+    .legend-box {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+    }
+
+    .legend-box.active { background: var(--color-primary-100); border: 2px solid var(--color-primary-500); }
+    .legend-box.success { background: #dcfce7; border: 2px solid var(--color-success); }
+    .legend-box.terminal { background: #fee2e2; border: 2px solid var(--color-error); }
+
+    .transition-table {
+      margin-top: 2rem;
+    }
+
+    .transition-table td {
+      vertical-align: top;
+    }
+
+    .transition-arrow {
+      color: var(--color-primary-500);
+      font-weight: bold;
+    }
+
+    .admin-only {
+      display: inline-block;
+      background: #fef3c7;
+      color: #92400e;
+      font-size: 0.6875rem;
+      padding: 0.125rem 0.375rem;
+      border-radius: 0.25rem;
+      margin-left: 0.25rem;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <header class="header" id="top">
+    <h1>Chaski UI Guide</h1>
+    <p>Comprehensive guide for end-users and developers</p>
+  </header>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="#user-guide">User Guide</a>
+      <a href="#senders">Senders</a>
+      <a href="#package-lifecycle">Lifecycle</a>
+      <a href="#couriers">Couriers</a>
+      <a href="#developer-guide">Developer Guide</a>
+      <a href="#components">Components</a>
+      <a href="#design-tokens">Design Tokens</a>
+      <a href="#patterns">Patterns</a>
+    </div>
+  </nav>
+
+  <main class="container">
+    <!-- Table of Contents -->
+    <div class="toc">
+      <h3>Table of Contents</h3>
+      <ul>
+        <li><a href="#user-guide">Part 1: End-User Guide</a></li>
+        <li><a href="#getting-started">Getting Started</a></li>
+        <li><a href="#senders">For Senders</a></li>
+        <li><a href="#package-lifecycle">Package Lifecycle</a></li>
+        <li><a href="#couriers">For Couriers</a></li>
+        <li><a href="#messaging">Messaging</a></li>
+        <li><a href="#notifications">Notifications</a></li>
+        <li><a href="#reviews">Reviews & Ratings</a></li>
+        <li><a href="#developer-guide">Part 2: Developer Guide</a></li>
+        <li><a href="#tech-stack">Technology Stack</a></li>
+        <li><a href="#project-structure">Project Structure</a></li>
+        <li><a href="#components">Component Library</a></li>
+        <li><a href="#design-tokens">Design Tokens</a></li>
+        <li><a href="#patterns">Form Patterns</a></li>
+        <li><a href="#api">API Integration</a></li>
+        <li><a href="#i18n">Internationalization</a></li>
+        <li><a href="#testing">Testing</a></li>
+      </ul>
+    </div>
+
+    <!-- PART 1: USER GUIDE -->
+    <div class="part-header" id="user-guide">
+      <h2>Part 1: End-User Guide</h2>
+      <p>Learn how to use the Chaski logistics platform</p>
+    </div>
+
+    <!-- Getting Started -->
+    <section class="section" id="getting-started">
+      <div class="section-header">
+        <h2>Getting Started</h2>
+      </div>
+
+      <h3>Account Creation</h3>
+      <ol class="steps">
+        <li>Navigate to the home page and click <strong>Get Started</strong> or <strong>Register</strong></li>
+        <li>Choose your role:
+          <ul>
+            <li><strong>Sender</strong> - Ship packages with travelers</li>
+            <li><strong>Courier</strong> - Deliver packages on your routes</li>
+            <li><strong>Both</strong> - Use both features</li>
+          </ul>
+        </li>
+        <li>Complete registration with email, password, and phone number</li>
+        <li>Verify your email via the confirmation link sent to your inbox</li>
+        <li>Optionally verify your phone number for enhanced trust</li>
+      </ol>
+
+      <h3>Logging In</h3>
+      <ul>
+        <li>Use email/password or Google Sign-In</li>
+        <li>Enable "Remember me" to stay logged in</li>
+        <li>After 5 failed attempts, your account locks for 15 minutes</li>
+      </ul>
+    </section>
+
+    <!-- For Senders -->
+    <section class="section" id="senders">
+      <div class="section-header">
+        <h2>For Senders</h2>
+      </div>
+
+      <h3>Creating a Package</h3>
+      <ol class="steps">
+        <li><strong>Navigate</strong> to Dashboard &rarr; Create Package</li>
+        <li><strong>Step 1 - Details:</strong> Enter package description, select size (small/medium/large/extra large), and weight</li>
+        <li><strong>Step 2 - Pickup:</strong> Enter pickup address using the autocomplete, add contact info</li>
+        <li><strong>Step 3 - Dropoff:</strong> Enter destination address and recipient contact</li>
+        <li><strong>Step 4 - Review:</strong> Confirm all details and submit</li>
+      </ol>
+
+      <h3>Managing Packages</h3>
+      <p><strong>Dashboard Overview:</strong></p>
+      <ul>
+        <li>View all your packages with status filters</li>
+        <li>Filter by: All, Active, Delivered, Canceled</li>
+      </ul>
+
+      <h4>Package Statuses</h4>
+      <div class="table-wrapper">
+        <table class="status-table">
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Meaning</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="badge badge-info">New</span></td><td>Just created, not yet open for bids</td></tr>
+            <tr><td><span class="badge badge-primary">Open for Bids</span></td><td>Couriers can submit delivery offers</td></tr>
+            <tr><td><span class="badge badge-warning">Bid Selected</span></td><td>You've chosen a courier</td></tr>
+            <tr><td><span class="badge badge-warning">Pending Pickup</span></td><td>Waiting for courier to collect</td></tr>
+            <tr><td><span class="badge badge-info">In Transit</span></td><td>Package is being delivered</td></tr>
+            <tr><td><span class="badge badge-success">Delivered</span></td><td>Successfully completed</td></tr>
+            <tr><td><span class="badge badge-error">Canceled</span></td><td>You canceled the shipment</td></tr>
+            <tr><td><span class="badge badge-error">Failed</span></td><td>Delivery attempt unsuccessful</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4 id="package-lifecycle">Package Lifecycle Flowchart</h4>
+      <p>The following diagram shows all possible state transitions for a package:</p>
+
+      <div class="flowchart-container">
+        <svg class="flowchart" viewBox="0 0 920 520" xmlns="http://www.w3.org/2000/svg">
+          <!-- Definitions -->
+          <defs>
+            <!-- Arrow markers -->
+            <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,6 L9,3 z" fill="#3B82F6"/>
+            </marker>
+            <marker id="arrowRed" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,6 L9,3 z" fill="#EF4444"/>
+            </marker>
+            <marker id="arrowOrange" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,6 L9,3 z" fill="#F59E0B"/>
+            </marker>
+            <marker id="arrowGray" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,6 L9,3 z" fill="#9CA3AF"/>
+            </marker>
+
+            <!-- Drop shadow filter -->
+            <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.15"/>
+            </filter>
+          </defs>
+
+          <!-- Background -->
+          <rect width="920" height="520" fill="#FAFAFA" rx="8"/>
+
+          <!-- Main Flow Path (horizontal) -->
+          <!-- NEW -->
+          <g transform="translate(40, 200)">
+            <rect width="100" height="50" rx="8" fill="#DBEAFE" stroke="#3B82F6" stroke-width="2" filter="url(#shadow)"/>
+            <text x="50" y="30" text-anchor="middle" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#1E3A8A">NEW</text>
+          </g>
+
+          <!-- Arrow: NEW → OPEN_FOR_BIDS -->
+          <path d="M140,225 L170,225" stroke="#3B82F6" stroke-width="2" marker-end="url(#arrowBlue)"/>
+
+          <!-- OPEN_FOR_BIDS -->
+          <g transform="translate(175, 200)">
+            <rect width="120" height="50" rx="8" fill="#DBEAFE" stroke="#3B82F6" stroke-width="2" filter="url(#shadow)"/>
+            <text x="60" y="24" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#1E3A8A">OPEN FOR</text>
+            <text x="60" y="38" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#1E3A8A">BIDS</text>
+          </g>
+
+          <!-- Arrow: OPEN_FOR_BIDS → BID_SELECTED -->
+          <path d="M295,225 L325,225" stroke="#3B82F6" stroke-width="2" marker-end="url(#arrowBlue)"/>
+
+          <!-- BID_SELECTED -->
+          <g transform="translate(330, 200)">
+            <rect width="110" height="50" rx="8" fill="#DBEAFE" stroke="#3B82F6" stroke-width="2" filter="url(#shadow)"/>
+            <text x="55" y="24" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#1E3A8A">BID</text>
+            <text x="55" y="38" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#1E3A8A">SELECTED</text>
+          </g>
+
+          <!-- Arrow: BID_SELECTED → PENDING_PICKUP -->
+          <path d="M440,225 L470,225" stroke="#3B82F6" stroke-width="2" marker-end="url(#arrowBlue)"/>
+
+          <!-- PENDING_PICKUP -->
+          <g transform="translate(475, 200)">
+            <rect width="110" height="50" rx="8" fill="#DBEAFE" stroke="#3B82F6" stroke-width="2" filter="url(#shadow)"/>
+            <text x="55" y="24" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#1E3A8A">PENDING</text>
+            <text x="55" y="38" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#1E3A8A">PICKUP</text>
+          </g>
+
+          <!-- Arrow: PENDING_PICKUP → IN_TRANSIT -->
+          <path d="M585,225 L615,225" stroke="#3B82F6" stroke-width="2" marker-end="url(#arrowBlue)"/>
+
+          <!-- IN_TRANSIT -->
+          <g transform="translate(620, 200)">
+            <rect width="100" height="50" rx="8" fill="#DBEAFE" stroke="#3B82F6" stroke-width="2" filter="url(#shadow)"/>
+            <text x="50" y="24" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#1E3A8A">IN</text>
+            <text x="50" y="38" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#1E3A8A">TRANSIT</text>
+          </g>
+
+          <!-- Arrow: IN_TRANSIT → DELIVERED -->
+          <path d="M720,225 L750,225" stroke="#3B82F6" stroke-width="2" marker-end="url(#arrowBlue)"/>
+
+          <!-- DELIVERED (Success Terminal) -->
+          <g transform="translate(755, 200)">
+            <rect width="110" height="50" rx="8" fill="#DCFCE7" stroke="#22C55E" stroke-width="2" filter="url(#shadow)"/>
+            <text x="55" y="30" text-anchor="middle" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#166534">DELIVERED</text>
+            <text x="55" y="44" text-anchor="middle" font-family="Inter, sans-serif" font-size="9" fill="#166534">(Terminal)</text>
+          </g>
+
+          <!-- CANCELED (Error Terminal) - Bottom Center -->
+          <g transform="translate(330, 420)">
+            <rect width="110" height="50" rx="8" fill="#FEE2E2" stroke="#EF4444" stroke-width="2" filter="url(#shadow)"/>
+            <text x="55" y="30" text-anchor="middle" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#991B1B">CANCELED</text>
+            <text x="55" y="44" text-anchor="middle" font-family="Inter, sans-serif" font-size="9" fill="#991B1B">(Terminal)</text>
+          </g>
+
+          <!-- FAILED - Right side -->
+          <g transform="translate(620, 340)">
+            <rect width="100" height="50" rx="8" fill="#FEF3C7" stroke="#F59E0B" stroke-width="2" filter="url(#shadow)"/>
+            <text x="50" y="30" text-anchor="middle" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#92400E">FAILED</text>
+          </g>
+
+          <!-- Cancel transitions (dashed red lines) -->
+          <!-- NEW → CANCELED -->
+          <path d="M90,250 L90,380 L330,445" stroke="#EF4444" stroke-width="1.5" stroke-dasharray="5,3" fill="none" marker-end="url(#arrowRed)"/>
+
+          <!-- OPEN_FOR_BIDS → CANCELED -->
+          <path d="M235,250 L235,380 L330,445" stroke="#EF4444" stroke-width="1.5" stroke-dasharray="5,3" fill="none" marker-end="url(#arrowRed)"/>
+
+          <!-- BID_SELECTED → CANCELED -->
+          <path d="M385,250 L385,420" stroke="#EF4444" stroke-width="1.5" stroke-dasharray="5,3" fill="none" marker-end="url(#arrowRed)"/>
+
+          <!-- PENDING_PICKUP → CANCELED -->
+          <path d="M530,250 L530,380 L440,445" stroke="#EF4444" stroke-width="1.5" stroke-dasharray="5,3" fill="none" marker-end="url(#arrowRed)"/>
+
+          <!-- BID_SELECTED → OPEN_FOR_BIDS (fallback - gray curved line) -->
+          <path d="M385,200 Q385,140 235,140 L235,195" stroke="#9CA3AF" stroke-width="2" fill="none" marker-end="url(#arrowGray)"/>
+          <text x="310" y="130" text-anchor="middle" font-family="Inter, sans-serif" font-size="10" fill="#6B7280">bid declined</text>
+
+          <!-- IN_TRANSIT → FAILED (admin only - orange) -->
+          <path d="M670,250 L670,335" stroke="#F59E0B" stroke-width="2" fill="none" marker-end="url(#arrowOrange)"/>
+          <rect x="680" y="280" width="55" height="16" rx="3" fill="#FEF3C7"/>
+          <text x="707" y="291" text-anchor="middle" font-family="Inter, sans-serif" font-size="9" font-weight="600" fill="#92400E">Admin</text>
+
+          <!-- FAILED → OPEN_FOR_BIDS (admin retry - orange curved line) -->
+          <path d="M620,365 Q400,365 400,80 Q400,60 235,60 L235,195" stroke="#F59E0B" stroke-width="2" fill="none" marker-end="url(#arrowOrange)"/>
+          <rect x="290" y="50" width="80" height="16" rx="3" fill="#FEF3C7"/>
+          <text x="330" y="61" text-anchor="middle" font-family="Inter, sans-serif" font-size="9" font-weight="600" fill="#92400E">Admin Retry</text>
+
+          <!-- Title -->
+          <text x="460" y="30" text-anchor="middle" font-family="Inter, sans-serif" font-size="16" font-weight="700" fill="#1E3A8A">Package Status State Machine</text>
+
+          <!-- Labels for main flow -->
+          <text x="155" y="210" text-anchor="middle" font-family="Inter, sans-serif" font-size="9" fill="#3B82F6">publish</text>
+          <text x="310" y="210" text-anchor="middle" font-family="Inter, sans-serif" font-size="9" fill="#3B82F6">select bid</text>
+          <text x="455" y="210" text-anchor="middle" font-family="Inter, sans-serif" font-size="9" fill="#3B82F6">confirm</text>
+          <text x="600" y="210" text-anchor="middle" font-family="Inter, sans-serif" font-size="9" fill="#3B82F6">pickup</text>
+          <text x="735" y="210" text-anchor="middle" font-family="Inter, sans-serif" font-size="9" fill="#3B82F6">deliver</text>
+
+          <!-- Cancel labels -->
+          <text x="75" y="330" text-anchor="middle" font-family="Inter, sans-serif" font-size="9" fill="#EF4444" transform="rotate(-70, 75, 330)">cancel</text>
+          <text x="220" y="330" text-anchor="middle" font-family="Inter, sans-serif" font-size="9" fill="#EF4444" transform="rotate(-70, 220, 330)">cancel</text>
+          <text x="395" y="330" text-anchor="middle" font-family="Inter, sans-serif" font-size="9" fill="#EF4444">cancel</text>
+          <text x="545" y="330" text-anchor="middle" font-family="Inter, sans-serif" font-size="9" fill="#EF4444" transform="rotate(70, 545, 330)">cancel</text>
+        </svg>
+      </div>
+
+      <div class="flowchart-legend">
+        <div class="legend-item">
+          <div class="legend-line normal"></div>
+          <span>Normal transition</span>
+        </div>
+        <div class="legend-item">
+          <svg width="30" height="3"><line x1="0" y1="1.5" x2="30" y2="1.5" stroke="#EF4444" stroke-width="2" stroke-dasharray="5,3"/></svg>
+          <span>Cancel (user)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-line admin"></div>
+          <span>Admin only</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-line fallback"></div>
+          <span>Fallback/Decline</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-box active"></div>
+          <span>Active state</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-box success"></div>
+          <span>Success terminal</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-box terminal"></div>
+          <span>Error terminal</span>
+        </div>
+      </div>
+
+      <h4>State Transition Rules</h4>
+      <div class="table-wrapper transition-table">
+        <table>
+          <thead>
+            <tr>
+              <th>From State</th>
+              <th>Allowed Transitions</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="badge badge-info">New</span></td>
+              <td>
+                <span class="transition-arrow">&rarr;</span> Open for Bids<br>
+                <span class="transition-arrow">&rarr;</span> Canceled
+              </td>
+              <td>Package created, waiting to be published</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-primary">Open for Bids</span></td>
+              <td>
+                <span class="transition-arrow">&rarr;</span> Bid Selected<br>
+                <span class="transition-arrow">&rarr;</span> Canceled
+              </td>
+              <td>Couriers can submit bids</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-warning">Bid Selected</span></td>
+              <td>
+                <span class="transition-arrow">&rarr;</span> Pending Pickup<br>
+                <span class="transition-arrow">&rarr;</span> Open for Bids<br>
+                <span class="transition-arrow">&rarr;</span> Canceled
+              </td>
+              <td>Can revert to Open for Bids if courier declines</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-warning">Pending Pickup</span></td>
+              <td>
+                <span class="transition-arrow">&rarr;</span> In Transit<br>
+                <span class="transition-arrow">&rarr;</span> Canceled
+              </td>
+              <td>Courier confirmed, awaiting pickup</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-info">In Transit</span></td>
+              <td>
+                <span class="transition-arrow">&rarr;</span> Delivered<br>
+                <span class="transition-arrow">&rarr;</span> Failed <span class="admin-only">Admin</span>
+              </td>
+              <td>Cannot be canceled once in transit</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-success">Delivered</span></td>
+              <td><em>None (terminal state)</em></td>
+              <td>Package successfully delivered</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-error">Canceled</span></td>
+              <td><em>None (terminal state)</em></td>
+              <td>Package canceled by sender</td>
+            </tr>
+            <tr>
+              <td><span class="badge" style="background:#fef3c7;color:#92400e;">Failed</span></td>
+              <td>
+                <span class="transition-arrow">&rarr;</span> Open for Bids <span class="admin-only">Admin</span>
+              </td>
+              <td>Admin can retry by reopening for bids</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="alert alert-info" style="margin-top: 1.5rem;">
+        <strong>Note:</strong> All status transitions are enforced by the backend. The <code>package_status.py</code> service validates transitions and prevents invalid state changes.
+      </div>
+
+      <h4>Available Actions</h4>
+      <ul>
+        <li><strong>View Details</strong> - See full package info, courier details, and tracking</li>
+        <li><strong>View Bids</strong> - Compare courier offers (when open for bids)</li>
+        <li><strong>Accept Bid</strong> - Choose a courier's offer</li>
+        <li><strong>Cancel Package</strong> - Cancel before pickup (restrictions apply)</li>
+        <li><strong>Rate Courier</strong> - Leave feedback after delivery</li>
+      </ul>
+
+      <h3>Reviewing Bids</h3>
+      <p>When couriers submit bids:</p>
+      <ol class="steps">
+        <li>Click <strong>View Bids</strong> on your package card</li>
+        <li>Compare offers based on: proposed price, estimated delivery time, courier rating and reviews, courier message</li>
+        <li>Click <strong>Accept</strong> on your preferred bid</li>
+        <li>The courier is notified and pickup is scheduled</li>
+      </ol>
+
+      <h3>Tracking Delivery</h3>
+      <p>Once a courier picks up your package:</p>
+      <ul>
+        <li>View real-time location on the map</li>
+        <li>See estimated time of arrival</li>
+        <li>Receive notifications at each status change</li>
+        <li>Contact courier via in-app messaging</li>
+      </ul>
+    </section>
+
+    <!-- For Couriers -->
+    <section class="section" id="couriers">
+      <div class="section-header">
+        <h2>For Couriers</h2>
+      </div>
+
+      <h3>Creating a Route</h3>
+      <ol class="steps">
+        <li><strong>Navigate</strong> to Dashboard &rarr; Create Route</li>
+        <li><strong>Enter details:</strong> Starting location, destination, trip date and departure time, maximum deviation distance</li>
+        <li><strong>Submit</strong> - Your route becomes active for matching</li>
+      </ol>
+
+      <h3>Finding Packages</h3>
+      <ol>
+        <li>Go to your active route</li>
+        <li>Click <strong>View Matches</strong> to see packages along your path</li>
+        <li>Packages are sorted by relevance to your route</li>
+        <li>Review package details: pickup/dropoff locations, size and weight, sender rating, offered price range</li>
+      </ol>
+
+      <h3>Placing Bids</h3>
+      <ol class="steps">
+        <li>Click <strong>Place Bid</strong> on a matching package</li>
+        <li>Enter: your proposed delivery price, estimated delivery time (hours), preferred pickup time, optional message to sender</li>
+        <li>Submit your bid</li>
+        <li>Wait for sender response (you'll be notified)</li>
+      </ol>
+
+      <h3>Delivering Packages</h3>
+
+      <div class="two-col">
+        <div>
+          <h4>Pickup</h4>
+          <ol>
+            <li>Navigate to pickup location at scheduled time</li>
+            <li>Verify package matches description</li>
+            <li>Mark as "Picked Up" in the app</li>
+          </ol>
+
+          <h4>In Transit</h4>
+          <ul>
+            <li>Enable location sharing for sender tracking</li>
+            <li>Update status if delays occur</li>
+            <li>Contact sender via messages if needed</li>
+          </ul>
+        </div>
+        <div>
+          <h4>Delivery</h4>
+          <ol>
+            <li>Navigate to dropoff location</li>
+            <li>Capture delivery proof: take photo, obtain signature (if required)</li>
+            <li>Mark as "Delivered"</li>
+            <li>Receive payment after confirmation</li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <!-- Messaging & Notifications -->
+    <section class="section" id="messaging">
+      <div class="section-header">
+        <h2>Messaging</h2>
+      </div>
+      <ul>
+        <li>Access <strong>Messages</strong> from the navigation bar</li>
+        <li>Conversations are organized by package</li>
+        <li>Real-time updates - no page refresh needed</li>
+        <li>View message history for past deliveries</li>
+      </ul>
+    </section>
+
+    <section class="section" id="notifications">
+      <div class="section-header">
+        <h2>Notifications</h2>
+      </div>
+      <ul>
+        <li>Click the bell icon in the navigation bar</li>
+        <li>View unread notification count</li>
+        <li>Notification types:
+          <ul>
+            <li>New bid on your package</li>
+            <li>Bid accepted/declined</li>
+            <li>Package status changes</li>
+            <li>New messages</li>
+            <li>Rating received</li>
+          </ul>
+        </li>
+        <li>Mark as read individually or all at once</li>
+      </ul>
+    </section>
+
+    <!-- Reviews -->
+    <section class="section" id="reviews">
+      <div class="section-header">
+        <h2>Reviews and Ratings</h2>
+      </div>
+
+      <div class="two-col">
+        <div>
+          <h4>Leaving a Review</h4>
+          <ul>
+            <li>After delivery, you'll be prompted to rate</li>
+            <li>Rate 1-5 stars</li>
+            <li>Add optional written feedback</li>
+            <li>Reviews help build community trust</li>
+          </ul>
+        </div>
+        <div>
+          <h4>Viewing Reviews</h4>
+          <ul>
+            <li>Go to Profile &rarr; Reviews</li>
+            <li>See ratings you've received</li>
+            <li>View ratings you've given</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Language Settings -->
+    <section class="section">
+      <div class="section-header">
+        <h2>Language Settings</h2>
+      </div>
+      <ul>
+        <li>Click the language icon in the top-right corner</li>
+        <li>Choose from: English (en), French (fr), Spanish (es)</li>
+        <li>The interface updates immediately</li>
+      </ul>
+    </section>
+
+    <!-- PART 2: DEVELOPER GUIDE -->
+    <div class="part-header developer" id="developer-guide">
+      <h2>Part 2: Developer UI Guide</h2>
+      <p>Technical documentation for building and maintaining the UI</p>
+    </div>
+
+    <!-- Technology Stack -->
+    <section class="section" id="tech-stack">
+      <div class="section-header">
+        <h2>Technology Stack</h2>
+      </div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Technology</th>
+              <th>Version</th>
+              <th>Purpose</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Next.js</td><td>14</td><td>React framework with App Router</td></tr>
+            <tr><td>React</td><td>18</td><td>UI library</td></tr>
+            <tr><td>TypeScript</td><td>5</td><td>Type safety</td></tr>
+            <tr><td>Tailwind CSS</td><td>3.3</td><td>Utility-first styling</td></tr>
+            <tr><td>next-intl</td><td>4.5</td><td>Internationalization</td></tr>
+            <tr><td>Recharts</td><td>-</td><td>Data visualization</td></tr>
+            <tr><td>React Google Maps</td><td>-</td><td>Map integration</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Project Structure -->
+    <section class="section" id="project-structure">
+      <div class="section-header">
+        <h2>Project Structure</h2>
+      </div>
+
+      <div class="file-tree">
+<span class="folder">frontend/</span>
+├── <span class="folder">app/</span>
+│   └── <span class="folder">[locale]/</span>           <span class="comment"># i18n routing (en, fr, es)</span>
+│       ├── <span class="file">page.tsx</span>        <span class="comment"># Landing page</span>
+│       ├── <span class="folder">login/</span>          <span class="comment"># Authentication pages</span>
+│       ├── <span class="folder">register/</span>
+│       ├── <span class="folder">dashboard/</span>
+│       ├── <span class="folder">sender/</span>         <span class="comment"># Sender-specific pages</span>
+│       ├── <span class="folder">courier/</span>        <span class="comment"># Courier-specific pages</span>
+│       ├── <span class="folder">packages/</span>
+│       ├── <span class="folder">messages/</span>
+│       ├── <span class="folder">notifications/</span>
+│       ├── <span class="folder">admin/</span>          <span class="comment"># Admin pages</span>
+│       └── <span class="file">layout.tsx</span>      <span class="comment"># Root layout</span>
+├── <span class="folder">components/</span>
+│   ├── <span class="folder">ui/</span>                 <span class="comment"># Base UI components</span>
+│   ├── <span class="folder">analytics/</span>          <span class="comment"># Analytics components</span>
+│   ├── <span class="folder">charts/</span>             <span class="comment"># Chart components</span>
+│   ├── <span class="folder">logistics/</span>          <span class="comment"># Package/route components</span>
+│   ├── <span class="folder">map/</span>                <span class="comment"># Map components</span>
+│   ├── <span class="folder">tracking/</span>           <span class="comment"># Tracking components</span>
+│   ├── <span class="folder">proof/</span>              <span class="comment"># Delivery proof components</span>
+│   └── <span class="folder">payment/</span>            <span class="comment"># Payment components</span>
+├── <span class="folder">contexts/</span>
+│   └── <span class="file">WebSocketContext.tsx</span>
+├── <span class="folder">hooks/</span>
+│   └── <span class="file">useWebSocket.ts</span>
+├── <span class="folder">lib/</span>
+│   ├── <span class="file">api.ts</span>              <span class="comment"># API client (REQUIRED)</span>
+│   └── <span class="file">logger.ts</span>           <span class="comment"># Frontend logging</span>
+├── <span class="folder">messages/</span>               <span class="comment"># i18n translation files</span>
+│   ├── <span class="file">en.json</span>
+│   ├── <span class="file">fr.json</span>
+│   └── <span class="file">es.json</span>
+└── <span class="file">globals.css</span>             <span class="comment"># Global styles</span>
+      </div>
+    </section>
+
+    <!-- Component Library -->
+    <section class="section" id="components">
+      <div class="section-header">
+        <h2>Component Library</h2>
+      </div>
+
+      <h3>Base UI Components</h3>
+      <p>Located in <code>components/ui/</code></p>
+
+      <h4>Button</h4>
+      <div class="component-example">
+        <h5>Example</h5>
+        <button class="btn-example btn-primary">Primary</button>
+        <button class="btn-example btn-secondary">Secondary</button>
+        <button class="btn-example btn-outline">Outline</button>
+        <button class="btn-example btn-danger">Danger</button>
+      </div>
+      <pre><code><span class="keyword">import</span> { Button } <span class="keyword">from</span> <span class="string">'@/components/ui/Button'</span>;
+
+<span class="tag">&lt;Button</span>
+  <span class="attr">variant</span>=<span class="string">"primary"</span>    <span class="comment">// primary | secondary | outline | ghost | danger | success</span>
+  <span class="attr">size</span>=<span class="string">"md"</span>            <span class="comment">// sm | md | lg</span>
+  <span class="attr">isLoading</span>={<span class="variable">false</span>}
+  <span class="attr">leftIcon</span>={<span class="tag">&lt;Icon /&gt;</span>}
+  <span class="attr">fullWidth</span>={<span class="variable">false</span>}
+<span class="tag">&gt;</span>
+  Click Me
+<span class="tag">&lt;/Button&gt;</span></code></pre>
+
+      <h4>Input</h4>
+      <pre><code><span class="keyword">import</span> { Input } <span class="keyword">from</span> <span class="string">'@/components/ui/Input'</span>;
+
+<span class="tag">&lt;Input</span>
+  <span class="attr">label</span>=<span class="string">"Email"</span>
+  <span class="attr">type</span>=<span class="string">"email"</span>
+  <span class="attr">name</span>=<span class="string">"email"</span>
+  <span class="attr">error</span>=<span class="string">"Invalid email"</span>
+  <span class="attr">helperText</span>=<span class="string">"We'll never share your email"</span>
+  <span class="attr">leftIcon</span>={<span class="tag">&lt;EmailIcon /&gt;</span>}
+<span class="tag">/&gt;</span></code></pre>
+
+      <h4>Card</h4>
+      <pre><code><span class="keyword">import</span> { Card, CardHeader, CardBody, CardFooter } <span class="keyword">from</span> <span class="string">'@/components/ui/Card'</span>;
+
+<span class="tag">&lt;Card</span> <span class="attr">hoverable</span> <span class="attr">padding</span>=<span class="string">"md"</span><span class="tag">&gt;</span>
+  <span class="tag">&lt;CardHeader&gt;</span>Title<span class="tag">&lt;/CardHeader&gt;</span>
+  <span class="tag">&lt;CardBody&gt;</span>Content here<span class="tag">&lt;/CardBody&gt;</span>
+  <span class="tag">&lt;CardFooter&gt;</span>Actions<span class="tag">&lt;/CardFooter&gt;</span>
+<span class="tag">&lt;/Card&gt;</span></code></pre>
+
+      <h4>Badge</h4>
+      <div class="component-example">
+        <h5>Example</h5>
+        <span class="badge badge-primary">Primary</span>
+        <span class="badge badge-success">Success</span>
+        <span class="badge badge-warning">Warning</span>
+        <span class="badge badge-error">Error</span>
+        <span class="badge badge-info">Info</span>
+      </div>
+      <pre><code><span class="keyword">import</span> { Badge } <span class="keyword">from</span> <span class="string">'@/components/ui/Badge'</span>;
+
+<span class="tag">&lt;Badge</span> <span class="attr">variant</span>=<span class="string">"success"</span> <span class="attr">size</span>=<span class="string">"md"</span><span class="tag">&gt;</span>Active<span class="tag">&lt;/Badge&gt;</span>
+<span class="comment">// Variants: primary | secondary | success | warning | error | info</span></code></pre>
+
+      <h4>Modal</h4>
+      <pre><code><span class="keyword">import</span> { Modal } <span class="keyword">from</span> <span class="string">'@/components/ui/Modal'</span>;
+
+<span class="tag">&lt;Modal</span> <span class="attr">isOpen</span>={isOpen} <span class="attr">onClose</span>={onClose} <span class="attr">size</span>=<span class="string">"md"</span><span class="tag">&gt;</span>
+  <span class="tag">&lt;Modal.Header&gt;</span>Title<span class="tag">&lt;/Modal.Header&gt;</span>
+  <span class="tag">&lt;Modal.Body&gt;</span>Content<span class="tag">&lt;/Modal.Body&gt;</span>
+  <span class="tag">&lt;Modal.Footer&gt;</span>
+    <span class="tag">&lt;Button</span> <span class="attr">onClick</span>={onClose}<span class="tag">&gt;</span>Cancel<span class="tag">&lt;/Button&gt;</span>
+    <span class="tag">&lt;Button</span> <span class="attr">variant</span>=<span class="string">"primary"</span><span class="tag">&gt;</span>Confirm<span class="tag">&lt;/Button&gt;</span>
+  <span class="tag">&lt;/Modal.Footer&gt;</span>
+<span class="tag">&lt;/Modal&gt;</span></code></pre>
+
+      <h4>Skeleton Loading</h4>
+      <pre><code><span class="keyword">import</span> { Skeleton } <span class="keyword">from</span> <span class="string">'@/components/ui/Skeleton'</span>;
+<span class="keyword">import</span> { SenderDashboardSkeleton } <span class="keyword">from</span> <span class="string">'@/components/ui/PageSkeletons'</span>;
+
+<span class="comment">// Basic skeleton</span>
+<span class="tag">&lt;Skeleton</span> <span class="attr">variant</span>=<span class="string">"text"</span> <span class="attr">width</span>=<span class="string">"100%"</span> <span class="attr">height</span>={<span class="variable">20</span>} <span class="tag">/&gt;</span>
+
+<span class="comment">// Pre-built page skeletons</span>
+<span class="tag">&lt;SenderDashboardSkeleton /&gt;</span>
+<span class="tag">&lt;CourierDashboardSkeleton /&gt;</span>
+<span class="tag">&lt;AdminDashboardSkeleton /&gt;</span></code></pre>
+
+      <h4>Toast Notifications</h4>
+      <pre><code><span class="keyword">import</span> { useToast } <span class="keyword">from</span> <span class="string">'@/components/ui/Toast'</span>;
+
+<span class="keyword">const</span> { showToast } = <span class="function">useToast</span>();
+
+<span class="function">showToast</span>({ <span class="attr">type</span>: <span class="string">'success'</span>, <span class="attr">message</span>: <span class="string">'Package created!'</span> });
+<span class="function">showToast</span>({ <span class="attr">type</span>: <span class="string">'error'</span>, <span class="attr">message</span>: <span class="string">'Something went wrong'</span> });</code></pre>
+
+      <h3>Domain Components</h3>
+
+      <h4>Status Timeline</h4>
+      <pre><code><span class="keyword">import</span> { StatusTimeline } <span class="keyword">from</span> <span class="string">'@/components/logistics/StatusTimeline'</span>;
+
+<span class="tag">&lt;StatusTimeline</span>
+  <span class="attr">currentStatus</span>=<span class="string">"in_transit"</span>
+  <span class="attr">orientation</span>=<span class="string">"horizontal"</span>  <span class="comment">// or "vertical"</span>
+  <span class="attr">timestamps</span>={{
+    <span class="attr">new</span>: <span class="string">'2024-01-01T10:00:00Z'</span>,
+    <span class="attr">open_for_bids</span>: <span class="string">'2024-01-01T11:00:00Z'</span>,
+  }}
+<span class="tag">/&gt;</span></code></pre>
+
+      <h4>Address Autocomplete</h4>
+      <pre><code><span class="keyword">import</span> { AddressAutocomplete } <span class="keyword">from</span> <span class="string">'@/components/AddressAutocomplete'</span>;
+
+<span class="tag">&lt;AddressAutocomplete</span>
+  <span class="attr">value</span>={address}
+  <span class="attr">onChange</span>={(address, coords) => {
+    <span class="function">setAddress</span>(address);
+    <span class="function">setCoordinates</span>(coords);
+  }}
+  <span class="attr">placeholder</span>=<span class="string">"Enter pickup address"</span>
+<span class="tag">/&gt;</span></code></pre>
+    </section>
+
+    <!-- Design Tokens -->
+    <section class="section" id="design-tokens">
+      <div class="section-header">
+        <h2>Design Tokens</h2>
+      </div>
+
+      <h3>Colors</h3>
+
+      <h4>Primary (Blue)</h4>
+      <div class="color-grid">
+        <div class="color-swatch">
+          <div class="color-swatch-preview" style="background: #EFF6FF;"></div>
+          <div class="color-swatch-info">
+            <div class="color-swatch-name">Primary 50</div>
+            <div class="color-swatch-value">#EFF6FF</div>
+          </div>
+        </div>
+        <div class="color-swatch">
+          <div class="color-swatch-preview" style="background: #3B82F6;"></div>
+          <div class="color-swatch-info">
+            <div class="color-swatch-name">Primary 500</div>
+            <div class="color-swatch-value">#3B82F6</div>
+          </div>
+        </div>
+        <div class="color-swatch">
+          <div class="color-swatch-preview" style="background: #1E3A8A;"></div>
+          <div class="color-swatch-info">
+            <div class="color-swatch-name">Primary 900</div>
+            <div class="color-swatch-value">#1E3A8A</div>
+          </div>
+        </div>
+      </div>
+
+      <h4>Secondary (Emerald)</h4>
+      <div class="color-grid">
+        <div class="color-swatch">
+          <div class="color-swatch-preview" style="background: #ECFDF5;"></div>
+          <div class="color-swatch-info">
+            <div class="color-swatch-name">Secondary 50</div>
+            <div class="color-swatch-value">#ECFDF5</div>
+          </div>
+        </div>
+        <div class="color-swatch">
+          <div class="color-swatch-preview" style="background: #10B981;"></div>
+          <div class="color-swatch-info">
+            <div class="color-swatch-name">Secondary 500</div>
+            <div class="color-swatch-value">#10B981</div>
+          </div>
+        </div>
+        <div class="color-swatch">
+          <div class="color-swatch-preview" style="background: #064E3B;"></div>
+          <div class="color-swatch-info">
+            <div class="color-swatch-name">Secondary 900</div>
+            <div class="color-swatch-value">#064E3B</div>
+          </div>
+        </div>
+      </div>
+
+      <h4>Semantic Colors</h4>
+      <div class="color-grid">
+        <div class="color-swatch">
+          <div class="color-swatch-preview" style="background: #22C55E;"></div>
+          <div class="color-swatch-info">
+            <div class="color-swatch-name">Success</div>
+            <div class="color-swatch-value">#22C55E</div>
+          </div>
+        </div>
+        <div class="color-swatch">
+          <div class="color-swatch-preview" style="background: #F59E0B;"></div>
+          <div class="color-swatch-info">
+            <div class="color-swatch-name">Warning</div>
+            <div class="color-swatch-value">#F59E0B</div>
+          </div>
+        </div>
+        <div class="color-swatch">
+          <div class="color-swatch-preview" style="background: #EF4444;"></div>
+          <div class="color-swatch-info">
+            <div class="color-swatch-name">Error</div>
+            <div class="color-swatch-value">#EF4444</div>
+          </div>
+        </div>
+        <div class="color-swatch">
+          <div class="color-swatch-preview" style="background: #3B82F6;"></div>
+          <div class="color-swatch-info">
+            <div class="color-swatch-name">Info</div>
+            <div class="color-swatch-value">#3B82F6</div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Typography</h3>
+      <pre><code><span class="comment">/* Font Families */</span>
+<span class="attr">--font-sans</span>: <span class="string">'Inter'</span>, -apple-system, BlinkMacSystemFont, <span class="string">'Segoe UI'</span>, Roboto, sans-serif;
+<span class="attr">--font-mono</span>: <span class="string">'JetBrains Mono'</span>, Menlo, Monaco, monospace;
+
+<span class="comment">/* Font Sizes */</span>
+<span class="attr">font-size</span>: <span class="variable">0.75rem</span>;   <span class="comment">/* xs - 12px */</span>
+<span class="attr">font-size</span>: <span class="variable">0.875rem</span>;  <span class="comment">/* sm - 14px */</span>
+<span class="attr">font-size</span>: <span class="variable">1rem</span>;      <span class="comment">/* base - 16px */</span>
+<span class="attr">font-size</span>: <span class="variable">1.125rem</span>;  <span class="comment">/* lg - 18px */</span>
+<span class="attr">font-size</span>: <span class="variable">1.25rem</span>;   <span class="comment">/* xl - 20px */</span></code></pre>
+
+      <h3>Spacing</h3>
+      <pre><code><span class="comment">/* Standard Tailwind scale (4px units) */</span>
+spacing: <span class="variable">1</span> (4px), <span class="variable">2</span> (8px), <span class="variable">3</span> (12px), <span class="variable">4</span> (16px), <span class="variable">6</span> (24px), <span class="variable">8</span> (32px)
+
+<span class="comment">/* Container */</span>
+<span class="attr">.page-container</span>: max-width: <span class="variable">1280px</span>, centered, responsive padding</code></pre>
+
+      <h3>Shadows</h3>
+      <pre><code><span class="attr">shadow-card</span>: <span class="variable">0 1px 3px rgba(0,0,0,0.1)</span>;
+<span class="attr">shadow-card-hover</span>: <span class="variable">0 10px 15px rgba(0,0,0,0.1)</span>;
+<span class="attr">shadow-modal</span>: <span class="variable">0 25px 50px rgba(0,0,0,0.25)</span>;
+<span class="attr">shadow-glow</span>: <span class="variable">0 0 20px rgba(59,130,246,0.3)</span>;</code></pre>
+
+      <h3>Border Radius</h3>
+      <pre><code><span class="attr">rounded-sm</span>: <span class="variable">0.125rem</span> (2px)
+<span class="attr">rounded-md</span>: <span class="variable">0.375rem</span> (6px)
+<span class="attr">rounded-lg</span>: <span class="variable">0.5rem</span> (8px)
+<span class="attr">rounded-xl</span>: <span class="variable">0.75rem</span> (12px)
+<span class="attr">rounded-full</span>: <span class="variable">9999px</span></code></pre>
+
+      <h3>Animation Classes</h3>
+      <pre><code><span class="comment">/* Entrance Animations */</span>
+<span class="attr">.animate-fade-in</span>      <span class="comment">/* Opacity fade */</span>
+<span class="attr">.animate-fade-in-up</span>   <span class="comment">/* Fade + slide up */</span>
+<span class="attr">.animate-slide-in-left</span>
+<span class="attr">.animate-slide-in-right</span>
+<span class="attr">.animate-scale-in</span>     <span class="comment">/* Scale from 0.95 */</span>
+<span class="attr">.animate-bounce-in</span>
+
+<span class="comment">/* Interactive */</span>
+<span class="attr">.animate-pulse-soft</span>   <span class="comment">/* Gentle opacity pulse */</span>
+<span class="attr">.animate-shimmer</span>      <span class="comment">/* Loading shimmer */</span>
+<span class="attr">.animate-ripple</span>       <span class="comment">/* Click ripple */</span>
+<span class="attr">.animate-shake</span>        <span class="comment">/* Error shake */</span>
+
+<span class="comment">/* Continuous */</span>
+<span class="attr">.animate-spin-slow</span>    <span class="comment">/* 3s rotation */</span></code></pre>
+    </section>
+
+    <!-- Form Patterns -->
+    <section class="section" id="patterns">
+      <div class="section-header">
+        <h2>Form Patterns</h2>
+      </div>
+
+      <h3>Standard Form Structure</h3>
+      <pre><code><span class="tag">&lt;form</span> <span class="attr">onSubmit</span>={handleSubmit}<span class="tag">&gt;</span>
+  <span class="tag">&lt;div</span> <span class="attr">className</span>=<span class="string">"form-group"</span><span class="tag">&gt;</span>
+    <span class="tag">&lt;label</span> <span class="attr">className</span>=<span class="string">"label"</span><span class="tag">&gt;</span>Field Label<span class="tag">&lt;/label&gt;</span>
+    <span class="tag">&lt;Input</span>
+      <span class="attr">name</span>=<span class="string">"fieldName"</span>
+      <span class="attr">value</span>={value}
+      <span class="attr">onChange</span>={(e) => <span class="function">setValue</span>(e.target.value)}
+      <span class="attr">error</span>={errors.fieldName}
+    <span class="tag">/&gt;</span>
+    {errors.fieldName && (
+      <span class="tag">&lt;p</span> <span class="attr">className</span>=<span class="string">"error-text"</span><span class="tag">&gt;</span>{errors.fieldName}<span class="tag">&lt;/p&gt;</span>
+    )}
+  <span class="tag">&lt;/div&gt;</span>
+
+  <span class="tag">&lt;Button</span> <span class="attr">type</span>=<span class="string">"submit"</span> <span class="attr">variant</span>=<span class="string">"primary"</span> <span class="attr">isLoading</span>={isSubmitting}<span class="tag">&gt;</span>
+    Submit
+  <span class="tag">&lt;/Button&gt;</span>
+<span class="tag">&lt;/form&gt;</span></code></pre>
+
+      <h3>Form Validation</h3>
+      <pre><code><span class="comment">// Client-side validation</span>
+<span class="keyword">const</span> <span class="function">validateForm</span> = () => {
+  <span class="keyword">const</span> errors: Record&lt;<span class="variable">string</span>, <span class="variable">string</span>&gt; = {};
+
+  <span class="keyword">if</span> (!email) errors.email = <span class="string">'Email is required'</span>;
+  <span class="keyword">if</span> (!email.includes(<span class="string">'@'</span>)) errors.email = <span class="string">'Invalid email format'</span>;
+  <span class="keyword">if</span> (password.length &lt; <span class="variable">8</span>) errors.password = <span class="string">'Password must be 8+ characters'</span>;
+
+  <span class="keyword">return</span> errors;
+};
+
+<span class="comment">// Display API errors</span>
+<span class="keyword">try</span> {
+  <span class="keyword">await</span> api.<span class="function">submit</span>(data);
+} <span class="keyword">catch</span> (error) {
+  <span class="keyword">if</span> (error.response?.data?.detail) {
+    <span class="function">setError</span>(error.response.data.detail);
+  }
+}</code></pre>
+    </section>
+
+    <!-- API Integration -->
+    <section class="section" id="api">
+      <div class="section-header">
+        <h2>API Integration</h2>
+      </div>
+
+      <div class="alert alert-warning">
+        <strong>Important:</strong> All API calls must go through <code>lib/api.ts</code>. Never use axios directly in components.
+      </div>
+
+      <pre><code><span class="keyword">import</span> { authAPI, packagesAPI, couriersAPI } <span class="keyword">from</span> <span class="string">'@/lib/api'</span>;
+
+<span class="comment">// Authentication</span>
+<span class="keyword">await</span> authAPI.<span class="function">login</span>({ email, password });
+<span class="keyword">await</span> authAPI.<span class="function">register</span>(userData);
+<span class="keyword">await</span> authAPI.<span class="function">logout</span>();
+
+<span class="comment">// Packages</span>
+<span class="keyword">const</span> packages = <span class="keyword">await</span> packagesAPI.<span class="function">list</span>();
+<span class="keyword">const</span> pkg = <span class="keyword">await</span> packagesAPI.<span class="function">get</span>(packageId);
+<span class="keyword">await</span> packagesAPI.<span class="function">create</span>(packageData);
+<span class="keyword">await</span> packagesAPI.<span class="function">cancel</span>(packageId);
+
+<span class="comment">// Couriers</span>
+<span class="keyword">const</span> routes = <span class="keyword">await</span> couriersAPI.<span class="function">getRoutes</span>();
+<span class="keyword">await</span> couriersAPI.<span class="function">createRoute</span>(routeData);</code></pre>
+    </section>
+
+    <!-- Internationalization -->
+    <section class="section" id="i18n">
+      <div class="section-header">
+        <h2>Internationalization (i18n)</h2>
+      </div>
+
+      <h3>Using Translations</h3>
+      <pre><code><span class="comment">// Client Components</span>
+<span class="string">'use client'</span>;
+<span class="keyword">import</span> { useTranslations } <span class="keyword">from</span> <span class="string">'next-intl'</span>;
+
+<span class="keyword">export function</span> <span class="function">MyComponent</span>() {
+  <span class="keyword">const</span> t = <span class="function">useTranslations</span>(<span class="string">'namespace'</span>);
+  <span class="keyword">return</span> <span class="tag">&lt;h1&gt;</span>{<span class="function">t</span>(<span class="string">'title'</span>)}<span class="tag">&lt;/h1&gt;</span>;
+}
+
+<span class="comment">// Server Components</span>
+<span class="keyword">import</span> { getTranslations } <span class="keyword">from</span> <span class="string">'next-intl/server'</span>;
+
+<span class="keyword">export default async function</span> <span class="function">Page</span>() {
+  <span class="keyword">const</span> t = <span class="keyword">await</span> <span class="function">getTranslations</span>(<span class="string">'namespace'</span>);
+  <span class="keyword">return</span> <span class="tag">&lt;h1&gt;</span>{<span class="function">t</span>(<span class="string">'title'</span>)}<span class="tag">&lt;/h1&gt;</span>;
+}</code></pre>
+
+      <h3>Translation Files Structure</h3>
+      <pre><code><span class="comment">// messages/en.json</span>
+{
+  <span class="string">"common"</span>: {
+    <span class="string">"loading"</span>: <span class="string">"Loading..."</span>,
+    <span class="string">"error"</span>: <span class="string">"An error occurred"</span>,
+    <span class="string">"save"</span>: <span class="string">"Save"</span>,
+    <span class="string">"cancel"</span>: <span class="string">"Cancel"</span>
+  },
+  <span class="string">"auth"</span>: {
+    <span class="string">"login"</span>: <span class="string">"Log In"</span>,
+    <span class="string">"logout"</span>: <span class="string">"Log Out"</span>,
+    <span class="string">"email"</span>: <span class="string">"Email"</span>,
+    <span class="string">"password"</span>: <span class="string">"Password"</span>
+  },
+  <span class="string">"packages"</span>: {
+    <span class="string">"title"</span>: <span class="string">"My Packages"</span>,
+    <span class="string">"create"</span>: <span class="string">"Create Package"</span>
+  }
+}</code></pre>
+    </section>
+
+    <!-- Responsive Design -->
+    <section class="section">
+      <div class="section-header">
+        <h2>Responsive Design</h2>
+      </div>
+
+      <h3>Breakpoints</h3>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Breakpoint</th>
+              <th>Width</th>
+              <th>Target</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><code>sm</code></td><td>640px</td><td>Mobile landscape</td></tr>
+            <tr><td><code>md</code></td><td>768px</td><td>Tablet</td></tr>
+            <tr><td><code>lg</code></td><td>1024px</td><td>Desktop</td></tr>
+            <tr><td><code>xl</code></td><td>1280px</td><td>Large desktop</td></tr>
+            <tr><td><code>2xl</code></td><td>1536px</td><td>Extra large</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Mobile-First Approach</h3>
+      <pre><code><span class="tag">&lt;div</span> <span class="attr">className</span>=<span class="string">"grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"</span><span class="tag">&gt;</span>
+  <span class="comment">{/* 1 column on mobile, 2 on tablet, 3 on desktop */}</span>
+<span class="tag">&lt;/div&gt;</span>
+
+<span class="tag">&lt;div</span> <span class="attr">className</span>=<span class="string">"px-4 md:px-6 lg:px-8"</span><span class="tag">&gt;</span>
+  <span class="comment">{/* Responsive padding */}</span>
+<span class="tag">&lt;/div&gt;</span>
+
+<span class="tag">&lt;Button</span> <span class="attr">className</span>=<span class="string">"w-full md:w-auto"</span><span class="tag">&gt;</span>
+  <span class="comment">{/* Full width on mobile, auto on larger screens */}</span>
+<span class="tag">&lt;/Button&gt;</span></code></pre>
+    </section>
+
+    <!-- Testing -->
+    <section class="section" id="testing">
+      <div class="section-header">
+        <h2>Testing</h2>
+      </div>
+
+      <h3>Running Tests</h3>
+      <pre><code><span class="comment"># Unit Tests</span>
+npm test                    <span class="comment"># Run all tests</span>
+npm test -- path/to/test    <span class="comment"># Single file</span>
+npm run test:watch          <span class="comment"># Watch mode</span>
+npm run test:coverage       <span class="comment"># With coverage</span>
+
+<span class="comment"># E2E Tests (Playwright)</span>
+npm run test:e2e            <span class="comment"># Headless</span>
+npm run test:e2e:ui         <span class="comment"># Interactive UI</span>
+npm run test:e2e:headed     <span class="comment"># Headed browser</span>
+npm run test:e2e:debug      <span class="comment"># Debug mode</span></code></pre>
+
+      <h3>Test Structure</h3>
+      <div class="file-tree">
+<span class="folder">components/</span>
+├── <span class="file">MyComponent.tsx</span>
+└── <span class="folder">__tests__/</span>
+    └── <span class="file">MyComponent.test.tsx</span>
+      </div>
+    </section>
+
+    <!-- Quick Reference -->
+    <section class="section">
+      <div class="section-header">
+        <h2>Quick Reference</h2>
+      </div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Task</th>
+              <th>Component/Module</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Button</td><td><code>components/ui/Button</code></td></tr>
+            <tr><td>Form inputs</td><td><code>components/ui/Input</code>, <code>Select</code></td></tr>
+            <tr><td>Cards</td><td><code>components/ui/Card</code></td></tr>
+            <tr><td>Modals</td><td><code>components/ui/Modal</code></td></tr>
+            <tr><td>Loading states</td><td><code>components/ui/Skeleton</code>, <code>PageSkeletons</code></td></tr>
+            <tr><td>Status display</td><td><code>components/ui/Badge</code>, <code>StatusTimeline</code></td></tr>
+            <tr><td>Notifications</td><td><code>components/ui/Toast</code>, <code>Alert</code></td></tr>
+            <tr><td>API calls</td><td><code>lib/api.ts</code></td></tr>
+            <tr><td>Translations</td><td><code>next-intl</code>, <code>messages/*.json</code></td></tr>
+            <tr><td>Real-time</td><td><code>contexts/WebSocketContext</code></td></tr>
+            <tr><td>Error handling</td><td><code>components/ErrorBoundary</code>, <code>logError</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Code Style Rules -->
+    <section class="section">
+      <div class="section-header">
+        <h2>Code Style Rules</h2>
+      </div>
+
+      <ol>
+        <li><strong>Components:</strong> Use TypeScript, define prop types with interfaces</li>
+        <li><strong>Styling:</strong> Prefer Tailwind utilities, use semantic classes from <code>globals.css</code> when needed</li>
+        <li><strong>API Calls:</strong> Always use <code>lib/api.ts</code> modules, never direct axios</li>
+        <li><strong>State:</strong> Use React hooks, context for global state</li>
+        <li><strong>Forms:</strong> Use controlled components with validation</li>
+        <li><strong>Loading:</strong> Always show skeletons or loading states</li>
+        <li><strong>Errors:</strong> Handle all API errors, show user-friendly messages</li>
+        <li><strong>Accessibility:</strong> Use semantic HTML, ARIA labels, proper focus management</li>
+      </ol>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>Chaski UI Guide &bull; Last updated: November 2024</p>
+  </footer>
+
+  <a href="#top" class="back-to-top" title="Back to top">&uarr;</a>
+</body>
+</html>
