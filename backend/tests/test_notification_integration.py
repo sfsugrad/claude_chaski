@@ -16,6 +16,7 @@ from unittest.mock import patch, AsyncMock
 from app.models.package import Package, PackageStatus
 from app.models.notification import Notification, NotificationType
 from app.models.user import User
+from app.utils.tracking_id import generate_tracking_id
 
 
 class TestAcceptPackageNotification:
@@ -40,6 +41,7 @@ class TestAcceptPackageNotification:
         db_session.refresh(sender)
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             description="Test package for notification",
             size="small",
@@ -59,7 +61,7 @@ class TestAcceptPackageNotification:
 
         # Accept the package as courier
         response = client.post(
-            f"/api/matching/accept-package/{package.id}",
+            f"/api/matching/accept-package/{package.tracking_id}",
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
 
@@ -94,6 +96,7 @@ class TestAcceptPackageNotification:
         db_session.commit()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             description="Test package",
             size="small",
@@ -112,7 +115,7 @@ class TestAcceptPackageNotification:
         db_session.refresh(package)
 
         client.post(
-            f"/api/matching/accept-package/{package.id}",
+            f"/api/matching/accept-package/{package.tracking_id}",
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
 
@@ -149,6 +152,7 @@ class TestDeclinePackageNotification:
 
         # Create matched package
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description="Package to decline",
@@ -169,7 +173,7 @@ class TestDeclinePackageNotification:
 
         with patch('app.routes.matching.send_package_declined_email', new_callable=AsyncMock):
             response = client.post(
-                f"/api/matching/decline-package/{package.id}",
+                f"/api/matching/decline-package/{package.tracking_id}",
                 headers={"Authorization": f"Bearer {authenticated_courier}"}
             )
 
@@ -207,6 +211,7 @@ class TestStatusUpdateNotification:
         db_session.commit()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description="Package for pickup",
@@ -226,8 +231,8 @@ class TestStatusUpdateNotification:
         db_session.refresh(package)
 
         response = client.put(
-            f"/api/packages/{package.id}/status",
-            json={"status": "in_transit"},
+            f"/api/packages/{package.tracking_id}/status",
+            json={"status": "IN_TRANSIT"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
 
@@ -259,6 +264,7 @@ class TestStatusUpdateNotification:
         db_session.commit()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description="Package in transit",
@@ -279,8 +285,8 @@ class TestStatusUpdateNotification:
 
         with patch('app.routes.packages.send_package_in_transit_email', new_callable=AsyncMock):
             response = client.put(
-                f"/api/packages/{package.id}/status",
-                json={"status": "in_transit"},
+                f"/api/packages/{package.tracking_id}/status",
+                json={"status": "IN_TRANSIT"},
                 headers={"Authorization": f"Bearer {authenticated_courier}"}
             )
 
@@ -312,6 +318,7 @@ class TestStatusUpdateNotification:
         db_session.commit()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description="Package to deliver",
@@ -332,8 +339,8 @@ class TestStatusUpdateNotification:
 
         with patch('app.routes.packages.send_package_delivered_email', new_callable=AsyncMock):
             response = client.put(
-                f"/api/packages/{package.id}/status",
-                json={"status": "delivered"},
+                f"/api/packages/{package.tracking_id}/status",
+                json={"status": "DELIVERED"},
                 headers={"Authorization": f"Bearer {authenticated_courier}"}
             )
 
@@ -374,6 +381,7 @@ class TestCancelPackageNotification:
         token = create_access_token(data={"sub": sender.email})
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             description="Package to cancel",
             size="small",
@@ -392,7 +400,7 @@ class TestCancelPackageNotification:
         db_session.refresh(package)
 
         response = client.put(
-            f"/api/packages/{package.id}/cancel",
+            f"/api/packages/{package.tracking_id}/cancel",
             headers={"Authorization": f"Bearer {token}"}
         )
 
@@ -440,6 +448,7 @@ class TestCancelPackageNotification:
         db_session.commit()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description="Matched package to cancel",
@@ -460,7 +469,7 @@ class TestCancelPackageNotification:
 
         with patch('app.routes.packages.send_package_cancelled_email', new_callable=AsyncMock):
             response = client.put(
-                f"/api/packages/{package.id}/cancel",
+                f"/api/packages/{package.tracking_id}/cancel",
                 headers={"Authorization": f"Bearer {token}"}
             )
 
@@ -507,6 +516,7 @@ class TestRouteCreationNotification:
 
         # Package very close to route (NYC to Boston route, package near NYC)
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             description="Package along route",
             size="small",
@@ -610,6 +620,7 @@ class TestNotificationReadStatus:
         db_session.commit()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             description="Test package",
             size="small",
@@ -628,7 +639,7 @@ class TestNotificationReadStatus:
         db_session.refresh(package)
 
         client.post(
-            f"/api/matching/accept-package/{package.id}",
+            f"/api/matching/accept-package/{package.tracking_id}",
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
 
@@ -660,6 +671,7 @@ class TestNotificationPackageReference:
         db_session.commit()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             description="Referenced package",
             size="large",
@@ -678,7 +690,7 @@ class TestNotificationPackageReference:
         db_session.refresh(package)
 
         client.post(
-            f"/api/matching/accept-package/{package.id}",
+            f"/api/matching/accept-package/{package.tracking_id}",
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
 

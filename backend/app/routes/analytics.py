@@ -164,14 +164,14 @@ async def get_platform_overview(
     ).count()
 
     # Package counts
-    total_packages = db.query(Package).filter(Package.is_deleted == False).count()
+    total_packages = db.query(Package).filter(Package.is_active == True).count()
     packages_delivered = db.query(Package).filter(
-        Package.is_deleted == False,
+        Package.is_active == True,
         Package.status == PackageStatus.DELIVERED
     ).count()
     packages_in_transit = db.query(Package).filter(
-        Package.is_deleted == False,
-        Package.status.in_([PackageStatus.PICKED_UP, PackageStatus.IN_TRANSIT])
+        Package.is_active == True,
+        Package.status.in_([PackageStatus.PENDING_PICKUP, PackageStatus.IN_TRANSIT])
     ).count()
 
     # Revenue
@@ -186,7 +186,7 @@ async def get_platform_overview(
     platform_fees_cents = revenue_data[1] or 0
 
     # Average rating
-    avg_rating = db.query(func.avg(Rating.rating)).scalar()
+    avg_rating = db.query(func.avg(Rating.score)).scalar()
 
     return PlatformOverview(
         total_users=total_users,

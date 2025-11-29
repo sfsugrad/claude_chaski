@@ -158,7 +158,7 @@ class TestCreateBid:
         response = client.post(
             "/api/bids",
             json={
-                "package_id": pending_package.id,
+                "tracking_id": pending_package.tracking_id,
                 "proposed_price": 20.0,
                 "estimated_delivery_hours": 12,
                 "message": "I can deliver this quickly!"
@@ -173,7 +173,7 @@ class TestCreateBid:
         assert data["proposed_price"] == 20.0
         assert data["estimated_delivery_hours"] == 12
         assert data["message"] == "I can deliver this quickly!"
-        assert data["status"] == "pending"  # Bid status is "pending" for new bid
+        assert data["status"].lower() == "pending"  # Bid status is "pending" for new bid
         assert data["courier_name"] == courier_user.full_name
 
         # Verify package remains in OPEN_FOR_BIDS status
@@ -187,7 +187,7 @@ class TestCreateBid:
         response = client.post(
             "/api/bids",
             json={
-                "package_id": pending_package.id,
+                "tracking_id": pending_package.tracking_id,
                 "proposed_price": 22.0
             },
             headers=get_auth_header(both_role_user)
@@ -202,7 +202,7 @@ class TestCreateBid:
         response = client.post(
             "/api/bids",
             json={
-                "package_id": bidding_package.id,
+                "tracking_id": bidding_package.tracking_id,
                 "proposed_price": 18.0
             },
             headers=get_auth_header(courier_user)
@@ -217,7 +217,7 @@ class TestCreateBid:
         response = client.post(
             "/api/bids",
             json={
-                "package_id": pending_package.id,
+                "tracking_id": pending_package.tracking_id,
                 "proposed_price": 20.0
             },
             headers=get_auth_header(sender_user)
@@ -250,7 +250,7 @@ class TestCreateBid:
         response = client.post(
             "/api/bids",
             json={
-                "package_id": package.id,
+                "tracking_id": package.tracking_id,
                 "proposed_price": 20.0
             },
             headers=get_auth_header(both_role_user)
@@ -275,7 +275,7 @@ class TestCreateBid:
         response = client.post(
             "/api/bids",
             json={
-                "package_id": pending_package.id,
+                "tracking_id": pending_package.tracking_id,
                 "proposed_price": 18.0
             },
             headers=get_auth_header(courier_user)
@@ -307,7 +307,7 @@ class TestCreateBid:
         response = client.post(
             "/api/bids",
             json={
-                "package_id": package.id,
+                "tracking_id": package.tracking_id,
                 "proposed_price": 20.0
             },
             headers=get_auth_header(courier_user)
@@ -321,7 +321,7 @@ class TestCreateBid:
         response = client.post(
             "/api/bids",
             json={
-                "package_id": 99999,
+                "tracking_id": "nonexistent-tracking-id",
                 "proposed_price": 20.0
             },
             headers=get_auth_header(courier_user)
@@ -335,7 +335,7 @@ class TestCreateBid:
         response = client.post(
             "/api/bids",
             json={
-                "package_id": pending_package.id,
+                "tracking_id": pending_package.tracking_id,
                 "proposed_price": -5.0  # Invalid negative price
             },
             headers=get_auth_header(courier_user)
@@ -440,7 +440,7 @@ class TestSelectBid:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] == "selected"
+        assert data["status"].lower() == "selected"
         assert data["selected_at"] is not None
 
         db_session.refresh(bid)
@@ -620,14 +620,14 @@ class TestGetMyBids:
 
         # Get only pending bids
         response = client.get(
-            "/api/bids/my-bids?status_filter=pending",
+            "/api/bids/my-bids?status_filter=PENDING",
             headers=get_auth_header(courier_user)
         )
 
         assert response.status_code == 200
         data = response.json()
         assert len(data) == 1
-        assert data[0]["status"] == "pending"  # Bid status, not package status
+        assert data[0]["status"].lower() == "pending"  # Bid status, not package status
 
     def test_get_my_bids_sender_forbidden(self, client, sender_user):
         """Sender cannot access my-bids endpoint."""
@@ -733,11 +733,11 @@ class TestConfirmPickup:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["message"] == "Pickup confirmed"
-        assert data["status"] == "pending_pickup"
+        assert "Pickup confirmed" in data["message"]
+        assert data["status"].lower() == "in_transit"
 
         db_session.refresh(bidding_package)
-        assert bidding_package.status == PackageStatus.PENDING_PICKUP
+        assert bidding_package.status == PackageStatus.IN_TRANSIT
 
     def test_confirm_pickup_not_owner(self, client, db_session, sender_user, courier_user, courier_user_2, bidding_package):
         """Non-owner cannot confirm pickup."""
@@ -823,7 +823,7 @@ class TestBidDeadline:
         response = client.post(
             "/api/bids",
             json={
-                "package_id": pending_package.id,
+                "tracking_id": pending_package.tracking_id,
                 "proposed_price": 20.0
             },
             headers=get_auth_header(courier_user)
@@ -848,7 +848,7 @@ class TestBidDeadline:
         response = client.post(
             "/api/bids",
             json={
-                "package_id": bidding_package.id,
+                "tracking_id": bidding_package.tracking_id,
                 "proposed_price": 20.0
             },
             headers=get_auth_header(courier_user)

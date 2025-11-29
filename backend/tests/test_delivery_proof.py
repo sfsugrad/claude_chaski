@@ -10,6 +10,7 @@ from app.models.package import Package, PackageStatus
 from app.models.user import User, UserRole
 from app.models.delivery_proof import DeliveryProof
 from app.utils.auth import get_password_hash
+from app.utils.tracking_id import generate_tracking_id
 
 
 class TestDeliveryProofSubmission:
@@ -35,6 +36,7 @@ class TestDeliveryProofSubmission:
 
         # Create package in PENDING_PICKUP status (not IN_TRANSIT)
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description="Test package",
@@ -66,7 +68,7 @@ class TestDeliveryProofSubmission:
             mock_storage.return_value.generate_presigned_download_url = AsyncMock(return_value="https://example.com/test.png")
 
             response = client.post(
-                f"/api/proof/{package.id}",
+                f"/api/proof/{package.tracking_id}",
                 json=proof_data,
                 headers={"Authorization": f"Bearer {authenticated_courier}"}
             )
@@ -101,6 +103,7 @@ class TestDeliveryProofSubmission:
 
         # Create package assigned to other_courier
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=other_courier.id,
             description="Test package",
@@ -128,7 +131,7 @@ class TestDeliveryProofSubmission:
         }
 
         response = client.post(
-            f"/api/proof/{package.id}",
+            f"/api/proof/{package.tracking_id}",
             json=proof_data,
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
@@ -156,6 +159,7 @@ class TestDeliveryProofSubmission:
 
         # Create package in IN_TRANSIT status
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description="Test package",
@@ -189,7 +193,7 @@ class TestDeliveryProofSubmission:
 
             with patch("app.routes.delivery_proof.create_notification_with_broadcast", new_callable=AsyncMock):
                 response = client.post(
-                    f"/api/proof/{package.id}",
+                    f"/api/proof/{package.tracking_id}",
                     json=proof_data,
                     headers={"Authorization": f"Bearer {authenticated_courier}"}
                 )
@@ -221,6 +225,7 @@ class TestDeliveryProofSubmission:
 
         # Create package in IN_TRANSIT status
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description="Test package",
@@ -247,7 +252,7 @@ class TestDeliveryProofSubmission:
         }
 
         response = client.post(
-            f"/api/proof/{package.id}",
+            f"/api/proof/{package.tracking_id}",
             json=proof_data,
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
@@ -275,6 +280,7 @@ class TestDeliveryProofSubmission:
 
         # Create package in IN_TRANSIT status
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description="Test package",
@@ -312,7 +318,7 @@ class TestDeliveryProofSubmission:
         }
 
         response = client.post(
-            f"/api/proof/{package.id}",
+            f"/api/proof/{package.tracking_id}",
             json=proof_data,
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
@@ -344,6 +350,7 @@ class TestDeliveryProofAutoPayment:
 
         # Create package with price
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description="Test package",
@@ -378,7 +385,7 @@ class TestDeliveryProofAutoPayment:
             with patch("app.routes.delivery_proof.create_notification_with_broadcast", new_callable=AsyncMock):
                 with patch("fastapi.BackgroundTasks.add_task") as mock_add_task:
                     response = client.post(
-                        f"/api/proof/{package.id}",
+                        f"/api/proof/{package.tracking_id}",
                         json=proof_data,
                         headers={"Authorization": f"Bearer {authenticated_courier}"}
                     )
@@ -407,6 +414,7 @@ class TestDeliveryProofAutoPayment:
 
         # Create package without price
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description="Test package",
@@ -440,7 +448,7 @@ class TestDeliveryProofAutoPayment:
 
             with patch("app.routes.delivery_proof.create_notification_with_broadcast", new_callable=AsyncMock):
                 response = client.post(
-                    f"/api/proof/{package.id}",
+                    f"/api/proof/{package.tracking_id}",
                     json=proof_data,
                     headers={"Authorization": f"Bearer {authenticated_courier}"}
                 )
@@ -484,6 +492,7 @@ class TestDeliveryProofAccess:
 
         # Create delivered package (using auth_sender as sender)
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=auth_sender.id,
             courier_id=courier.id,
             description="Delivered package",
@@ -519,7 +528,7 @@ class TestDeliveryProofAccess:
             mock_storage.return_value = mock_instance
 
             response = client.get(
-                f"/api/proof/{package.id}",
+                f"/api/proof/{package.tracking_id}",
                 headers={"Authorization": f"Bearer {authenticated_sender}"}
             )
 
@@ -554,6 +563,7 @@ class TestDeliveryProofAccess:
 
         # Create delivered package
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description="Private package",
@@ -584,7 +594,7 @@ class TestDeliveryProofAccess:
 
         # Try to view as unrelated user
         response = client.get(
-            f"/api/proof/{package.id}",
+            f"/api/proof/{package.tracking_id}",
             headers={"Authorization": f"Bearer {authenticated_both_role}"}
         )
 
@@ -614,6 +624,7 @@ class TestDeliveryProofLocation:
 
         # Create package with specific dropoff location
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description="Test package",
@@ -651,7 +662,7 @@ class TestDeliveryProofLocation:
 
             with patch("app.routes.delivery_proof.create_notification_with_broadcast", new_callable=AsyncMock):
                 response = client.post(
-                    f"/api/proof/{package.id}",
+                    f"/api/proof/{package.tracking_id}",
                     json=proof_data,
                     headers={"Authorization": f"Bearer {authenticated_courier}"}
                 )
@@ -680,6 +691,7 @@ class TestCompleteDeliveryFlow:
         )
         assert create_response.status_code == status.HTTP_201_CREATED
         package_id = create_response.json()["id"]
+        tracking_id = create_response.json()["tracking_id"]
         assert create_response.json()["requires_proof"] is True
 
         # Step 2: Simulate matching and bid selection
@@ -691,16 +703,16 @@ class TestCompleteDeliveryFlow:
 
         # Step 3: Courier marks in transit (PENDING_PICKUP -> IN_TRANSIT)
         transit_response = client.put(
-            f"/api/packages/{package_id}/status",
-            json={"status": "in_transit"},
+            f"/api/packages/{tracking_id}/status",
+            json={"status": "IN_TRANSIT"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
         assert transit_response.status_code == status.HTTP_200_OK
 
         # Step 5: Try to mark delivered via status endpoint (should fail - proof required)
         delivered_response = client.put(
-            f"/api/packages/{package_id}/status",
-            json={"status": "delivered"},
+            f"/api/packages/{tracking_id}/status",
+            json={"status": "DELIVERED"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
         assert delivered_response.status_code == status.HTTP_400_BAD_REQUEST
@@ -723,7 +735,7 @@ class TestCompleteDeliveryFlow:
 
             with patch("app.routes.delivery_proof.create_notification_with_broadcast", new_callable=AsyncMock):
                 proof_response = client.post(
-                    f"/api/proof/{package_id}",
+                    f"/api/proof/{tracking_id}",
                     json=proof_data,
                     headers={"Authorization": f"Bearer {authenticated_courier}"}
                 )
@@ -733,10 +745,10 @@ class TestCompleteDeliveryFlow:
 
         # Step 7: Verify package is delivered
         get_response = client.get(
-            f"/api/packages/{package_id}",
+            f"/api/packages/{tracking_id}",
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
         assert get_response.status_code == status.HTTP_200_OK
-        assert get_response.json()["status"] == "delivered"
+        assert get_response.json()["status"].lower() == "delivered"
         # Terminal status - no allowed next statuses
         assert get_response.json()["allowed_next_statuses"] == []

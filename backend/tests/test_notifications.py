@@ -4,6 +4,7 @@ from app.models.notification import Notification, NotificationType
 from app.models.user import User, UserRole
 from app.models.package import Package, PackageStatus
 from app.routes.notifications import create_notification
+from app.utils.tracking_id import generate_tracking_id
 
 
 class TestGetNotifications:
@@ -238,7 +239,7 @@ class TestGetNotificationById:
         data = response.json()
         assert data["id"] == notification.id
         assert data["message"] == "Your package was matched!"
-        assert data["type"] == "package_matched"
+        assert data["type"].lower() == "package_matched"
         assert data["read"] is False
 
     def test_get_notification_not_found(self, client, authenticated_sender):
@@ -625,6 +626,7 @@ class TestNotificationWithPackage:
 
         # Create a package
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=user.id,
             description=test_package_data["description"],
             size=test_package_data["size"],
@@ -689,6 +691,7 @@ class TestCreateNotificationUtility:
 
         # Create package
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=user.id,
             description=test_package_data["description"],
             size=test_package_data["size"],

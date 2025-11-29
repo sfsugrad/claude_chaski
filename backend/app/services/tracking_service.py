@@ -161,10 +161,10 @@ class TrackingService:
 
         # Calculate new ETA
         package = self.db.query(Package).filter(Package.id == session.package_id).first()
-        if package and package.dropoff_latitude and package.dropoff_longitude:
+        if package and package.dropoff_lat and package.dropoff_lng:
             eta = await self._calculate_eta(
                 latitude, longitude,
-                package.dropoff_latitude, package.dropoff_longitude,
+                package.dropoff_lat, package.dropoff_lng,
                 speed_mps or DEFAULT_SPEED
             )
             if eta:

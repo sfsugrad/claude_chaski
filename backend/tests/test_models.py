@@ -5,6 +5,7 @@ from datetime import datetime
 from app.models.user import User, UserRole
 from app.models.package import Package, PackageStatus, PackageSize, CourierRoute
 from app.utils.auth import get_password_hash
+from app.utils.tracking_id import generate_tracking_id
 
 
 class TestUserModel:
@@ -307,6 +308,7 @@ class TestPackageModel:
     def test_create_package_with_all_fields(self, db_session, test_verified_user):
         """Test creating a package with all fields"""
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=test_verified_user.id,
             description="Test package",
             size=PackageSize.MEDIUM,
@@ -339,6 +341,7 @@ class TestPackageModel:
     def test_create_package_minimal_fields(self, db_session, test_verified_user):
         """Test creating a package with minimal required fields"""
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=test_verified_user.id,
             description="Minimal package",
             size=PackageSize.SMALL,
@@ -370,6 +373,7 @@ class TestPackageModel:
 
         for idx, status in enumerate(statuses):
             package = Package(
+            tracking_id=generate_tracking_id(),
                 sender_id=test_verified_user.id,
                 description=f"Package {status.value}",
                 size=PackageSize.SMALL,
@@ -403,6 +407,7 @@ class TestPackageModel:
 
         for size, weight in sizes:
             package = Package(
+            tracking_id=generate_tracking_id(),
                 sender_id=test_verified_user.id,
                 description=f"Package {size.value}",
                 size=size,
@@ -424,6 +429,7 @@ class TestPackageModel:
     def test_package_sender_required(self, db_session):
         """Test that sender_id is required"""
         package = Package(
+            tracking_id=generate_tracking_id(),
             description="No sender package",
             size=PackageSize.SMALL,
             weight_kg=1.0,
@@ -457,6 +463,7 @@ class TestPackageModel:
         db_session.commit()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=test_verified_user.id,
             courier_id=courier.id,
             description="Package with courier",
@@ -478,6 +485,7 @@ class TestPackageModel:
     def test_package_repr(self, db_session, test_verified_user):
         """Test package string representation"""
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=test_verified_user.id,
             description="Test repr package",
             size=PackageSize.SMALL,
@@ -493,8 +501,8 @@ class TestPackageModel:
         db_session.commit()
 
         repr_str = repr(package)
-        assert str(package.id) in repr_str
-        assert package.status.value in repr_str.lower()
+        assert package.tracking_id in repr_str
+        assert package.status.value.lower() in repr_str.lower()
 
 
 class TestCourierRouteModel:

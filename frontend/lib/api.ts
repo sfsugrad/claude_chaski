@@ -432,6 +432,7 @@ export interface AdminUser {
 
 export interface AdminPackage {
   id: number
+  tracking_id: string
   sender_id: number
   courier_id: number | null
   description: string

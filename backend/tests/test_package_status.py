@@ -18,6 +18,7 @@ from datetime import datetime
 from app.models.package import Package, PackageStatus
 from app.models.user import User, UserRole
 from app.utils.auth import get_password_hash
+from app.utils.tracking_id import generate_tracking_id
 from app.services.package_status import (
     validate_transition,
     get_allowed_next_statuses,
@@ -80,11 +81,11 @@ class TestValidateTransition:
         assert is_valid is True
         assert error == ""
 
-    def test_valid_transition_pending_pickup_to_failed(self):
-        """PENDING_PICKUP -> FAILED should be valid."""
+    def test_invalid_transition_pending_pickup_to_failed(self):
+        """PENDING_PICKUP -> FAILED should be invalid (admin-only and only from IN_TRANSIT)."""
         is_valid, error = validate_transition(PackageStatus.PENDING_PICKUP, PackageStatus.FAILED)
-        assert is_valid is True
-        assert error == ""
+        assert is_valid is False
+        assert "admin" in error.lower()  # Admin check happens first
 
     def test_valid_transition_pending_pickup_to_canceled(self):
         """PENDING_PICKUP -> CANCELED should be valid."""
@@ -98,11 +99,17 @@ class TestValidateTransition:
         assert is_valid is True
         assert error == ""
 
-    def test_valid_transition_in_transit_to_failed(self):
-        """IN_TRANSIT -> FAILED should be valid."""
-        is_valid, error = validate_transition(PackageStatus.IN_TRANSIT, PackageStatus.FAILED)
+    def test_valid_transition_in_transit_to_failed_admin(self):
+        """IN_TRANSIT -> FAILED should be valid for admin."""
+        is_valid, error = validate_transition(PackageStatus.IN_TRANSIT, PackageStatus.FAILED, is_admin=True)
         assert is_valid is True
         assert error == ""
+
+    def test_invalid_transition_in_transit_to_failed_non_admin(self):
+        """IN_TRANSIT -> FAILED should be invalid for non-admin."""
+        is_valid, error = validate_transition(PackageStatus.IN_TRANSIT, PackageStatus.FAILED, is_admin=False)
+        assert is_valid is False
+        assert "admin" in error.lower()
 
     def test_valid_transition_failed_to_open_for_bids_admin(self):
         """FAILED -> OPEN_FOR_BIDS (admin only) should be valid when is_admin=True."""
@@ -165,38 +172,45 @@ class TestGetAllowedNextStatuses:
     def test_new_allows_open_for_bids_and_canceled(self):
         """NEW allows OPEN_FOR_BIDS and CANCELED."""
         allowed = get_allowed_next_statuses(PackageStatus.NEW)
-        assert "open_for_bids" in allowed
-        assert "canceled" in allowed
+        assert "OPEN_FOR_BIDS" in allowed
+        assert "CANCELED" in allowed
         assert len(allowed) == 2
 
     def test_open_for_bids_allows_bid_selected_and_canceled(self):
         """OPEN_FOR_BIDS allows BID_SELECTED and CANCELED."""
         allowed = get_allowed_next_statuses(PackageStatus.OPEN_FOR_BIDS)
-        assert "bid_selected" in allowed
-        assert "canceled" in allowed
+        assert "BID_SELECTED" in allowed
+        assert "CANCELED" in allowed
         assert len(allowed) == 2
 
     def test_bid_selected_allows_pending_pickup_open_for_bids_canceled(self):
         """BID_SELECTED allows PENDING_PICKUP, OPEN_FOR_BIDS, and CANCELED."""
         allowed = get_allowed_next_statuses(PackageStatus.BID_SELECTED)
-        assert "pending_pickup" in allowed
-        assert "open_for_bids" in allowed
-        assert "canceled" in allowed
+        assert "PENDING_PICKUP" in allowed
+        assert "OPEN_FOR_BIDS" in allowed
+        assert "CANCELED" in allowed
         assert len(allowed) == 3
 
-    def test_pending_pickup_allows_in_transit_failed_canceled(self):
-        """PENDING_PICKUP allows IN_TRANSIT, FAILED, and CANCELED."""
+    def test_pending_pickup_allows_in_transit_and_canceled(self):
+        """PENDING_PICKUP allows IN_TRANSIT and CANCELED (FAILED only allowed from IN_TRANSIT)."""
         allowed = get_allowed_next_statuses(PackageStatus.PENDING_PICKUP)
-        assert "in_transit" in allowed
-        assert "failed" in allowed
-        assert "canceled" in allowed
-        assert len(allowed) == 3
+        assert "IN_TRANSIT" in allowed
+        assert "CANCELED" in allowed
+        assert "FAILED" not in allowed  # FAILED only allowed from IN_TRANSIT
+        assert len(allowed) == 2
 
-    def test_in_transit_allows_delivered_and_failed(self):
-        """IN_TRANSIT allows DELIVERED and FAILED."""
-        allowed = get_allowed_next_statuses(PackageStatus.IN_TRANSIT)
-        assert "delivered" in allowed
-        assert "failed" in allowed
+    def test_in_transit_allows_delivered_for_non_admin(self):
+        """IN_TRANSIT allows only DELIVERED for non-admin (FAILED is admin-only)."""
+        allowed = get_allowed_next_statuses(PackageStatus.IN_TRANSIT, is_admin=False)
+        assert "DELIVERED" in allowed
+        assert "FAILED" not in allowed  # FAILED is admin-only
+        assert len(allowed) == 1
+
+    def test_in_transit_allows_delivered_and_failed_for_admin(self):
+        """IN_TRANSIT allows DELIVERED and FAILED for admin."""
+        allowed = get_allowed_next_statuses(PackageStatus.IN_TRANSIT, is_admin=True)
+        assert "DELIVERED" in allowed
+        assert "FAILED" in allowed
         assert len(allowed) == 2
 
     def test_delivered_allows_nothing(self):
@@ -212,7 +226,7 @@ class TestGetAllowedNextStatuses:
     def test_failed_allows_open_for_bids(self):
         """FAILED allows OPEN_FOR_BIDS (admin only)."""
         allowed = get_allowed_next_statuses(PackageStatus.FAILED, is_admin=True)
-        assert "open_for_bids" in allowed
+        assert "OPEN_FOR_BIDS" in allowed
         assert len(allowed) == 1
 
     def test_failed_allows_nothing_for_non_admin(self):
@@ -227,6 +241,7 @@ class TestCanMarkDelivered:
     def test_can_deliver_when_in_transit_no_proof_required(self, db_session):
         """Package in IN_TRANSIT with requires_proof=False can be delivered."""
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=1,
             description="Test",
             size="small",
@@ -248,6 +263,7 @@ class TestCanMarkDelivered:
     def test_can_deliver_when_in_transit_proof_required(self, db_session):
         """Package in IN_TRANSIT with requires_proof=True returns proof_required."""
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=1,
             description="Test",
             size="small",
@@ -269,6 +285,7 @@ class TestCanMarkDelivered:
     def test_cannot_deliver_when_pending_pickup(self, db_session):
         """Package in PENDING_PICKUP cannot be directly delivered."""
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=1,
             description="Test",
             size="small",
@@ -290,6 +307,7 @@ class TestCanMarkDelivered:
     def test_cannot_deliver_when_open_for_bids(self, db_session):
         """Package in OPEN_FOR_BIDS cannot be directly delivered."""
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=1,
             description="Test",
             size="small",
@@ -363,6 +381,7 @@ class TestTransitionPackage:
         db_session.commit()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             description="Test",
             size="small",
@@ -411,6 +430,7 @@ class TestTransitionPackage:
         db_session.commit()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description="Test",
@@ -460,6 +480,7 @@ class TestTransitionPackage:
         db_session.commit()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description="Test",
@@ -510,6 +531,7 @@ class TestTransitionPackage:
         db_session.commit()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description="Test",
@@ -559,6 +581,7 @@ class TestTransitionPackage:
         db_session.commit()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description="Test",
@@ -576,7 +599,8 @@ class TestTransitionPackage:
         db_session.add(package)
         db_session.commit()
 
-        updated_package, error = transition_package(db_session, package, PackageStatus.FAILED, courier.id)
+        # FAILED transitions are admin-only
+        updated_package, error = transition_package(db_session, package, PackageStatus.FAILED, courier.id, is_admin=True)
 
         assert error == ""
         assert updated_package.status == PackageStatus.FAILED
@@ -597,6 +621,7 @@ class TestTransitionPackage:
         db_session.commit()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             description="Test",
             size="small",
@@ -627,6 +652,7 @@ class TestGetStatusProgress:
     def test_progress_new(self, db_session):
         """Test progress calculation for NEW status."""
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=1,
             description="Test",
             size="small",
@@ -651,6 +677,7 @@ class TestGetStatusProgress:
     def test_progress_open_for_bids(self, db_session):
         """Test progress calculation for OPEN_FOR_BIDS status."""
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=1,
             description="Test",
             size="small",
@@ -674,6 +701,7 @@ class TestGetStatusProgress:
     def test_progress_delivered(self, db_session):
         """Test progress calculation for DELIVERED status."""
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=1,
             description="Test",
             size="small",
@@ -699,6 +727,7 @@ class TestGetStatusProgress:
     def test_progress_canceled(self, db_session):
         """Test progress calculation for CANCELED status."""
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=1,
             description="Test",
             size="small",
@@ -724,6 +753,7 @@ class TestGetStatusProgress:
     def test_progress_failed(self, db_session):
         """Test progress calculation for FAILED status."""
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=1,
             description="Test",
             size="small",
@@ -773,14 +803,14 @@ class TestAllowedTransitionsComplete:
 
         # PENDING_PICKUP transitions
         (PackageStatus.PENDING_PICKUP, PackageStatus.IN_TRANSIT, True),
-        (PackageStatus.PENDING_PICKUP, PackageStatus.FAILED, True),
+        (PackageStatus.PENDING_PICKUP, PackageStatus.FAILED, False),  # FAILED only allowed from IN_TRANSIT
         (PackageStatus.PENDING_PICKUP, PackageStatus.CANCELED, True),
         (PackageStatus.PENDING_PICKUP, PackageStatus.DELIVERED, False),
         (PackageStatus.PENDING_PICKUP, PackageStatus.NEW, False),
 
-        # IN_TRANSIT transitions
+        # IN_TRANSIT transitions (note: FAILED requires admin, tested separately)
         (PackageStatus.IN_TRANSIT, PackageStatus.DELIVERED, True),
-        (PackageStatus.IN_TRANSIT, PackageStatus.FAILED, True),
+        (PackageStatus.IN_TRANSIT, PackageStatus.FAILED, False),  # FAILED requires admin
         (PackageStatus.IN_TRANSIT, PackageStatus.CANCELED, False),
         (PackageStatus.IN_TRANSIT, PackageStatus.PENDING_PICKUP, False),
         (PackageStatus.IN_TRANSIT, PackageStatus.NEW, False),

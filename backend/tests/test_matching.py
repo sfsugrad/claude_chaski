@@ -7,6 +7,7 @@ from datetime import datetime
 from app.models.user import User, UserRole
 from app.models.package import Package, PackageStatus, PackageSize, CourierRoute
 from app.utils.auth import create_access_token, get_password_hash
+from app.utils.tracking_id import generate_tracking_id
 
 
 class TestMatchingAlgorithm:
@@ -69,6 +70,7 @@ class TestMatchingAlgorithm:
     def package_along_route(self, db_session, sender_user):
         """Create a package along the route (Palo Alto area)"""
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender_user.id,
             description="Test package along route",
             size=PackageSize.SMALL,
@@ -92,6 +94,7 @@ class TestMatchingAlgorithm:
     def package_far_from_route(self, db_session, sender_user):
         """Create a package far from the route (Sacramento area)"""
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender_user.id,
             description="Test package far from route",
             size=PackageSize.MEDIUM,
@@ -344,6 +347,7 @@ class TestMatchingAlgorithm:
         # Create multiple packages with different detour distances
         # Package 1: Close to start (smaller detour)
         package1 = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender_user.id,
             description="Close to start",
             size=PackageSize.SMALL,
@@ -361,6 +365,7 @@ class TestMatchingAlgorithm:
 
         # Package 2: In the middle (medium detour)
         package2 = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender_user.id,
             description="In the middle",
             size=PackageSize.SMALL,
@@ -397,6 +402,7 @@ class TestMatchingAlgorithm:
         """Test that inactive packages are not included in matches"""
         # Create inactive package
         inactive_package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender_user.id,
             description="Inactive package",
             size=PackageSize.SMALL,

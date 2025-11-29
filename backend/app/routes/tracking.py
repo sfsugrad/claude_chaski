@@ -153,7 +153,7 @@ async def start_tracking(
             detail="You are not the assigned courier for this package"
         )
 
-    if package.status not in [PackageStatus.MATCHED, PackageStatus.PICKED_UP, PackageStatus.IN_TRANSIT]:
+    if package.status not in [PackageStatus.BID_SELECTED, PackageStatus.PENDING_PICKUP, PackageStatus.IN_TRANSIT]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Cannot start tracking for package with status {package.status.value}"

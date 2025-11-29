@@ -15,6 +15,7 @@ import { Card, Button, Badge, Alert, FadeIn, SlideIn, PackageDetailSkeleton } fr
 
 interface Package {
   id: number
+  tracking_id: string
   sender_id: number
   courier_id: number | null
   sender_name: string | null
@@ -114,6 +115,12 @@ export default function PackageDetailPage() {
       const packageResponse = await packagesAPI.getByTrackingId(packageId)
       const packageData = packageResponse.data
       setPkg(packageData)
+
+      // Redirect to canonical tracking_id URL if accessed via numeric ID
+      if (packageData.tracking_id && packageId !== packageData.tracking_id) {
+        router.replace(`/packages/${packageData.tracking_id}`)
+        return
+      }
 
       // Get sender information
       if (userResponse.data.role === 'admin' || userResponse.data.role === 'ADMIN') {

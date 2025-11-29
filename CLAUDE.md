@@ -92,12 +92,14 @@ npm run lint
   - `delivery_proof.py` - Delivery proof image upload (AWS S3)
   - `tracking.py` - Real-time location tracking for deliveries
   - `analytics.py` - Platform statistics and metrics
+  - `notes.py` - Package notes for sender-courier communication
 - `app/utils/` - Shared utilities:
   - `dependencies.py` - FastAPI dependencies (`get_current_user`, `get_current_admin_user`)
   - `auth.py` - JWT token and password hashing
   - `email.py` - Email sending via FastAPI-Mail (includes event notification emails)
   - `geo.py` - Geospatial calculations for route matching (centralized `haversine_distance` function)
   - `oauth.py` - Google OAuth configuration
+  - `tracking_id.py` - Unique tracking ID generation for packages
 - `app/services/` - Business logic services:
   - `websocket_manager.py` - WebSocket connection manager and broadcast functions
   - `matching_job.py` - Background job for automatic package-route matching (can run as standalone script)
@@ -110,6 +112,8 @@ npm run lint
   - `package_status.py` - Complex package state transitions
   - `bid_deadline_job.py` - Background job for bid deadline monitoring
   - `route_cleanup_job.py` - Periodic cleanup of expired/completed routes
+  - `route_deactivation_service.py` - Automatic route deactivation after completion/expiry
+  - `user_service.py` - User-related business logic operations
 - `test_data/` - JSON fixtures and loader script for seeding the database
 
 ### Frontend Structure
@@ -196,6 +200,8 @@ Users have one role: `sender`, `courier`, `both`, or `admin`
 - **Rating & Review System**: Post-delivery ratings, user average ratings, reviews page at /profile/reviews
 - **In-App Messaging**: Package-based conversations between sender and courier, real-time via WebSocket
 - **Audit Logging**: Tracks authentication, admin actions, package operations, courier routes with IP/user agent
+- **Package Notes**: Sender can add notes to packages for courier visibility
+- **Tracking IDs**: Unique tracking identifiers for each package for easy reference
 
 ## Package Status State Machine
 

@@ -20,6 +20,7 @@ from app.models.package import Package, PackageStatus, CourierRoute
 from app.models.bid import CourierBid, BidStatus
 from app.models.notification import Notification, NotificationType
 from app.utils.auth import get_password_hash, create_access_token
+from app.utils.tracking_id import generate_tracking_id
 from app.services.route_deactivation_service import (
     has_active_deliveries,
     withdraw_pending_bids_for_courier,
@@ -118,6 +119,7 @@ def expired_route(db_session, courier_user):
 def open_package(db_session, sender_user):
     """Create a package open for bids."""
     package = Package(
+            tracking_id=generate_tracking_id(),
         sender_id=sender_user.id,
         description="Test package",
         size="SMALL",
@@ -142,6 +144,7 @@ def open_package(db_session, sender_user):
 def pending_pickup_package(db_session, sender_user, courier_user):
     """Create a package in PENDING_PICKUP status."""
     package = Package(
+            tracking_id=generate_tracking_id(),
         sender_id=sender_user.id,
         courier_id=courier_user.id,
         description="Pending pickup package",
@@ -166,6 +169,7 @@ def pending_pickup_package(db_session, sender_user, courier_user):
 def in_transit_package(db_session, sender_user, courier_user):
     """Create a package in IN_TRANSIT status."""
     package = Package(
+            tracking_id=generate_tracking_id(),
         sender_id=sender_user.id,
         courier_id=courier_user.id,
         description="In transit package",
@@ -283,6 +287,7 @@ class TestHasActiveDeliveries:
     def test_delivered_package_not_active(self, db_session, sender_user, courier_user):
         """Delivered package is not considered active."""
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender_user.id,
             courier_id=courier_user.id,
             description="Delivered package",
@@ -340,6 +345,7 @@ class TestWithdrawPendingBids:
         """Only PENDING bids are withdrawn, not other statuses."""
         # Create packages
         pkg1 = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender_user.id,
             description="Package 1",
             size="SMALL",
@@ -355,6 +361,7 @@ class TestWithdrawPendingBids:
             bid_count=1
         )
         pkg2 = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender_user.id,
             description="Package 2",
             size="SMALL",
@@ -431,6 +438,7 @@ class TestWithdrawPendingBids:
 
         # Create packages
         pkg1 = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender_user.id,
             description="Package 1",
             size="SMALL",
@@ -446,6 +454,7 @@ class TestWithdrawPendingBids:
             bid_count=1
         )
         pkg2 = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender_user.id,
             description="Package 2",
             size="SMALL",
@@ -503,6 +512,7 @@ class TestCancelSelectedBids:
         """Selected bid is cancelled and package reset to OPEN_FOR_BIDS."""
         # Create package with selected bid
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender_user.id,
             courier_id=courier_user.id,
             description="Selected package",
@@ -558,6 +568,7 @@ class TestCancelSelectedBids:
     def test_does_not_cancel_for_in_transit_package(self, db_session, sender_user, courier_user, active_route):
         """Does not cancel bids for packages already in transit."""
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender_user.id,
             courier_id=courier_user.id,
             description="In transit package",
@@ -611,6 +622,7 @@ class TestDeleteRouteWithDeactivation:
         """Deleting route withdraws pending bids."""
         # Create package and bid
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender_user.id,
             description="Test package",
             size="SMALL",
@@ -690,6 +702,7 @@ class TestCreateRouteWithDeactivation:
         """Creating new route deactivates old route and withdraws its bids."""
         # Create bid on old route
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender_user.id,
             description="Test package",
             size="SMALL",
@@ -776,6 +789,7 @@ class TestBidCreationWithExpiredRoute:
     def test_cannot_bid_with_expired_route(self, client, db_session, courier_user, sender_user, expired_route):
         """Cannot create bid when route is expired."""
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender_user.id,
             description="Test package",
             size="SMALL",
@@ -795,7 +809,7 @@ class TestBidCreationWithExpiredRoute:
         response = client.post(
             "/api/bids",
             json={
-                "package_id": package.id,
+                "tracking_id": package.tracking_id,
                 "proposed_price": 20.0,
                 "route_id": expired_route.id
             },
@@ -808,6 +822,7 @@ class TestBidCreationWithExpiredRoute:
     def test_can_bid_with_valid_route(self, client, db_session, courier_user, sender_user, active_route):
         """Can create bid when route is valid (not expired)."""
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender_user.id,
             description="Test package",
             size="SMALL",
@@ -827,7 +842,7 @@ class TestBidCreationWithExpiredRoute:
         response = client.post(
             "/api/bids",
             json={
-                "package_id": package.id,
+                "tracking_id": package.tracking_id,
                 "proposed_price": 20.0,
                 "route_id": active_route.id
             },
@@ -853,6 +868,7 @@ class TestBidCreationWithExpiredRoute:
         db_session.commit()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender_user.id,
             description="Test package",
             size="SMALL",
@@ -872,7 +888,7 @@ class TestBidCreationWithExpiredRoute:
         response = client.post(
             "/api/bids",
             json={
-                "package_id": package.id,
+                "tracking_id": package.tracking_id,
                 "proposed_price": 20.0,
                 "route_id": inactive_route.id
             },

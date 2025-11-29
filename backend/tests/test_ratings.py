@@ -4,6 +4,7 @@ from app.models.user import User, UserRole
 from app.models.package import Package, PackageStatus
 from app.models.rating import Rating
 from app.utils.auth import get_password_hash, create_access_token
+from app.utils.tracking_id import generate_tracking_id
 
 
 class TestCreateRating:
@@ -39,6 +40,7 @@ class TestCreateRating:
 
         # Create delivered package
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description="Test package",
@@ -77,7 +79,7 @@ class TestCreateRating:
         response = client.post(
             "/api/ratings/",
             json={
-                "package_id": setup["package"].id,
+                "tracking_id": setup["package"].tracking_id,
                 "score": 5,
                 "comment": "Great delivery service!"
             },
@@ -99,7 +101,7 @@ class TestCreateRating:
         response = client.post(
             "/api/ratings/",
             json={
-                "package_id": setup["package"].id,
+                "tracking_id": setup["package"].tracking_id,
                 "score": 4,
                 "comment": "Easy pickup"
             },
@@ -119,6 +121,7 @@ class TestCreateRating:
 
         # Create pending package
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             description=test_package_data["description"],
             size=test_package_data["size"],
@@ -136,7 +139,7 @@ class TestCreateRating:
 
         response = client.post(
             "/api/ratings/",
-            json={"package_id": package.id, "score": 5},
+            json={"tracking_id": package.tracking_id, "score": 5},
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
 
@@ -163,7 +166,7 @@ class TestCreateRating:
 
         response = client.post(
             "/api/ratings/",
-            json={"package_id": setup["package"].id, "score": 5},
+            json={"tracking_id": setup["package"].tracking_id, "score": 5},
             headers={"Authorization": f"Bearer {other_token}"}
         )
 
@@ -177,7 +180,7 @@ class TestCreateRating:
         # First rating
         response1 = client.post(
             "/api/ratings/",
-            json={"package_id": setup["package"].id, "score": 5},
+            json={"tracking_id": setup["package"].tracking_id, "score": 5},
             headers={"Authorization": f"Bearer {setup['sender_token']}"}
         )
         assert response1.status_code == 201
@@ -185,7 +188,7 @@ class TestCreateRating:
         # Second rating attempt
         response2 = client.post(
             "/api/ratings/",
-            json={"package_id": setup["package"].id, "score": 3},
+            json={"tracking_id": setup["package"].tracking_id, "score": 3},
             headers={"Authorization": f"Bearer {setup['sender_token']}"}
         )
         assert response2.status_code == 400
@@ -198,7 +201,7 @@ class TestCreateRating:
         # Score too low
         response = client.post(
             "/api/ratings/",
-            json={"package_id": setup["package"].id, "score": 0},
+            json={"tracking_id": setup["package"].tracking_id, "score": 0},
             headers={"Authorization": f"Bearer {setup['sender_token']}"}
         )
         assert response.status_code == 422
@@ -206,7 +209,7 @@ class TestCreateRating:
         # Score too high
         response = client.post(
             "/api/ratings/",
-            json={"package_id": setup["package"].id, "score": 6},
+            json={"tracking_id": setup["package"].tracking_id, "score": 6},
             headers={"Authorization": f"Bearer {setup['sender_token']}"}
         )
         assert response.status_code == 422
@@ -217,7 +220,7 @@ class TestCreateRating:
 
         response = client.post(
             "/api/ratings/",
-            json={"package_id": setup["package"].id, "score": 4},
+            json={"tracking_id": setup["package"].tracking_id, "score": 4},
             headers={"Authorization": f"Bearer {setup['sender_token']}"}
         )
 
@@ -228,7 +231,7 @@ class TestCreateRating:
         """Rating a nonexistent package returns 404."""
         response = client.post(
             "/api/ratings/",
-            json={"package_id": 9999, "score": 5},
+            json={"tracking_id": "nonexistent-tracking-id", "score": 5},
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
 
@@ -273,6 +276,7 @@ class TestGetUserRatings:
         packages = []
         for i, sender in enumerate(senders):
             package = Package(
+                tracking_id=generate_tracking_id(),
                 sender_id=sender.id,
                 courier_id=courier.id,
                 description=f"Package {i}",
@@ -389,6 +393,7 @@ class TestGetUserRatingSummary:
         scores = [5, 5, 4, 4, 3]  # Two 5s, two 4s, one 3
         for i, (sender, score) in enumerate(zip(senders, scores)):
             package = Package(
+                tracking_id=generate_tracking_id(),
                 sender_id=sender.id,
                 courier_id=courier.id,
                 description=f"Package {i}",
@@ -468,6 +473,7 @@ class TestGetPackageRatings:
         db_session.commit()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description="Rated Package",
@@ -562,6 +568,7 @@ class TestGetMyPendingRatings:
         packages = []
         for i in range(2):
             package = Package(
+                tracking_id=generate_tracking_id(),
                 sender_id=sender.id,
                 courier_id=courier.id,
                 description=f"Pending Package {i}",
@@ -648,6 +655,7 @@ class TestRatingCreatesNewRatingNotification:
 
         # Create delivered package
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description="Test package for notification",
@@ -688,7 +696,7 @@ class TestRatingCreatesNewRatingNotification:
         response = client.post(
             "/api/ratings/",
             json={
-                "package_id": setup["package"].id,
+                "tracking_id": setup["package"].tracking_id,
                 "score": 5,
                 "comment": "Great service!"
             },
@@ -716,7 +724,7 @@ class TestRatingCreatesNewRatingNotification:
         response = client.post(
             "/api/ratings/",
             json={
-                "package_id": setup["package"].id,
+                "tracking_id": setup["package"].tracking_id,
                 "score": 4
             },
             headers={"Authorization": f"Bearer {setup['courier_token']}"}
@@ -765,6 +773,7 @@ class TestAverageRatingInAuthMe:
 
         # Create delivered package
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=rater.id,
             courier_id=rated_user.id,
             description="Test Package",

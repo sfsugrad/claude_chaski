@@ -51,6 +51,7 @@ class UserAdminResponse(BaseModel):
 
 class PackageAdminResponse(BaseModel):
     id: int
+    tracking_id: str
     sender_id: int
     courier_id: int | None
     description: str
@@ -771,6 +772,7 @@ class RunMatchingJobRequest(BaseModel):
 
 class MatchedPackageInfo(BaseModel):
     package_id: int
+    tracking_id: str
     description: str
     distance_km: float
     detour_km: float

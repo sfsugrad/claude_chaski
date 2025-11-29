@@ -132,28 +132,39 @@ export default function AdminPage() {
   }
 
   const loadData = async () => {
+    const errors: string[] = []
+
     // Load users
     try {
       const usersResponse = await adminAPI.getUsers()
       setUsers(usersResponse.data)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error loading users:', err)
+      errors.push(`Failed to load users: ${err.response?.data?.detail || err.message}`)
     }
 
     // Load packages
     try {
       const packagesResponse = await adminAPI.getPackages()
       setPackages(packagesResponse.data)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error loading packages:', err)
+      errors.push(`Failed to load packages: ${err.response?.data?.detail || err.message}`)
     }
 
     // Load stats from backend
     try {
       const statsResponse = await adminAPI.getStats()
       setStats(statsResponse.data)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error loading stats:', err)
+      errors.push(`Failed to load stats: ${err.response?.data?.detail || err.message}`)
+    }
+
+    // Show errors if any occurred
+    if (errors.length > 0) {
+      setError(errors.join('\n'))
+      console.error('Data loading errors:', errors)
     }
   }
 
@@ -671,10 +682,10 @@ export default function AdminPage() {
                                 {rd.matched_packages && rd.matched_packages.length > 0 && (
                                   <div className="mt-2 space-y-1">
                                     {rd.matched_packages.map((pkg) => (
-                                      <div key={pkg.package_id} className="flex items-center justify-between text-xs bg-surface-50 p-2 rounded">
+                                      <div key={pkg.tracking_id || pkg.package_id} className="flex items-center justify-between text-xs bg-surface-50 p-2 rounded">
                                         <div className="flex items-center gap-2">
-                                          <Link href={`/packages/${pkg.package_id}`} className="text-primary-600 hover:underline font-medium">
-                                            Package #{pkg.package_id}
+                                          <Link href={`/packages/${pkg.tracking_id || pkg.package_id}`} className="text-primary-600 hover:underline font-medium">
+                                            {pkg.tracking_id || `#${pkg.package_id}`}
                                           </Link>
                                           <span className="text-surface-500 truncate max-w-[150px]">{pkg.description}</span>
                                         </div>

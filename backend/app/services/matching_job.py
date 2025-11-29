@@ -223,6 +223,7 @@ def run_matching_job(
 
                 package_info = {
                     'package_id': package.id,
+                    'tracking_id': package.tracking_id,
                     'description': package.description[:50],
                     'distance_km': match['distance_from_route_km'],
                     'detour_km': match['estimated_detour_km'],

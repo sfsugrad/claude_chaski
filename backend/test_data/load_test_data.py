@@ -18,6 +18,7 @@ from app.models.notification import Notification, NotificationType
 from app.models.rating import Rating
 from app.models.base import Base
 from app.utils.auth import get_password_hash
+from app.utils.tracking_id import generate_tracking_id
 
 
 def load_users(db: Session, data_file: Path):
@@ -63,6 +64,10 @@ def load_packages(db: Session, data_file: Path, user_id_mapping: dict):
 
         if package_data.get("courier_id"):
             package_data["courier_id"] = user_id_mapping.get(package_data["courier_id"])
+
+        # Generate tracking_id if not present
+        if "tracking_id" not in package_data:
+            package_data["tracking_id"] = generate_tracking_id()
 
         package = Package(**package_data)
         db.add(package)

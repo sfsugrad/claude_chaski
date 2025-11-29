@@ -5,7 +5,7 @@ from sqlalchemy import desc, or_, and_, func
 from pydantic import BaseModel, Field
 from app.database import get_db
 from app.models.user import User
-from app.models.package import Package
+from app.models.package import Package, PackageStatus
 from app.models.message import Message
 from app.utils.dependencies import get_current_user
 
@@ -76,7 +76,7 @@ def check_message_access(package: Package, user: User) -> bool:
         return True
 
     # For packages open for bids, any courier can message (to ask questions before accepting)
-    if package.status.value == 'open_for_bids' and user.role in [UserRole.COURIER, UserRole.BOTH]:
+    if package.status == PackageStatus.OPEN_FOR_BIDS and user.role in [UserRole.COURIER, UserRole.BOTH]:
         return True
 
     return False

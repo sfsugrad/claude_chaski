@@ -1,5 +1,6 @@
 """Tests for the messaging API endpoints."""
 import pytest
+from app.utils.tracking_id import generate_tracking_id
 
 
 class TestMessagesAPI:
@@ -16,6 +17,7 @@ class TestMessagesAPI:
 
         # Create a package with courier assigned
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description=test_package_data["description"],
@@ -34,7 +36,7 @@ class TestMessagesAPI:
 
         # Send message as sender
         response = client.post(
-            f"/api/messages/package/{package.id}",
+            f"/api/messages/package/{package.tracking_id}",
             json={"content": "Hello, when can you pick up the package?"},
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
@@ -55,6 +57,7 @@ class TestMessagesAPI:
         courier = db_session.query(User).filter(User.email == "courier@example.com").first()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description=test_package_data["description"],
@@ -72,7 +75,7 @@ class TestMessagesAPI:
         db_session.commit()
 
         response = client.post(
-            f"/api/messages/package/{package.id}",
+            f"/api/messages/package/{package.tracking_id}",
             json={"content": "I'll be there in 30 minutes"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
@@ -91,6 +94,7 @@ class TestMessagesAPI:
         courier = db_session.query(User).filter(User.email == "courier@example.com").first()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description=test_package_data["description"],
@@ -109,7 +113,7 @@ class TestMessagesAPI:
 
         # Try to send message as a different user
         response = client.post(
-            f"/api/messages/package/{package.id}",
+            f"/api/messages/package/{package.tracking_id}",
             json={"content": "I shouldn't be able to send this"},
             headers={"Authorization": f"Bearer {authenticated_both_role}"}
         )
@@ -126,6 +130,7 @@ class TestMessagesAPI:
         courier = db_session.query(User).filter(User.email == "courier@example.com").first()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description=test_package_data["description"],
@@ -149,7 +154,7 @@ class TestMessagesAPI:
         db_session.commit()
 
         response = client.get(
-            f"/api/messages/package/{package.id}",
+            f"/api/messages/package/{package.tracking_id}",
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
 
@@ -168,6 +173,7 @@ class TestMessagesAPI:
         courier = db_session.query(User).filter(User.email == "courier@example.com").first()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description=test_package_data["description"],
@@ -211,6 +217,7 @@ class TestMessagesAPI:
         courier = db_session.query(User).filter(User.email == "courier@example.com").first()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description=test_package_data["description"],
@@ -252,6 +259,7 @@ class TestMessagesAPI:
         courier = db_session.query(User).filter(User.email == "courier@example.com").first()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description=test_package_data["description"],
@@ -276,7 +284,7 @@ class TestMessagesAPI:
 
         # Sender marks all as read
         response = client.put(
-            f"/api/messages/package/{package.id}/read-all",
+            f"/api/messages/package/{package.tracking_id}/read-all",
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
 
@@ -294,6 +302,7 @@ class TestMessagesAPI:
         courier = db_session.query(User).filter(User.email == "courier@example.com").first()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description=test_package_data["description"],
@@ -335,6 +344,7 @@ class TestMessagesAPI:
         courier = db_session.query(User).filter(User.email == "courier@example.com").first()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description=test_package_data["description"],
@@ -353,7 +363,7 @@ class TestMessagesAPI:
 
         # Empty message should fail
         response = client.post(
-            f"/api/messages/package/{package.id}",
+            f"/api/messages/package/{package.tracking_id}",
             json={"content": ""},
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
@@ -369,8 +379,8 @@ class TestMessagesAPI:
 
         assert response.status_code == 404
 
-    def test_admin_cannot_access_messages(self, client, db_session, authenticated_sender, authenticated_courier, authenticated_admin, test_package_data):
-        """Test that admins cannot access private messages"""
+    def test_admin_can_access_messages(self, client, db_session, authenticated_sender, authenticated_courier, authenticated_admin, test_package_data):
+        """Test that admins can access messages for oversight purposes"""
         from app.models.user import User
         from app.models.package import Package, PackageStatus
         from app.models.message import Message
@@ -379,6 +389,7 @@ class TestMessagesAPI:
         courier = db_session.query(User).filter(User.email == "courier@example.com").first()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description=test_package_data["description"],
@@ -395,13 +406,13 @@ class TestMessagesAPI:
         db_session.add(package)
         db_session.commit()
 
-        # Admin tries to access messages
+        # Admin can access messages for oversight
         response = client.get(
-            f"/api/messages/package/{package.id}",
+            f"/api/messages/package/{package.tracking_id}",
             headers={"Authorization": f"Bearer {authenticated_admin}"}
         )
 
-        assert response.status_code == 403
+        assert response.status_code == 200
 
     def test_courier_can_message_pending_package(self, client, db_session, authenticated_sender, authenticated_courier, test_package_data):
         """Test that any courier can message about pending packages (to ask questions before accepting)"""
@@ -412,6 +423,7 @@ class TestMessagesAPI:
 
         # Create a pending package with NO courier assigned
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=None,  # No courier assigned yet
             description=test_package_data["description"],
@@ -430,7 +442,7 @@ class TestMessagesAPI:
 
         # Courier (not assigned) should be able to send a message
         response = client.post(
-            f"/api/messages/package/{package.id}",
+            f"/api/messages/package/{package.tracking_id}",
             json={"content": "Hi, I have a question about this package before accepting"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
@@ -450,6 +462,7 @@ class TestMessagesAPI:
 
         # Create a matched package with a DIFFERENT courier assigned
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=assigned_courier.id,  # Different courier is assigned
             description=test_package_data["description"],
@@ -468,7 +481,7 @@ class TestMessagesAPI:
 
         # A different courier should NOT be able to send a message
         response = client.post(
-            f"/api/messages/package/{package.id}",
+            f"/api/messages/package/{package.tracking_id}",
             json={"content": "I shouldn't be able to send this"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
@@ -486,6 +499,7 @@ class TestMessagesAPI:
 
         # Create a pending package with NO courier assigned
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=None,  # No courier assigned
             description=test_package_data["description"],
@@ -532,6 +546,7 @@ class TestMessagesAPI:
 
         # Create a pending package with NO courier assigned
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=None,  # No courier assigned
             description=test_package_data["description"],

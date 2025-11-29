@@ -17,6 +17,20 @@ from app.utils.dependencies import get_current_user
 router = APIRouter()
 
 
+def get_package_by_tracking_id(db: Session, tracking_id: str) -> Package | None:
+    """Get a package by tracking_id, with fallback to numeric ID."""
+    package = db.query(Package).filter(
+        Package.tracking_id == tracking_id,
+        Package.is_active == True
+    ).first()
+    if not package and tracking_id.isdigit():
+        package = db.query(Package).filter(
+            Package.id == int(tracking_id),
+            Package.is_active == True
+        ).first()
+    return package
+
+
 # Pydantic schemas
 class NoteCreate(BaseModel):
     content: str
@@ -35,9 +49,9 @@ class NoteResponse(BaseModel):
         from_attributes = True
 
 
-@router.get("/{package_id}/notes", response_model=List[NoteResponse])
+@router.get("/{tracking_id}/notes", response_model=List[NoteResponse])
 async def get_package_notes(
-    package_id: int,
+    tracking_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -46,10 +60,7 @@ async def get_package_notes(
     - Sender and admin can view notes at any time.
     - Courier can only view notes if assigned to the package.
     """
-    package = db.query(Package).filter(
-        Package.id == package_id,
-        Package.is_active == True
-    ).first()
+    package = get_package_by_tracking_id(db, tracking_id)
 
     if not package:
         raise HTTPException(
@@ -69,7 +80,7 @@ async def get_package_notes(
         )
 
     notes = db.query(PackageNote).filter(
-        PackageNote.package_id == package_id
+        PackageNote.package_id == package.id
     ).order_by(PackageNote.created_at.asc()).all()
 
     # Build response with author names
@@ -96,9 +107,9 @@ async def get_package_notes(
     return result
 
 
-@router.post("/{package_id}/notes", response_model=NoteResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/{tracking_id}/notes", response_model=NoteResponse, status_code=status.HTTP_201_CREATED)
 async def add_package_note(
-    package_id: int,
+    tracking_id: str,
     note_data: NoteCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -108,10 +119,7 @@ async def add_package_note(
     - Sender and admin can add notes at any time after package is created.
     - Courier can only add notes after being assigned to the package.
     """
-    package = db.query(Package).filter(
-        Package.id == package_id,
-        Package.is_active == True
-    ).first()
+    package = get_package_by_tracking_id(db, tracking_id)
 
     if not package:
         raise HTTPException(
@@ -165,7 +173,7 @@ async def add_package_note(
 
     # Create note
     note = PackageNote(
-        package_id=package_id,
+        package_id=package.id,
         author_id=current_user.id,
         author_type=author_type,
         content=note_data.content.strip()
@@ -185,8 +193,8 @@ async def add_package_note(
         sender_notification = Notification(
             user_id=package.sender_id,
             type=NotificationType.NEW_NOTE_ADDED,
-            message=f"{author_type_label} added a note to package #{package_id}: \"{note_preview}\"",
-            package_id=package_id
+            message=f"{author_type_label} added a note to package {package.tracking_id}: \"{note_preview}\"",
+            package_id=package.id
         )
         db.add(sender_notification)
 
@@ -195,8 +203,8 @@ async def add_package_note(
         courier_notification = Notification(
             user_id=package.courier_id,
             type=NotificationType.NEW_NOTE_ADDED,
-            message=f"{author_type_label} added a note to package #{package_id}: \"{note_preview}\"",
-            package_id=package_id
+            message=f"{author_type_label} added a note to package {package.tracking_id}: \"{note_preview}\"",
+            package_id=package.id
         )
         db.add(courier_notification)
 

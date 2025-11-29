@@ -6,6 +6,7 @@ from app.models.user import User, UserRole
 from app.models.package import Package, PackageStatus, CourierRoute
 from app.models.notification import Notification, NotificationType
 from app.utils.auth import get_password_hash, create_access_token
+from app.utils.tracking_id import generate_tracking_id
 from app.services.matching_job import (
     haversine_distance,
     find_matching_packages_for_route,
@@ -89,6 +90,7 @@ class TestFindMatchingPackagesForRoute:
 
         # Create package near route (should match)
         package_near = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             description="Near package",
             size="small",
@@ -107,6 +109,7 @@ class TestFindMatchingPackagesForRoute:
 
         # Create package far from route (should not match)
         package_far = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             description="Far package",
             size="small",
@@ -125,6 +128,7 @@ class TestFindMatchingPackagesForRoute:
 
         # Create non-pending package (should not match)
         package_matched = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             description="Matched package",
             size="small",
@@ -185,6 +189,7 @@ class TestFindMatchingPackagesForRoute:
 
         # Create another package closer to route
         closer_package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=setup["sender"].id,
             description="Closer package",
             size="small",
@@ -238,6 +243,7 @@ class TestHasRecentMatchNotification:
         db_session.commit()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             description="Notification check package",
             size="small",
@@ -342,6 +348,7 @@ class TestCreateMatchNotification:
         db_session.commit()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             description="Test package for notification",
             size="small",
@@ -429,6 +436,7 @@ class TestRunMatchingJob:
         db_session.commit()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             description="Job test package",
             size="small",

@@ -62,7 +62,7 @@ class StripeService:
         """Get Stripe customer by ID."""
         try:
             return stripe.Customer.retrieve(customer_id)
-        except stripe.error.StripeError:
+        except Exception:
             return None
 
     # ==================== Payment Methods ====================
@@ -168,7 +168,7 @@ class StripeService:
         # Detach from Stripe
         try:
             stripe.PaymentMethod.detach(pm.stripe_payment_method_id)
-        except stripe.error.StripeError:
+        except Exception:
             pass  # May already be detached
 
         db.delete(pm)
