@@ -141,10 +141,31 @@ Key migrations: `add_phone_verification_fields.py`, `add_account_lockout_column.
 
 ## Role System
 
+Users have one of four roles:
 - **sender**: Can create/manage packages
 - **courier**: Can create routes, view/accept matching packages
 - **both**: Combined sender + courier capabilities
-- **admin**: Full platform management (created directly in database)
+- **admin**: Full platform management
+
+**Role Hierarchy:**
+```
+        ADMIN (highest)
+           ↕
+         BOTH (middle)
+        ↗    ↖
+   SENDER    COURIER (lowest)
+```
+
+**Role Transitions (Admin Only):**
+Only these 4 transitions are allowed:
+- `sender → both` (upgrade)
+- `courier → both` (upgrade)
+- `both → admin` (promote)
+- `admin → both` (demote)
+
+All other transitions are **forbidden**. To promote sender to admin: `sender → both → admin` (2 steps).
+
+See **[backend/docs/USER_ROLES_LIFECYCLE.md](backend/docs/USER_ROLES_LIFECYCLE.md)** for complete documentation on user states, lifecycle, and restrictions.
 
 ## Internationalization (i18n)
 

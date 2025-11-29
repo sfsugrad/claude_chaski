@@ -173,9 +173,25 @@ export default function AdminPage() {
       await adminAPI.updateUserRole(userId, newRole)
       await loadData()
       alert('User role updated successfully')
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error updating role:', err)
-      alert('Failed to update user role')
+      const detail = err.response?.data?.detail
+      let errorMessage = 'Failed to update user role'
+      if (detail) {
+        if (typeof detail === 'string') {
+          errorMessage = detail
+        } else if (detail.message) {
+          errorMessage = detail.message
+          if (detail.allowed_transitions) {
+            const currentRole = detail.current_role
+            const allowed = detail.allowed_transitions[currentRole]
+            if (allowed) {
+              errorMessage += `\n\nAllowed transitions from ${currentRole}: ${allowed.join(', ')}`
+            }
+          }
+        }
+      }
+      alert(errorMessage)
     }
   }
 
@@ -326,6 +342,28 @@ export default function AdminPage() {
     }
 
     return filtered
+  }
+
+  // Get allowed role transitions based on current role
+  // Only 4 transitions are allowed:
+  // - sender → both
+  // - courier → both
+  // - both → admin
+  // - admin → both
+  const getAllowedRoles = (currentRole: string): string[] => {
+    const role = currentRole.toLowerCase()
+    switch (role) {
+      case 'sender':
+        return ['sender', 'both']
+      case 'courier':
+        return ['courier', 'both']
+      case 'both':
+        return ['both', 'admin']
+      case 'admin':
+        return ['admin', 'both']
+      default:
+        return [role]
+    }
   }
 
   if (loading) {
@@ -857,10 +895,11 @@ export default function AdminPage() {
                             disabled={!u.is_active || u.id === user?.id}
                             title={u.id === user?.id ? 'You cannot change your own role' : ''}
                           >
-                            <option value="sender">Sender</option>
-                            <option value="courier">Courier</option>
-                            <option value="both">Both</option>
-                            <option value="admin">Admin</option>
+                            {getAllowedRoles(u.role).map((role) => (
+                              <option key={role} value={role}>
+                                {role.charAt(0).toUpperCase() + role.slice(1)}
+                              </option>
+                            ))}
                           </select>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">

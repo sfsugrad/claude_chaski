@@ -119,6 +119,12 @@ export default function UserDetailPage() {
           alert('You cannot change your own role')
           return
         }
+        // Validate role transition is allowed
+        const allowedRoles = getAllowedRoles(user.role)
+        if (!allowedRoles.includes(editedUser.role.toLowerCase())) {
+          alert(`Role transition from ${user.role} to ${editedUser.role} is not allowed.\n\n${getRoleTransitionHelp(user.role)}`)
+          return
+        }
         await adminAPI.updateUserRole(parseInt(userId), editedUser.role)
       }
 
@@ -224,6 +230,50 @@ export default function UserDetailPage() {
 
   const canEditActiveStatus = () => {
     return user && currentUser && user.id !== currentUser.id
+  }
+
+  // Get allowed role transitions based on current role
+  // Only 4 transitions are allowed:
+  // - sender → both
+  // - courier → both
+  // - both → admin
+  // - admin → both
+  const getAllowedRoles = (currentRole: string): string[] => {
+    const role = currentRole.toLowerCase()
+    switch (role) {
+      case 'sender':
+        return ['sender', 'both']  // Can only upgrade to both
+      case 'courier':
+        return ['courier', 'both']  // Can only upgrade to both
+      case 'both':
+        return ['both', 'admin']  // Can only promote to admin
+      case 'admin':
+        return ['admin', 'both']  // Can only demote to both
+      default:
+        return [role]
+    }
+  }
+
+  const getRoleTransitionHelp = (currentRole: string): string => {
+    const role = currentRole.toLowerCase()
+    switch (role) {
+      case 'sender':
+        return 'Senders can only be upgraded to "Both" role'
+      case 'courier':
+        return 'Couriers can only be upgraded to "Both" role'
+      case 'both':
+        return 'Users with "Both" role can only be promoted to Admin'
+      case 'admin':
+        return 'Admins can only be demoted to "Both" role'
+      default:
+        return ''
+    }
+  }
+
+  const isRoleDisabled = (targetRole: string): boolean => {
+    if (!user) return true
+    const allowedRoles = getAllowedRoles(user.role)
+    return !allowedRoles.includes(targetRole.toLowerCase())
   }
 
   if (loading) {
@@ -381,13 +431,18 @@ export default function UserDetailPage() {
                       disabled={!canEditRole()}
                       title={!canEditRole() ? 'You cannot change your own role' : ''}
                     >
-                      <option value="sender">Sender</option>
-                      <option value="courier">Courier</option>
-                      <option value="both">Both</option>
-                      <option value="admin">Admin</option>
+                      {getAllowedRoles(user.role).map((role) => (
+                        <option key={role} value={role}>
+                          {role.charAt(0).toUpperCase() + role.slice(1)}
+                        </option>
+                      ))}
                     </select>
-                    {!canEditRole() && (
+                    {!canEditRole() ? (
                       <p className="text-xs text-red-500 mt-1">You cannot change your own role</p>
+                    ) : (
+                      <p className="text-xs text-gray-500 mt-1">
+                        {getRoleTransitionHelp(user.role)}
+                      </p>
                     )}
                   </>
                 ) : (

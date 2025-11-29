@@ -272,6 +272,22 @@ async def update_user_role(
     """
     Update a user's role (admin only).
 
+    Role transitions follow a strict hierarchy to prevent accidental permission changes.
+
+    Allowed transitions (whitelist):
+    - sender → both (upgrade to dual role)
+    - courier → both (upgrade to dual role)
+    - both → admin (promote to admin)
+    - admin → both (demote from admin)
+
+    All other transitions are FORBIDDEN.
+
+    Role hierarchy:
+        sender/courier → both ↔ admin
+
+    To change a sender to admin: sender → both → admin (2 steps)
+    To change an admin to courier: admin → both (cannot go further down)
+
     Args:
         user_id: User ID
         role_update: New role data
@@ -282,7 +298,7 @@ async def update_user_role(
         Updated user details
 
     Raises:
-        HTTPException: If user not found or invalid role
+        HTTPException: If user not found, invalid role, or forbidden transition
     """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -306,6 +322,50 @@ async def update_user_role(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid role. Must be one of: SENDER, COURIER, BOTH, ADMIN"
+        )
+
+    # Check if role is actually changing
+    if user.role == new_role:
+        return user  # No change needed
+
+    # Define allowed role transitions
+    # Only these transitions are permitted:
+    # - sender → both (upgrade to dual role)
+    # - courier → both (upgrade to dual role)
+    # - both → admin (promote to admin)
+    # - admin → both (demote from admin)
+    allowed_transitions = [
+        (UserRole.SENDER, UserRole.BOTH),
+        (UserRole.COURIER, UserRole.BOTH),
+        (UserRole.BOTH, UserRole.ADMIN),
+        (UserRole.ADMIN, UserRole.BOTH),
+    ]
+
+    if (user.role, new_role) not in allowed_transitions:
+        # Build helpful error message based on current role
+        if user.role == UserRole.SENDER:
+            suggestion = "sender → both → admin"
+        elif user.role == UserRole.COURIER:
+            suggestion = "courier → both → admin"
+        elif user.role == UserRole.BOTH:
+            suggestion = "both → admin (only allowed transition)"
+        else:  # ADMIN
+            suggestion = "admin → both (only allowed transition)"
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Role transition from {user.role.value} to {new_role.value} is not allowed.",
+                "current_role": user.role.value,
+                "requested_role": new_role.value,
+                "allowed_transitions": {
+                    "sender": ["both"],
+                    "courier": ["both"],
+                    "both": ["admin"],
+                    "admin": ["both"],
+                },
+                "suggestion": suggestion
+            }
         )
 
     old_role = user.role.value
