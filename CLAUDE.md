@@ -72,6 +72,7 @@ Key migrations: `add_phone_verification_fields.py`, `add_account_lockout_column.
   - `password_validator.py` - Password strength validation
   - `file_validator.py` - File upload validation (type, size)
   - `geo.py` - Geospatial calculations (`haversine_distance`)
+  - `geo_restriction.py` - IP-based country geolocation for registration restrictions (uses ip-api.com with Redis caching)
   - `sms.py` - Twilio SMS/Verify integration (falls back to console)
   - `email.py`, `oauth.py`, `tracking_id.py`, `logging_config.py`
 - `app/services/` - Business logic:
@@ -108,6 +109,11 @@ Key migrations: `add_phone_verification_fields.py`, `add_account_lockout_column.
 - Input sanitization for XSS prevention
 - File upload validation (type, size limits)
 - JWT blacklisting for logout
+- Geo-restriction: NEW registrations restricted by country (IP-based, default: US only)
+  - Existing users grandfathered in
+  - Admin override via `ALLOW_INTERNATIONAL_REGISTRATION` env var
+  - Fail-secure: blocks if geolocation lookup fails
+  - Logs blocked attempts to audit log
 
 **Database:**
 - PostgreSQL with PostGIS for geospatial queries
@@ -207,6 +213,9 @@ DATABASE_URL=postgresql://user:pass@localhost:5432/chaski_db
 SECRET_KEY=your-jwt-secret
 ENCRYPTION_KEY=fernet-key  # Generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 FRONTEND_URL=http://localhost:3000
+# Geo-restriction (optional - restricts NEW user registrations by country)
+ALLOW_INTERNATIONAL_REGISTRATION=false  # Set to 'true' to allow all countries
+REGISTRATION_COUNTRY_ALLOWLIST=US       # Comma-separated country codes (e.g., "US,CA,GB")
 # Email, OAuth, Stripe, AWS, Twilio - see .env.example
 ```
 

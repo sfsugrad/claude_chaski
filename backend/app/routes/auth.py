@@ -46,6 +46,8 @@ from app.services.auth_security import (
 from app.services.jwt_blacklist import JWTBlacklistService
 from app.services.session_tracker import SessionTracker
 from app.utils.input_sanitizer import sanitize_plain_text, sanitize_email, sanitize_phone
+from app.utils.geo_restriction import get_country_from_ip, is_country_allowed
+from app.models.audit_log import AuditLog, AuditAction
 from pydantic import BaseModel, EmailStr, Field
 
 logger = logging.getLogger(__name__)
@@ -165,6 +167,47 @@ async def register(request: Request, user_data: UserRegister, db: Session = Depe
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
+        )
+
+    # GEO-RESTRICTION CHECK: Block registrations from outside allowed countries
+    client_ip = request.client.host if request.client else None
+
+    if client_ip:
+        country_code = await get_country_from_ip(client_ip)
+
+        if not is_country_allowed(country_code):
+            # Log blocked registration attempt
+            audit_log = AuditLog(
+                user_id=None,
+                action=AuditAction.UNAUTHORIZED_ACCESS,
+                resource_type="registration",
+                resource_id=None,
+                details=f"Registration blocked from country: {country_code}",
+                ip_address=client_ip,
+                user_agent=request.headers.get("user-agent")
+            )
+            db.add(audit_log)
+            db.commit()
+
+            # Return structured error for frontend handling
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "error_code": "COUNTRY_NOT_ALLOWED",
+                    "message": "We're currently only accepting registrations from the United States. Join our waitlist to be notified when we expand to your region!",
+                    "country_detected": country_code,
+                }
+            )
+    else:
+        # No IP address available - fail-secure (block registration)
+        logger.warning("No client IP available for geo-check - blocking registration")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "error_code": "COUNTRY_NOT_ALLOWED",
+                "message": "Unable to verify your location. Please contact support if you believe this is an error.",
+                "country_detected": None,
+            }
         )
 
     # Validate password strength

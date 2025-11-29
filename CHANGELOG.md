@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Geo-Restriction for Registrations**: IP-based country restrictions for NEW user registrations
+  - Uses ip-api.com free tier with Redis caching (24-hour TTL)
+  - Default: US-only registrations, configurable via `REGISTRATION_COUNTRY_ALLOWLIST` env var
+  - Admin override via `ALLOW_INTERNATIONAL_REGISTRATION` env var
+  - Fail-secure approach: blocks registration if geolocation lookup fails
+  - Existing users grandfathered in (only affects new registrations)
+  - Audit logging for blocked registration attempts
+  - Frontend modal with friendly error message and waitlist option
+  - Comprehensive test coverage (11 unit tests + 5 integration tests)
 - **Notification System**: Frontend notification dropdown component with bell icon badge
   - Real-time unread count polling (30-second intervals)
   - Type-specific icons and colors for different notification types

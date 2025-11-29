@@ -11,6 +11,12 @@ Chaski is a logistics platform that connects package senders with couriers trave
 - **JWT-based Authentication** for secure API access
 - **Password Hashing** with bcrypt
 - **Role-based Access Control** (sender, courier, or both)
+- **Geographic Registration Restrictions** - IP-based country filtering for new user registrations
+  - Default: US-only registrations (configurable via environment variables)
+  - Existing users grandfathered in
+  - Admin override option for international access
+  - Fail-secure design (blocks if geolocation fails)
+  - Audit logging for blocked attempts
 
 ### For Senders
 - **Create Package Delivery Requests** with Google Places address autocomplete (coordinates auto-generated)

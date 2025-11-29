@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+from unittest.mock import patch, AsyncMock
 
 from app.utils.tracking_id import generate_tracking_id
 
@@ -249,3 +250,26 @@ def test_admin(db_session):
     db_session.commit()
     db_session.refresh(admin)
     return admin
+
+
+@pytest.fixture(autouse=True)
+def mock_geo_restriction_default(request):
+    """
+    Auto-mock geo-restriction for all tests to return 'US' by default.
+    Tests in test_geo_restriction.py are skipped via marker.
+    Individual tests can override by using the patch decorator directly.
+    """
+    # Skip this fixture for geo-restriction tests
+    if 'test_geo_restriction.py' in str(request.fspath):
+        yield
+        return
+
+    # Skip for tests that explicitly mock geo-restriction themselves
+    if request.node.get_closest_marker('skip_geo_mock'):
+        yield
+        return
+
+    # Mock get_country_from_ip to return "US" for all tests
+    with patch('app.routes.auth.get_country_from_ip', new_callable=AsyncMock) as mock_geo:
+        mock_geo.return_value = "US"
+        yield mock_geo

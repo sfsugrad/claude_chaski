@@ -1200,3 +1200,127 @@ class TestUserRegistrationWithAddress:
         assert data["default_address"] == "100 Test Blvd, Boston, MA"
         assert data["default_address_lat"] == 42.3601
         assert data["default_address_lng"] == -71.0589
+
+
+# ==========================
+# GEO-RESTRICTION TESTS
+# ==========================
+
+def test_register_blocked_from_non_us_ip(client, db_session):
+    """Test registration is blocked for non-US IPs"""
+    from unittest.mock import patch
+
+    with patch('app.routes.auth.get_country_from_ip') as mock_geo:
+        mock_geo.return_value = "CA"  # Canadian IP
+
+        response = client.post("/api/auth/register", json={
+            "email": "canadian@example.com",
+            "password": "SecurePass123!@#",
+            "full_name": "John Doe",
+            "role": "sender",
+            "phone_number": "+15551234567"
+        })
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        data = response.json()
+        assert isinstance(data["detail"], dict), f"Expected dict but got: {data['detail']}"
+        assert data["detail"]["error_code"] == "COUNTRY_NOT_ALLOWED"
+        assert "United States" in data["detail"]["message"]
+        assert data["detail"]["country_detected"] == "CA"
+
+
+def test_register_allowed_from_us_ip(client, db_session):
+    """Test registration is allowed for US IPs"""
+    from unittest.mock import patch
+
+    with patch('app.routes.auth.get_country_from_ip') as mock_geo:
+        mock_geo.return_value = "US"
+
+        response = client.post("/api/auth/register", json={
+            "email": "american@example.com",
+            "password": "SecurePass123!@#",
+            "full_name": "Jane Doe",
+            "role": "sender",
+            "phone_number": "+15551234567"
+        })
+
+        assert response.status_code == status.HTTP_201_CREATED
+
+
+def test_register_blocked_when_geo_lookup_fails(client, db_session):
+    """Test registration is blocked when geo lookup fails (fail-secure)"""
+    from unittest.mock import patch
+
+    with patch('app.routes.auth.get_country_from_ip') as mock_geo:
+        mock_geo.return_value = None  # Geo lookup failed
+
+        response = client.post("/api/auth/register", json={
+            "email": "unknown@example.com",
+            "password": "SecurePass123!@#",
+            "full_name": "Unknown User",
+            "role": "sender",
+            "phone_number": "+15551234567"
+        })
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        data = response.json()
+        assert data["detail"]["error_code"] == "COUNTRY_NOT_ALLOWED"
+        assert data["detail"]["country_detected"] is None
+
+
+def test_register_logs_blocked_attempts_to_audit(client, db_session):
+    """Test blocked registration attempts are logged to audit log"""
+    from unittest.mock import patch
+    from app.models.audit_log import AuditLog, AuditAction
+
+    with patch('app.routes.auth.get_country_from_ip') as mock_geo:
+        mock_geo.return_value = "FR"  # French IP
+
+        response = client.post("/api/auth/register", json={
+            "email": "french@example.com",
+            "password": "SecurePass123!@#",
+            "full_name": "Pierre Dubois",
+            "role": "sender",
+            "phone_number": "+33612345678"
+        })
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+        # Check audit log
+        audit_log = db_session.query(AuditLog).filter(
+            AuditLog.action == AuditAction.UNAUTHORIZED_ACCESS,
+            AuditLog.resource_type == "registration"
+        ).first()
+
+        assert audit_log is not None
+        assert "FR" in audit_log.details
+        assert audit_log.user_id is None  # No user created yet
+
+
+def test_register_with_admin_override_allows_all_countries(client, db_session):
+    """Test registration allowed from all countries when admin override is enabled"""
+    from unittest.mock import patch
+    from app.config import settings
+
+    # Save original value
+    original_value = settings.ALLOW_INTERNATIONAL_REGISTRATION
+
+    try:
+        # Enable admin override
+        settings.ALLOW_INTERNATIONAL_REGISTRATION = True
+
+        with patch('app.routes.auth.get_country_from_ip') as mock_geo:
+            mock_geo.return_value = "FR"  # French IP
+
+            response = client.post("/api/auth/register", json={
+                "email": "french@example.com",
+                "password": "SecurePass123!@#",
+                "full_name": "Pierre Dubois",
+                "role": "sender",
+                "phone_number": "+33612345678"
+            })
+
+            assert response.status_code == status.HTTP_201_CREATED
+    finally:
+        # Restore original value
+        settings.ALLOW_INTERNATIONAL_REGISTRATION = original_value

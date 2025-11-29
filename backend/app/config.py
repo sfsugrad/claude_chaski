@@ -91,6 +91,10 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
     REDIS_LOCATION_TTL: int = 60  # seconds for location cache
 
+    # Geo-restriction Configuration
+    ALLOW_INTERNATIONAL_REGISTRATION: bool = False  # Admin override to allow international registrations
+    REGISTRATION_COUNTRY_ALLOWLIST: str = "US"  # Comma-separated country codes (e.g., "US,CA,GB")
+
     # AWS S3 Configuration
     AWS_ACCESS_KEY_ID: Optional[str] = None
     AWS_SECRET_ACCESS_KEY: Optional[str] = None
