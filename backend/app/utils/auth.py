@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 import hashlib
+import hmac
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from app.config import settings
@@ -71,3 +72,28 @@ def verify_token_hash(plain_token: str, hashed_token: str) -> bool:
         bool: True if the token matches the hash, False otherwise
     """
     return hash_token(plain_token) == hashed_token
+
+
+def hash_pii(value: str) -> str:
+    """
+    Hash PII (Personally Identifiable Information) for secure lookup.
+
+    Uses HMAC-SHA256 with the application secret key to prevent rainbow table attacks.
+    This creates a deterministic hash that can be used for database lookups while
+    keeping the actual PII encrypted.
+
+    Used for: email addresses, phone numbers (for uniqueness checks and lookups)
+
+    Args:
+        value: The PII value to hash (e.g., email address, phone number)
+
+    Returns:
+        str: HMAC-SHA256 hash as a hexadecimal string
+    """
+    # Normalize the value (lowercase for email, strip whitespace)
+    normalized = value.lower().strip()
+    return hmac.new(
+        settings.SECRET_KEY.encode('utf-8'),
+        normalized.encode('utf-8'),
+        hashlib.sha256
+    ).hexdigest()

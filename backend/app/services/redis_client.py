@@ -79,6 +79,44 @@ class RedisClient:
         """Check if key exists."""
         return await self.client.exists(key) > 0
 
+    async def expire(self, key: str, ttl: int) -> bool:
+        """Set TTL on a key."""
+        return await self.client.expire(key, ttl)
+
+    # Hash operations
+    async def hset(self, key: str, mapping: dict) -> int:
+        """Set multiple hash fields."""
+        return await self.client.hset(key, mapping=mapping)
+
+    async def hget(self, key: str, field: str) -> Optional[str]:
+        """Get a hash field value."""
+        return await self.client.hget(key, field)
+
+    async def hgetall(self, key: str) -> dict:
+        """Get all hash fields and values."""
+        return await self.client.hgetall(key)
+
+    async def hdel(self, key: str, *fields: str) -> int:
+        """Delete hash fields."""
+        return await self.client.hdel(key, *fields)
+
+    # Set operations
+    async def sadd(self, key: str, *members: str) -> int:
+        """Add members to a set."""
+        return await self.client.sadd(key, *members)
+
+    async def srem(self, key: str, *members: str) -> int:
+        """Remove members from a set."""
+        return await self.client.srem(key, *members)
+
+    async def smembers(self, key: str) -> set:
+        """Get all members of a set."""
+        return await self.client.smembers(key)
+
+    async def sismember(self, key: str, member: str) -> bool:
+        """Check if member is in set."""
+        return await self.client.sismember(key, member)
+
     # JSON operations
     async def get_json(self, key: str) -> Optional[Any]:
         """Get and deserialize JSON value."""

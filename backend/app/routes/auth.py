@@ -13,7 +13,7 @@ from app.config import settings
 from app.database import get_db
 from app.models.user import User, UserRole
 from app.models.rating import Rating
-from app.utils.auth import get_password_hash, verify_password, create_access_token, hash_token, verify_token_hash, verify_token
+from app.utils.auth import get_password_hash, verify_password, create_access_token, hash_token, verify_token_hash, verify_token, hash_pii
 from app.utils.dependencies import get_current_user
 from app.utils.email import send_verification_email, send_welcome_email, send_password_reset_email, generate_verification_token
 from app.utils.oauth import oauth
@@ -244,30 +244,40 @@ async def register(request: Request, user_data: UserRegister, db: Session = Depe
     sanitized_phone = sanitize_phone(user_data.phone_number) if user_data.phone_number else None
     sanitized_default_address = sanitize_plain_text(user_data.default_address) if user_data.default_address else None
 
-    # Encrypt PII data (dual-write: store both plain text and encrypted)
+    # Encrypt PII data and create hashes for lookup
     encryption_service = get_encryption_service()
     encrypted_email = encryption_service.encrypt(sanitized_email) if encryption_service else None
     encrypted_full_name = encryption_service.encrypt(sanitized_full_name) if encryption_service else None
     encrypted_phone = encryption_service.encrypt(sanitized_phone) if encryption_service and sanitized_phone else None
 
+    # Create deterministic hashes for secure lookup
+    email_hash_value = hash_pii(sanitized_email)
+    phone_hash_value = hash_pii(sanitized_phone) if sanitized_phone else None
+
     # Create new user
     new_user = User(
-        email=sanitized_email,
+        # Email: hash for lookup, encrypted for storage, plaintext for transition
+        email_hash=email_hash_value,
         email_encrypted=encrypted_email,
+        email=sanitized_email,  # DEPRECATED: kept for transition period
         hashed_password=hashed_password,
-        full_name=sanitized_full_name,
+        # Full name: encrypted only (not queried)
         full_name_encrypted=encrypted_full_name,
+        full_name=sanitized_full_name,  # DEPRECATED: kept for transition period
         role=user_role,
-        phone_number=sanitized_phone,
+        # Phone: hash for lookup, encrypted for storage
+        phone_number_hash=phone_hash_value,
         phone_number_encrypted=encrypted_phone,
+        phone_number=sanitized_phone,  # DEPRECATED: kept for transition period
         max_deviation_km=user_data.max_deviation_km or 5,
         default_address=sanitized_default_address,
         default_address_lat=user_data.default_address_lat,
         default_address_lng=user_data.default_address_lng,
         preferred_language=user_data.preferred_language,
-        verification_token=verification_token,  # Store plain text for transition period
-        verification_token_hash=verification_token_hash_value,  # Store hash for security
-        verification_token_expires_at=verification_token_expires_at
+        # Verification token: hash only (no plaintext stored)
+        verification_token_hash=verification_token_hash_value,
+        verification_token_expires_at=verification_token_expires_at,
+        verification_token=None,  # DEPRECATED: no longer storing plaintext
     )
 
     db.add(new_user)
@@ -304,8 +314,13 @@ async def login(request: Request, response: Response, credentials: UserLogin, db
     ip_address = request.client.host if request.client else "unknown"
     user_agent = request.headers.get("user-agent", "unknown")
 
-    # Find user by email
-    user = db.query(User).filter(User.email == credentials.email).first()
+    # Find user by email hash (secure lookup)
+    email_hash_value = hash_pii(credentials.email)
+    user = db.query(User).filter(User.email_hash == email_hash_value).first()
+
+    # Fallback to plaintext email for users who registered before hash migration
+    if not user:
+        user = db.query(User).filter(User.email == credentials.email).first()
 
     # Check if account is locked (even if user doesn't exist, to prevent enumeration)
     if user and is_account_locked(user):
@@ -556,12 +571,8 @@ async def verify_email(token: str, db: Session = Depends(get_db)):
     # Hash the incoming token for secure comparison
     token_hash_value = hash_token(token)
 
-    # Find user by verification token hash (preferred) or plain token (fallback for transition)
+    # Find user by verification token hash only (no plaintext fallback)
     user = db.query(User).filter(User.verification_token_hash == token_hash_value).first()
-
-    if not user:
-        # Fallback to plain text token for users created before migration
-        user = db.query(User).filter(User.verification_token == token).first()
 
     if not user:
         raise HTTPException(
@@ -582,9 +593,9 @@ async def verify_email(token: str, db: Session = Depends(get_db)):
             detail="Verification token has expired. Please request a new verification email."
         )
 
-    # Mark user as verified and clear the token and hash
+    # Mark user as verified and clear the token hash
     user.is_verified = True
-    user.verification_token = None
+    user.verification_token = None  # Clear deprecated field if present
     user.verification_token_hash = None
     user.verification_token_expires_at = None
     db.commit()
@@ -611,7 +622,13 @@ async def resend_verification_email(request: Request, email: EmailStr, db: Sessi
 
     Note: Returns success message regardless of whether email exists to prevent user enumeration.
     """
-    user = db.query(User).filter(User.email == email).first()
+    # Find user by email hash (secure lookup)
+    email_hash_value = hash_pii(email)
+    user = db.query(User).filter(User.email_hash == email_hash_value).first()
+
+    # Fallback to plaintext email for users who registered before hash migration
+    if not user:
+        user = db.query(User).filter(User.email == email).first()
 
     if not user:
         raise HTTPException(
@@ -627,8 +644,8 @@ async def resend_verification_email(request: Request, email: EmailStr, db: Sessi
 
     # Generate new verification token (expires in 24 hours)
     verification_token = generate_verification_token()
-    user.verification_token = verification_token  # Store plain text for transition period
-    user.verification_token_hash = hash_token(verification_token)  # Store hash for security
+    user.verification_token = None  # DEPRECATED: no longer storing plaintext
+    user.verification_token_hash = hash_token(verification_token)  # Store hash only
     user.verification_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
     db.commit()
 
@@ -784,7 +801,13 @@ async def forgot_password(request: Request, data: ForgotPasswordRequest, db: Ses
 
     Note: Returns success message regardless of whether email exists to prevent user enumeration.
     """
-    user = db.query(User).filter(User.email == data.email).first()
+    # Find user by email hash (secure lookup)
+    email_hash_value = hash_pii(data.email)
+    user = db.query(User).filter(User.email_hash == email_hash_value).first()
+
+    # Fallback to plaintext email for users who registered before hash migration
+    if not user:
+        user = db.query(User).filter(User.email == data.email).first()
 
     # Always return success to prevent user enumeration
     if not user:
@@ -796,8 +819,8 @@ async def forgot_password(request: Request, data: ForgotPasswordRequest, db: Ses
 
     # Generate password reset token (expires in 1 hour)
     reset_token = generate_verification_token()
-    user.password_reset_token = reset_token  # Store plain text for transition period
-    user.password_reset_token_hash = hash_token(reset_token)  # Store hash for security
+    user.password_reset_token = None  # DEPRECATED: no longer storing plaintext
+    user.password_reset_token_hash = hash_token(reset_token)  # Store hash only
     user.password_reset_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
     db.commit()
 
@@ -835,12 +858,8 @@ async def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_d
     # Hash the incoming token for secure comparison
     token_hash_value = hash_token(data.token)
 
-    # Find user by reset token hash (preferred) or plain token (fallback for transition)
+    # Find user by reset token hash only (no plaintext fallback)
     user = db.query(User).filter(User.password_reset_token_hash == token_hash_value).first()
-
-    if not user:
-        # Fallback to plain text token for users with tokens created before migration
-        user = db.query(User).filter(User.password_reset_token == data.token).first()
 
     if not user:
         raise HTTPException(

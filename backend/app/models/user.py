@@ -14,34 +14,40 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
-    # PII fields - dual storage during migration (plain text + encrypted)
-    email = Column(String, unique=True, index=True, nullable=False)
-    email_encrypted = Column(String, nullable=True)  # Encrypted version
+    # Email - hash for lookup, encrypted for storage
+    email_hash = Column(String, unique=True, index=True, nullable=True)  # SHA256 hash for lookup
+    email_encrypted = Column(String, nullable=True)  # Encrypted version for retrieval
+    email = Column(String, unique=True, index=True, nullable=True)  # DEPRECATED: Remove after migration
 
     hashed_password = Column(String, nullable=False)
 
-    full_name = Column(String, nullable=False)
+    # Full name - encrypted only (not queried)
     full_name_encrypted = Column(String, nullable=True)  # Encrypted version
+    full_name = Column(String, nullable=True)  # DEPRECATED: Remove after migration
 
-    phone_number = Column(String)
+    # Phone number - hash for uniqueness check, encrypted for storage
+    phone_number_hash = Column(String, unique=True, index=True, nullable=True)  # SHA256 hash for lookup
     phone_number_encrypted = Column(String, nullable=True)  # Encrypted version
+    phone_number = Column(String, nullable=True)  # DEPRECATED: Remove after migration
 
     role = Column(SQLEnum(UserRole), nullable=False)
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
-    verification_token = Column(String, nullable=True)
-    verification_token_hash = Column(String, nullable=True)  # Hashed version for security
+
+    # Verification token - hashed only (plaintext no longer stored)
+    verification_token_hash = Column(String, nullable=True)  # SHA256 hash for lookup
     verification_token_expires_at = Column(DateTime(timezone=True), nullable=True)
+    verification_token = Column(String, nullable=True)  # DEPRECATED: Remove after migration
 
     # Phone verification fields
     phone_verified = Column(Boolean, default=False)
     phone_verification_code = Column(String, nullable=True)
     phone_verification_code_expires_at = Column(DateTime(timezone=True), nullable=True)
 
-    # Password reset fields
-    password_reset_token = Column(String, nullable=True)
-    password_reset_token_hash = Column(String, nullable=True)  # Hashed version for security
+    # Password reset token - hashed only (plaintext no longer stored)
+    password_reset_token_hash = Column(String, nullable=True)  # SHA256 hash for lookup
     password_reset_token_expires_at = Column(DateTime(timezone=True), nullable=True)
+    password_reset_token = Column(String, nullable=True)  # DEPRECATED: Remove after migration
 
     # Account lockout fields
     account_locked_until = Column(DateTime(timezone=True), nullable=True)  # NULL = not locked
