@@ -916,6 +916,21 @@ export interface TimeSeriesPoint {
   value: number
 }
 
+export interface MonthlyPackageCount {
+  month: string
+  count: number
+}
+
+export interface SenderStatsResponse {
+  total_packages: number
+  packages_this_month: number
+  status_breakdown: Record<string, number>
+  delivery_rate: number
+  total_spent: number
+  average_delivery_time_hours: number | null
+  packages_by_month: MonthlyPackageCount[]
+}
+
 // Analytics API
 export const analyticsAPI = {
   // Admin endpoints
@@ -950,6 +965,10 @@ export const analyticsAPI = {
 
   getCourierLeaderboard: (metric: 'deliveries' | 'rating' | 'earnings' = 'deliveries', limit: number = 10) =>
     api.get<CourierPerformance[]>(`/analytics/courier-leaderboard?metric=${metric}&limit=${limit}`),
+
+  // Sender endpoints
+  getSenderStats: () =>
+    api.get<SenderStatsResponse>('/analytics/sender-stats'),
 }
 
 // Bid Types

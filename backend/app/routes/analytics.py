@@ -108,6 +108,23 @@ class HourlyActivityResponse(BaseModel):
     active_couriers: int
 
 
+class MonthlyPackageCount(BaseModel):
+    """Monthly package count for trend data."""
+    month: str
+    count: int
+
+
+class SenderStatsResponse(BaseModel):
+    """Sender-specific analytics response."""
+    total_packages: int
+    packages_this_month: int
+    status_breakdown: dict[str, int]
+    delivery_rate: float
+    total_spent: float
+    average_delivery_time_hours: Optional[float]
+    packages_by_month: List[MonthlyPackageCount]
+
+
 # Admin endpoints
 @router.get("/overview", response_model=PlatformOverview)
 async def get_platform_overview(
@@ -482,3 +499,112 @@ async def get_revenue_trend(
         )
         for m in metrics
     ]
+
+
+# Sender-specific endpoints
+@router.get("/sender-stats", response_model=SenderStatsResponse)
+async def get_sender_stats(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get analytics for the current sender's packages.
+    Available to senders and users with both role.
+    """
+    if current_user.role not in [UserRole.SENDER, UserRole.BOTH, UserRole.ADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only senders can access sender analytics"
+        )
+
+    # Get all packages for this sender
+    sender_packages = db.query(Package).filter(
+        Package.sender_id == current_user.id,
+        Package.is_active == True
+    )
+
+    # Total packages
+    total_packages = sender_packages.count()
+
+    # Packages this month
+    first_of_month = date.today().replace(day=1)
+    packages_this_month = sender_packages.filter(
+        Package.created_at >= first_of_month
+    ).count()
+
+    # Status breakdown
+    status_counts = db.query(
+        Package.status,
+        func.count(Package.id)
+    ).filter(
+        Package.sender_id == current_user.id,
+        Package.is_active == True
+    ).group_by(Package.status).all()
+
+    status_breakdown = {status.value: count for status, count in status_counts}
+
+    # Delivery rate (delivered / total)
+    delivered_count = status_breakdown.get(PackageStatus.DELIVERED.value, 0)
+    delivery_rate = (delivered_count / total_packages * 100) if total_packages > 0 else 0
+
+    # Total spent (sum of prices for delivered packages)
+    total_spent_result = db.query(
+        func.coalesce(func.sum(Package.price), 0)
+    ).filter(
+        Package.sender_id == current_user.id,
+        Package.is_active == True,
+        Package.status == PackageStatus.DELIVERED
+    ).scalar()
+    total_spent = float(total_spent_result or 0)
+
+    # Average delivery time (for delivered packages with timestamps)
+    avg_delivery_time = None
+    delivered_with_times = db.query(Package).filter(
+        Package.sender_id == current_user.id,
+        Package.is_active == True,
+        Package.status == PackageStatus.DELIVERED,
+        Package.created_at.isnot(None),
+        Package.delivery_time.isnot(None)
+    ).all()
+
+    if delivered_with_times:
+        total_hours = 0
+        count = 0
+        for pkg in delivered_with_times:
+            if pkg.delivery_time and pkg.created_at:
+                diff = pkg.delivery_time - pkg.created_at
+                total_hours += diff.total_seconds() / 3600
+                count += 1
+        if count > 0:
+            avg_delivery_time = round(total_hours / count, 1)
+
+    # Packages by month (last 6 months)
+    six_months_ago = date.today() - timedelta(days=180)
+    monthly_data = db.query(
+        func.date_trunc('month', Package.created_at).label('month'),
+        func.count(Package.id).label('count')
+    ).filter(
+        Package.sender_id == current_user.id,
+        Package.is_active == True,
+        Package.created_at >= six_months_ago
+    ).group_by(
+        func.date_trunc('month', Package.created_at)
+    ).order_by('month').all()
+
+    packages_by_month = [
+        MonthlyPackageCount(
+            month=m.strftime('%b %Y') if m else 'Unknown',
+            count=c
+        )
+        for m, c in monthly_data
+    ]
+
+    return SenderStatsResponse(
+        total_packages=total_packages,
+        packages_this_month=packages_this_month,
+        status_breakdown=status_breakdown,
+        delivery_rate=round(delivery_rate, 1),
+        total_spent=total_spent,
+        average_delivery_time_hours=avg_delivery_time,
+        packages_by_month=packages_by_month
+    )

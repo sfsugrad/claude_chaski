@@ -104,6 +104,15 @@ export default function Navbar({ user }: NavbarProps) {
                       My Packages
                     </Link>
                     <Link
+                      href="/sender/analytics"
+                      className={`nav-link ${isActiveLink('/sender/analytics') ? 'nav-link-active' : ''}`}
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                      Analytics
+                    </Link>
+                    <Link
                       href="/packages/create"
                       className={`nav-link ${isActiveLink('/packages/create') ? 'nav-link-active' : ''}`}
                     >
@@ -379,6 +388,16 @@ export default function Navbar({ user }: NavbarProps) {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                   </svg>
                   My Packages
+                </Link>
+                <Link
+                  href="/sender/analytics"
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-base font-medium ${isActiveLink('/sender/analytics') ? 'bg-primary-50 text-primary-700' : 'text-surface-600 hover:bg-surface-100'}`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                  Analytics
                 </Link>
                 <Link
                   href="/packages/create"
