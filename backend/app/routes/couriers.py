@@ -10,6 +10,10 @@ from app.utils.geo import haversine_distance
 from app.routes.notifications import create_notification, create_notification_with_broadcast
 from app.utils.email import send_route_match_found_email
 from app.services.audit_service import log_route_create, log_route_update, log_route_delete
+from app.services.route_deactivation_service import (
+    has_active_deliveries,
+    handle_route_deactivation
+)
 from pydantic import BaseModel, Field
 from typing import List
 from datetime import datetime
@@ -118,17 +122,32 @@ async def create_route(
     Business Rules:
     - Only courier/both roles can create routes
     - Deactivate any existing active routes for this courier (one active route at a time)
+    - Cannot create new route if courier has active deliveries
     - Validate coordinates are within valid ranges
     """
     verify_courier_role(current_user)
 
-    # Deactivate existing active routes (one active route per courier)
-    db.query(CourierRoute).filter(
+    # Check for active deliveries that would block route change
+    has_active, active_packages = has_active_deliveries(db, current_user.id)
+    if has_active:
+        package_ids = [p.id for p in active_packages]
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cannot create new route while you have active deliveries. Complete or cancel packages {package_ids} first."
+        )
+
+    # Find existing active routes
+    existing_routes = db.query(CourierRoute).filter(
         and_(
             CourierRoute.courier_id == current_user.id,
             CourierRoute.is_active == True
         )
-    ).update({"is_active": False})
+    ).all()
+
+    # Handle deactivation of existing routes (withdraw/cancel bids)
+    for existing_route in existing_routes:
+        await handle_route_deactivation(db, current_user.id, existing_route.id)
+        existing_route.is_active = False
 
     # Create new route
     new_route = CourierRoute(
@@ -312,6 +331,18 @@ async def delete_route(
             detail="Route not found"
         )
 
+    # Check for active deliveries that would block deactivation
+    has_active, active_packages = has_active_deliveries(db, current_user.id)
+    if has_active:
+        package_ids = [p.id for p in active_packages]
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cannot deactivate route while you have active deliveries. Complete or cancel packages {package_ids} first."
+        )
+
+    # Handle bid cleanup before deactivation
+    deactivation_result = await handle_route_deactivation(db, current_user.id, route_id)
+
     # Soft delete
     route.is_active = False
     db.commit()
@@ -319,7 +350,11 @@ async def delete_route(
     # Audit log route deletion
     log_route_delete(db, current_user, route_id, request)
 
-    return {"message": "Route deactivated successfully"}
+    return {
+        "message": "Route deactivated successfully",
+        "bids_withdrawn": deactivation_result["bids_withdrawn"],
+        "bids_cancelled": deactivation_result["bids_cancelled"]
+    }
 
 
 @router.put("/routes/{route_id}/activate", response_model=RouteResponse)
@@ -336,6 +371,7 @@ async def activate_route(
     - Only courier/both roles can activate routes
     - Route must belong to the current user
     - Route must be inactive
+    - Cannot switch routes if courier has active deliveries
     - Deactivates any existing active routes (one active route at a time)
     """
     verify_courier_role(current_user)
@@ -360,13 +396,27 @@ async def activate_route(
             detail="Route is already active"
         )
 
-    # Deactivate any existing active routes (one active route per courier)
-    db.query(CourierRoute).filter(
+    # Check for active deliveries that would block route switch
+    has_active, active_packages = has_active_deliveries(db, current_user.id)
+    if has_active:
+        package_ids = [p.id for p in active_packages]
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cannot switch routes while you have active deliveries. Complete or cancel packages {package_ids} first."
+        )
+
+    # Find and deactivate existing active routes (one active route per courier)
+    existing_routes = db.query(CourierRoute).filter(
         and_(
             CourierRoute.courier_id == current_user.id,
             CourierRoute.is_active == True
         )
-    ).update({"is_active": False})
+    ).all()
+
+    # Handle deactivation of existing routes (withdraw/cancel bids)
+    for existing_route in existing_routes:
+        await handle_route_deactivation(db, current_user.id, existing_route.id)
+        existing_route.is_active = False
 
     # Activate the selected route
     route.is_active = True

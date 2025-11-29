@@ -11,6 +11,7 @@ from app.models.package import Package, PackageStatus, CourierRoute
 from app.models.user import User, UserRole
 from app.utils.dependencies import get_current_user
 from app.utils.geo import haversine_distance
+from app.services.route_deactivation_service import is_route_expired
 
 router = APIRouter()
 
@@ -100,6 +101,14 @@ async def get_packages_along_route(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Active route not found"
+        )
+
+    # Check if route has expired
+    if is_route_expired(route):
+        trip_date_str = route.trip_date.strftime('%Y-%m-%d') if route.trip_date else 'unknown'
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"This route has expired. Trip date {trip_date_str} has passed."
         )
 
     # Create route line (Shapely uses lng, lat order)

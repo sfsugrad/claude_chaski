@@ -6,10 +6,10 @@ that match their active routes.
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 from shapely.geometry import LineString, Point
 from shapely.ops import nearest_points
 
@@ -172,12 +172,19 @@ def run_matching_job(
     try:
         logger.info("Starting package-route matching job...")
 
-        # Get all active courier routes
+        # Get all active, non-expired courier routes
+        now = datetime.now(timezone.utc)
         active_routes = db.query(CourierRoute).filter(
-            CourierRoute.is_active == True
+            and_(
+                CourierRoute.is_active == True,
+                or_(
+                    CourierRoute.trip_date.is_(None),  # No trip_date set (indefinite)
+                    CourierRoute.trip_date >= now       # Trip date not yet passed
+                )
+            )
         ).all()
 
-        logger.info(f"Found {len(active_routes)} active courier routes")
+        logger.info(f"Found {len(active_routes)} active non-expired courier routes")
 
         results = {
             'started_at': datetime.utcnow().isoformat(),

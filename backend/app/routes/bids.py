@@ -17,7 +17,7 @@ from typing import List, Optional
 from datetime import datetime, timedelta, timezone
 
 from app.database import get_db
-from app.models.package import Package, PackageStatus
+from app.models.package import Package, PackageStatus, CourierRoute
 from app.models.bid import CourierBid, BidStatus
 from app.models.user import User, UserRole
 from app.models.notification import NotificationType
@@ -25,6 +25,7 @@ from app.models.rating import Rating
 from app.utils.dependencies import get_current_user
 from app.routes.notifications import create_notification_with_broadcast
 from app.services.audit_service import log_audit
+from app.services.route_deactivation_service import is_route_expired
 
 router = APIRouter()
 
@@ -151,11 +152,12 @@ async def create_bid(
             detail="Cannot bid on your own package"
         )
 
-    # Check for existing bid
+    # Check for existing active bid (exclude withdrawn, rejected, expired)
     existing_bid = db.query(CourierBid).filter(
         and_(
             CourierBid.package_id == bid_data.package_id,
-            CourierBid.courier_id == current_user.id
+            CourierBid.courier_id == current_user.id,
+            CourierBid.status.in_([BidStatus.PENDING, BidStatus.SELECTED])
         )
     ).first()
 
@@ -163,6 +165,45 @@ async def create_bid(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You have already placed a bid on this package"
+        )
+
+    # Validate route (either specified or courier's active route)
+    route = None
+    if bid_data.route_id:
+        # Validate specified route
+        route = db.query(CourierRoute).filter(
+            and_(
+                CourierRoute.id == bid_data.route_id,
+                CourierRoute.courier_id == current_user.id
+            )
+        ).first()
+
+        if not route:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Route not found"
+            )
+
+        if not route.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot bid with an inactive route"
+            )
+    else:
+        # Check courier's active route
+        route = db.query(CourierRoute).filter(
+            and_(
+                CourierRoute.courier_id == current_user.id,
+                CourierRoute.is_active == True
+            )
+        ).first()
+
+    # Validate route is not expired (if route exists)
+    if route and is_route_expired(route):
+        trip_date_str = route.trip_date.strftime('%Y-%m-%d') if route.trip_date else 'unknown'
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot bid with expired route. Trip date {trip_date_str} has passed."
         )
 
     # Create bid
@@ -205,6 +246,15 @@ async def create_bid(
         user_id=package.sender_id,
         notification_type=NotificationType.NEW_BID_RECEIVED,
         message=f"New bid of ${bid.proposed_price:.2f} received from {current_user.full_name} for your package",
+        package_id=package.id
+    )
+
+    # Notify courier (confirmation of bid placement)
+    await create_notification_with_broadcast(
+        db=db,
+        user_id=current_user.id,
+        notification_type=NotificationType.BID_PLACED,
+        message=f"Your bid of ${bid.proposed_price:.2f} has been placed on '{package.description}'",
         package_id=package.id
     )
 
@@ -277,6 +327,15 @@ async def withdraw_bid(
             message=f"A courier has withdrawn their bid on your package",
             package_id=package.id
         )
+
+    # Notify courier (confirmation of withdrawal)
+    await create_notification_with_broadcast(
+        db=db,
+        user_id=current_user.id,
+        notification_type=NotificationType.BID_WITHDRAWN_CONFIRMED,
+        message=f"Your bid has been withdrawn successfully",
+        package_id=bid.package_id
+    )
 
     return {"message": "Bid withdrawn successfully"}
 

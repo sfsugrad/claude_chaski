@@ -16,6 +16,7 @@ export default function RouteMatchesPage() {
   const [error, setError] = useState('')
   const [selectedPackage, setSelectedPackage] = useState<MatchedPackage | null>(null)
   const [showBidModal, setShowBidModal] = useState(false)
+  const [withdrawingBidId, setWithdrawingBidId] = useState<number | null>(null)
 
   useEffect(() => {
     loadData()
@@ -44,6 +45,23 @@ export default function RouteMatchesPage() {
 
   const handleBidPlaced = () => {
     loadData()
+  }
+
+  const handleWithdrawBid = async (bidId: number) => {
+    if (!confirm('Are you sure you want to withdraw this bid? This action cannot be undone.')) {
+      return
+    }
+
+    setWithdrawingBidId(bidId)
+    try {
+      await bidsAPI.withdraw(bidId)
+      await loadData()
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { detail?: string } } }
+      alert(error.response?.data?.detail || 'Failed to withdraw bid')
+    } finally {
+      setWithdrawingBidId(null)
+    }
   }
 
   const getExistingBid = (packageId: number) => {
@@ -196,7 +214,7 @@ export default function RouteMatchesPage() {
                     </div>
 
                     <div className="ml-4 flex flex-col gap-2">
-                      {!existingBid || getBidStatus(existingBid) === 'rejected' || getBidStatus(existingBid) === 'expired' ? (
+                      {!existingBid || getBidStatus(existingBid) === 'rejected' || getBidStatus(existingBid) === 'expired' || getBidStatus(existingBid) === 'withdrawn' ? (
                         <button
                           onClick={() => handlePlaceBid(pkg)}
                           className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium whitespace-nowrap"
@@ -205,10 +223,11 @@ export default function RouteMatchesPage() {
                         </button>
                       ) : getBidStatus(existingBid) === 'pending' ? (
                         <button
-                          disabled
-                          className="bg-gray-400 text-white px-6 py-3 rounded-lg font-medium whitespace-nowrap cursor-not-allowed"
+                          onClick={() => handleWithdrawBid(existingBid!.id)}
+                          disabled={withdrawingBidId === existingBid!.id}
+                          className="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition-colors font-medium whitespace-nowrap disabled:bg-red-400 disabled:cursor-not-allowed"
                         >
-                          Bid Pending
+                          {withdrawingBidId === existingBid!.id ? 'Withdrawing...' : 'Withdraw Bid'}
                         </button>
                       ) : getBidStatus(existingBid) === 'selected' ? (
                         <Link

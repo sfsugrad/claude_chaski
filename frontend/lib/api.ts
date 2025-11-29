@@ -933,6 +933,21 @@ export interface SenderStatsResponse {
   packages_by_month: MonthlyPackageCount[]
 }
 
+export interface CourierStatsResponse {
+  total_deliveries: number
+  deliveries_this_month: number
+  total_bids_placed: number
+  bids_won: number
+  bid_win_rate: number
+  status_breakdown: Record<string, number>
+  delivery_rate: number
+  total_earnings: number
+  earnings_this_month: number
+  average_rating: number | null
+  average_delivery_time_hours: number | null
+  deliveries_by_month: MonthlyPackageCount[]
+}
+
 // Analytics API
 export const analyticsAPI = {
   // Admin endpoints
@@ -971,6 +986,10 @@ export const analyticsAPI = {
   // Sender endpoints
   getSenderStats: () =>
     api.get<SenderStatsResponse>('/analytics/sender-stats'),
+
+  // Courier endpoints (stats)
+  getCourierStats: () =>
+    api.get<CourierStatsResponse>('/analytics/courier-stats'),
 }
 
 // Bid Types

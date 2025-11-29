@@ -24,13 +24,19 @@ class NotificationType(str, enum.Enum):
     PACKAGE_REMINDER = "PACKAGE_REMINDER"  # Reminder for stale MATCHED packages
     # Bidding notifications
     NEW_BID_RECEIVED = "NEW_BID_RECEIVED"  # Sender: new bid on their package
+    BID_PLACED = "BID_PLACED"  # Courier: confirmation their bid was placed
     BID_SELECTED = "BID_SELECTED"  # Courier: their bid was selected
     BID_REJECTED = "BID_REJECTED"  # Courier: another bid was selected
     BID_WITHDRAWN = "BID_WITHDRAWN"  # Sender: courier withdrew their bid
+    BID_WITHDRAWN_CONFIRMED = "BID_WITHDRAWN_CONFIRMED"  # Courier: confirmation their bid was withdrawn
     BID_DEADLINE_WARNING = "BID_DEADLINE_WARNING"  # Sender: 6 hours left to select a bid
     BID_DEADLINE_EXTENDED = "BID_DEADLINE_EXTENDED"  # Sender: deadline extended by 12 hours
     BID_DEADLINE_EXPIRED = "BID_DEADLINE_EXPIRED"  # All parties: bidding period ended
     NEW_NOTE_ADDED = "NEW_NOTE_ADDED"  # Sender/Courier: new note added to their package
+    # Route deactivation notifications
+    ROUTE_DEACTIVATED = "ROUTE_DEACTIVATED"  # Courier: route was deactivated
+    BID_AUTO_WITHDRAWN = "BID_AUTO_WITHDRAWN"  # Courier: bid withdrawn due to route deactivation
+    BID_CANCELLED_BY_COURIER = "BID_CANCELLED_BY_COURIER"  # Sender: selected bid cancelled by courier
     SYSTEM = "SYSTEM"
 
 

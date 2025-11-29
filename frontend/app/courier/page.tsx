@@ -204,18 +204,32 @@ export default function CourierDashboard() {
         <FadeIn duration={400}>
           <div className="flex justify-between items-center mb-8">
             <h1 className="text-2xl sm:text-3xl font-bold text-surface-900">Courier Dashboard</h1>
-            <Link href="/courier/routes/create">
-              <Button
-                variant="success"
-                leftIcon={
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                }
-              >
-                Create New Route
-              </Button>
-            </Link>
+            <div className="flex gap-3">
+              <Link href="/courier/analytics">
+                <Button
+                  variant="ghost"
+                  leftIcon={
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                  }
+                >
+                  Analytics
+                </Button>
+              </Link>
+              <Link href="/courier/routes/create">
+                <Button
+                  variant="success"
+                  leftIcon={
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                  }
+                >
+                  Create New Route
+                </Button>
+              </Link>
+            </div>
           </div>
         </FadeIn>
 

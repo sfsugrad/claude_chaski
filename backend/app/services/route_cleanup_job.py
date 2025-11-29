@@ -13,6 +13,7 @@ from sqlalchemy import and_
 
 from app.database import SessionLocal
 from app.models.package import CourierRoute
+from app.services.route_deactivation_service import withdraw_pending_bids_for_courier
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,7 @@ def run_route_cleanup_job(dry_run: bool = False, db: Optional[Session] = None) -
         results = {
             'started_at': now.isoformat(),
             'routes_deactivated': 0,
+            'bids_withdrawn': 0,
             'dry_run': dry_run,
             'deactivated_routes': []
         }
@@ -57,19 +59,31 @@ def run_route_cleanup_job(dry_run: bool = False, db: Optional[Session] = None) -
         logger.info(f"Found {len(expired_routes)} expired routes to deactivate")
 
         for route in expired_routes:
+            # Withdraw pending bids for this route before deactivation
+            withdrawn_bid_ids = []
+            if not dry_run:
+                withdrawn_bid_ids = withdraw_pending_bids_for_courier(
+                    db, route.courier_id, route.id
+                )
+
             route_detail = {
                 'route_id': route.id,
                 'courier_id': route.courier_id,
                 'trip_date': route.trip_date.isoformat() if route.trip_date else None,
                 'start_address': route.start_address[:50] if route.start_address else None,
                 'end_address': route.end_address[:50] if route.end_address else None,
+                'bids_withdrawn': len(withdrawn_bid_ids)
             }
 
             if not dry_run:
                 route.is_active = False
-                logger.info(f"Deactivated route {route.id} (trip_date: {route.trip_date})")
+                logger.info(
+                    f"Deactivated route {route.id} (trip_date: {route.trip_date}), "
+                    f"withdrew {len(withdrawn_bid_ids)} pending bid(s)"
+                )
 
             results['routes_deactivated'] += 1
+            results['bids_withdrawn'] += len(withdrawn_bid_ids)
             results['deactivated_routes'].append(route_detail)
 
         if not dry_run:
@@ -77,7 +91,10 @@ def run_route_cleanup_job(dry_run: bool = False, db: Optional[Session] = None) -
 
         results['completed_at'] = datetime.now(timezone.utc).isoformat()
 
-        logger.info(f"Route cleanup job completed: {results['routes_deactivated']} routes deactivated")
+        logger.info(
+            f"Route cleanup job completed: {results['routes_deactivated']} routes deactivated, "
+            f"{results['bids_withdrawn']} bids withdrawn"
+        )
 
         return results
 
@@ -114,6 +131,7 @@ if __name__ == "__main__":
     print("\n=== Route Cleanup Job Results ===")
     print(f"Dry run: {results['dry_run']}")
     print(f"Routes deactivated: {results['routes_deactivated']}")
+    print(f"Bids withdrawn: {results['bids_withdrawn']}")
 
     if results['deactivated_routes']:
         print("\n--- Deactivated Routes ---")

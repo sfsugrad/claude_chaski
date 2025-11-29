@@ -19,6 +19,7 @@ from app.models.analytics import (
     GeographicMetrics,
     HourlyActivity,
 )
+from app.models.bid import CourierBid, BidStatus
 from app.utils.dependencies import get_current_user, get_current_admin_user
 
 router = APIRouter()
@@ -123,6 +124,22 @@ class SenderStatsResponse(BaseModel):
     total_spent: float
     average_delivery_time_hours: Optional[float]
     packages_by_month: List[MonthlyPackageCount]
+
+
+class CourierStatsResponse(BaseModel):
+    """Courier-specific analytics response."""
+    total_deliveries: int
+    deliveries_this_month: int
+    total_bids_placed: int
+    bids_won: int
+    bid_win_rate: float
+    status_breakdown: dict[str, int]
+    delivery_rate: float
+    total_earnings: float
+    earnings_this_month: float
+    average_rating: Optional[float]
+    average_delivery_time_hours: Optional[float]
+    deliveries_by_month: List[MonthlyPackageCount]
 
 
 # Admin endpoints
@@ -607,4 +624,149 @@ async def get_sender_stats(
         total_spent=total_spent,
         average_delivery_time_hours=avg_delivery_time,
         packages_by_month=packages_by_month
+    )
+
+
+@router.get("/courier-stats", response_model=CourierStatsResponse)
+async def get_courier_stats(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get analytics for the current courier's deliveries and bids.
+    Available to couriers and users with both role.
+    """
+    if current_user.role not in [UserRole.COURIER, UserRole.BOTH, UserRole.ADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only couriers can access courier analytics"
+        )
+
+    # Get all packages delivered by this courier
+    courier_packages = db.query(Package).filter(
+        Package.courier_id == current_user.id,
+        Package.is_active == True
+    )
+
+    # Total deliveries (all delivered packages)
+    total_deliveries = courier_packages.filter(
+        Package.status == PackageStatus.DELIVERED
+    ).count()
+
+    # Deliveries this month
+    first_of_month = date.today().replace(day=1)
+    deliveries_this_month = courier_packages.filter(
+        Package.status == PackageStatus.DELIVERED,
+        Package.delivery_time >= first_of_month
+    ).count()
+
+    # Bid statistics
+    total_bids_placed = db.query(CourierBid).filter(
+        CourierBid.courier_id == current_user.id
+    ).count()
+
+    bids_won = db.query(CourierBid).filter(
+        CourierBid.courier_id == current_user.id,
+        CourierBid.status == BidStatus.SELECTED
+    ).count()
+
+    bid_win_rate = (bids_won / total_bids_placed * 100) if total_bids_placed > 0 else 0
+
+    # Status breakdown (for packages assigned to this courier)
+    status_counts = db.query(
+        Package.status,
+        func.count(Package.id)
+    ).filter(
+        Package.courier_id == current_user.id,
+        Package.is_active == True
+    ).group_by(Package.status).all()
+
+    status_breakdown = {status.value: count for status, count in status_counts}
+
+    # Delivery rate (delivered vs total assigned packages)
+    total_assigned = courier_packages.count()
+    delivery_rate = (total_deliveries / total_assigned * 100) if total_assigned > 0 else 0
+
+    # Total earnings (sum of prices for delivered packages)
+    total_earnings_result = db.query(
+        func.coalesce(func.sum(Package.price), 0)
+    ).filter(
+        Package.courier_id == current_user.id,
+        Package.is_active == True,
+        Package.status == PackageStatus.DELIVERED
+    ).scalar()
+    total_earnings = float(total_earnings_result or 0)
+
+    # Earnings this month
+    earnings_this_month_result = db.query(
+        func.coalesce(func.sum(Package.price), 0)
+    ).filter(
+        Package.courier_id == current_user.id,
+        Package.is_active == True,
+        Package.status == PackageStatus.DELIVERED,
+        Package.delivery_time >= first_of_month
+    ).scalar()
+    earnings_this_month = float(earnings_this_month_result or 0)
+
+    # Average rating
+    avg_rating = db.query(func.avg(Rating.score)).filter(
+        Rating.rated_user_id == current_user.id
+    ).scalar()
+
+    # Average delivery time (for delivered packages with timestamps)
+    avg_delivery_time = None
+    delivered_with_times = db.query(Package).filter(
+        Package.courier_id == current_user.id,
+        Package.is_active == True,
+        Package.status == PackageStatus.DELIVERED,
+        Package.pickup_time.isnot(None),
+        Package.delivery_time.isnot(None)
+    ).all()
+
+    if delivered_with_times:
+        total_hours = 0
+        count = 0
+        for pkg in delivered_with_times:
+            if pkg.delivery_time and pkg.pickup_time:
+                diff = pkg.delivery_time - pkg.pickup_time
+                total_hours += diff.total_seconds() / 3600
+                count += 1
+        if count > 0:
+            avg_delivery_time = round(total_hours / count, 1)
+
+    # Deliveries by month (last 6 months)
+    six_months_ago = date.today() - timedelta(days=180)
+    monthly_data = db.query(
+        func.date_trunc('month', Package.delivery_time).label('month'),
+        func.count(Package.id).label('count')
+    ).filter(
+        Package.courier_id == current_user.id,
+        Package.is_active == True,
+        Package.status == PackageStatus.DELIVERED,
+        Package.delivery_time >= six_months_ago
+    ).group_by(
+        func.date_trunc('month', Package.delivery_time)
+    ).order_by('month').all()
+
+    deliveries_by_month = [
+        MonthlyPackageCount(
+            month=m.strftime('%b %Y') if m else 'Unknown',
+            count=c
+        )
+        for m, c in monthly_data
+    ]
+
+    return CourierStatsResponse(
+        total_deliveries=total_deliveries,
+        deliveries_this_month=deliveries_this_month,
+        total_bids_placed=total_bids_placed,
+        bids_won=bids_won,
+        bid_win_rate=round(bid_win_rate, 1),
+        status_breakdown=status_breakdown,
+        delivery_rate=round(delivery_rate, 1),
+        total_earnings=total_earnings,
+        earnings_this_month=earnings_this_month,
+        average_rating=round(avg_rating, 2) if avg_rating else None,
+        average_delivery_time_hours=avg_delivery_time,
+        deliveries_by_month=deliveries_by_month
     )
