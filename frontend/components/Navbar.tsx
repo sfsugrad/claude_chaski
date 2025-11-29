@@ -8,6 +8,7 @@ import NotificationDropdown from './NotificationDropdown'
 import StarRating from './StarRating'
 import { useWebSocketContext } from '@/contexts/WebSocketContext'
 import { Badge, ConnectionStatus } from '@/components/ui'
+import LanguageSwitcher from './LanguageSwitcher'
 
 interface NavbarProps {
   user: UserResponse | null
@@ -152,6 +153,9 @@ export default function Navbar({ user }: NavbarProps) {
 
           {/* Right side - Notifications and User */}
           <div className="flex items-center gap-2">
+            {/* Language Switcher */}
+            <LanguageSwitcher />
+
             {user && (
               <>
                 {/* Connection Status Indicator */}
