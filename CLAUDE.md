@@ -93,6 +93,7 @@ npm run lint
   - `tracking.py` - Real-time location tracking for deliveries
   - `analytics.py` - Platform statistics and metrics
   - `notes.py` - Package notes for sender-courier communication
+  - `logs.py` - Frontend error logging endpoint
 - `app/utils/` - Shared utilities:
   - `dependencies.py` - FastAPI dependencies (`get_current_user`, `get_current_admin_user`)
   - `auth.py` - JWT token and password hashing
@@ -100,6 +101,8 @@ npm run lint
   - `geo.py` - Geospatial calculations for route matching (centralized `haversine_distance` function)
   - `oauth.py` - Google OAuth configuration
   - `tracking_id.py` - Unique tracking ID generation for packages
+  - `sms.py` - SMS sending utility (console logging for development)
+  - `logging_config.py` - Structured logging configuration with file rotation
 - `app/services/` - Business logic services:
   - `websocket_manager.py` - WebSocket connection manager and broadcast functions
   - `matching_job.py` - Background job for automatic package-route matching (can run as standalone script)
@@ -115,6 +118,8 @@ npm run lint
   - `route_deactivation_service.py` - Automatic route deactivation after completion/expiry
   - `user_service.py` - User-related business logic operations
 - `test_data/` - JSON fixtures and loader script for seeding the database
+- `app/middleware/` - FastAPI middleware:
+  - `logging_middleware.py` - Request/response logging, performance monitoring, user activity tracking
 
 ### Frontend Structure
 - `app/` - Next.js 14 App Router pages
@@ -123,11 +128,13 @@ npm run lint
   - TypeScript interfaces for all API types
   - Organized API modules: `authAPI`, `packagesAPI`, `couriersAPI`, `matchingAPI`, `notificationsAPI`, `ratingsAPI`, `messagesAPI`, `adminAPI`, `verificationAPI`, `bidsAPI`, `paymentsAPI`, `payoutsAPI`, `trackingAPI`, `proofAPI`, `analyticsAPI`
   - All API calls should go through these modules (no direct axios calls in components)
+- `lib/logger.ts` - Frontend error tracking and logging utility
 - `hooks/` - Custom React hooks:
   - `useWebSocket.ts` - WebSocket connection hook with auto-reconnect
 - `contexts/` - React contexts:
   - `WebSocketContext.tsx` - Shared WebSocket provider for app-wide real-time updates (wraps useWebSocket)
-- `components/` - Reusable React components
+- `components/` - Reusable React components:
+  - `ErrorBoundary.tsx` - React Error Boundary for catching and logging component errors
 
 ### Key Patterns
 
@@ -202,6 +209,179 @@ Users have one role: `sender`, `courier`, `both`, or `admin`
 - **Audit Logging**: Tracks authentication, admin actions, package operations, courier routes with IP/user agent
 - **Package Notes**: Sender can add notes to packages for courier visibility
 - **Tracking IDs**: Unique tracking identifiers for each package for easy reference
+- **Internationalization (i18n)**: Multi-language support for English, French, and Spanish using next-intl
+- **Phone Verification**: SMS-based phone number verification for users (console logging in development)
+- **Logging System**: Comprehensive structured logging with file rotation, request/response tracking, performance monitoring, and frontend error tracking
+
+## Internationalization (i18n)
+
+The frontend supports multiple languages using `next-intl`. See **[frontend/I18N_PLAN.md](frontend/I18N_PLAN.md)** for the complete internationalization roadmap.
+
+**Current Status:**
+- ✅ Infrastructure set up with next-intl
+- ✅ Locale-based routing (`/en`, `/fr`, `/es`)
+- ✅ Language switcher component in navbar
+- ✅ Initial translation keys for common UI elements
+- 🚧 Full page translations (in progress - see I18N_PLAN.md)
+
+**Supported Languages:**
+- English (en) - Default
+- French (fr)
+- Spanish (es)
+
+**Key Files:**
+- `frontend/i18n/request.ts` - i18n configuration
+- `frontend/middleware.ts` - Locale routing middleware
+- `frontend/messages/*.json` - Translation files (en.json, fr.json, es.json)
+- `frontend/components/LanguageSwitcher.tsx` - Language selector component
+
+**Usage in Components:**
+
+Client Components:
+```typescript
+'use client';
+import { useTranslations } from 'next-intl';
+
+export default function Component() {
+  const t = useTranslations('namespace');
+  return <h1>{t('key')}</h1>;
+}
+```
+
+Server Components:
+```typescript
+import { getTranslations } from 'next-intl/server';
+
+export default async function Page() {
+  const t = await getTranslations('namespace');
+  return <h1>{t('key')}</h1>;
+}
+```
+
+**Adding New Translations:**
+1. Add keys to all language files in `frontend/messages/*.json`
+2. Use the `useTranslations()` hook in components
+3. Replace hardcoded strings with `t('key')` calls
+4. Test in all supported languages
+
+**URL Structure:**
+- Default (English): `http://localhost:3000/en`
+- French: `http://localhost:3000/fr`
+- Spanish: `http://localhost:3000/es`
+
+**Next Steps:** See the detailed implementation plan in [frontend/I18N_PLAN.md](frontend/I18N_PLAN.md) for translating the remaining pages and backend components.
+
+## Logging System
+
+The application has a comprehensive logging system for monitoring, debugging, and error tracking across both backend and frontend.
+
+### Backend Logging
+
+**Configuration** (`app/utils/logging_config.py`):
+- **Structured JSON logging** with timestamps, log levels, module/function info, and contextual data
+- **Rotating file handlers** (max 10MB per file, keeps 5 backups)
+- Multiple specialized log files in `backend/logs/`:
+  - `app.log` - All application logs (DEBUG+)
+  - `error.log` - Error logs only (ERROR+)
+  - `requests.log` - HTTP request/response logs
+  - `performance.log` - Performance metrics and slow request warnings
+  - `frontend.log` - Frontend errors from browser
+
+**Middleware** (`app/middleware/logging_middleware.py`):
+1. **RequestLoggingMiddleware**:
+   - Logs every HTTP request with unique request IDs
+   - Captures: method, endpoint, IP address, user agent, query params, duration
+   - Adds `X-Request-ID` header to responses for distributed tracing
+
+2. **PerformanceMonitoringMiddleware**:
+   - Monitors request execution time
+   - Logs warnings for slow requests (>1 second threshold)
+   - Skips health check and docs endpoints
+
+3. **UserActivityLoggingMiddleware**:
+   - Logs authenticated user actions
+   - Tracks state-changing operations (POST, PUT, DELETE, PATCH)
+   - Includes user ID and email
+
+**Frontend Logging API** (`app/routes/logs.py`):
+- Endpoint: `POST /api/logs/frontend`
+- Receives and logs frontend errors, warnings, and info messages
+- Captures stack traces, URLs, user agents, and custom context
+
+**Log Format Example**:
+```json
+{
+  "timestamp": "2025-11-29T11:49:30.420273",
+  "level": "ERROR",
+  "logger": "chaski.frontend",
+  "message": "[FRONTEND] Test frontend error",
+  "module": "logs",
+  "function": "log_frontend_error",
+  "line": 56,
+  "request_id": "d8a4525f-e6fb-4731-916f-19c70b060b97",
+  "ip_address": "127.0.0.1"
+}
+```
+
+### Frontend Logging
+
+**Logger Utility** (`lib/logger.ts`):
+- Singleton logger with `error()`, `warn()`, and `info()` methods
+- Captures error stack traces and contextual data
+- Sends logs to backend in production only (via `/api/logs/frontend`)
+- **Global error handlers** automatically log:
+  - Unhandled JavaScript errors
+  - Unhandled promise rejections
+  - Network connectivity changes
+
+**Error Boundary** (`components/ErrorBoundary.tsx`):
+- React Error Boundary that catches component rendering errors
+- Automatically logs errors to the logging system
+- Shows user-friendly error UI with reload/go back options
+- Displays error details in development mode
+
+**Usage Example**:
+```typescript
+import { logError, logWarn, logInfo } from '@/lib/logger';
+
+// Log an error with context
+try {
+  // code that might fail
+} catch (error) {
+  logError('Failed to process payment', error, { userId, packageId });
+}
+
+// Initialize global handlers in root layout
+logger.initGlobalHandlers();
+```
+
+### Viewing Logs
+
+**Development**:
+```bash
+# View all logs
+tail -f backend/logs/app.log
+
+# View requests only
+tail -f backend/logs/requests.log | jq .
+
+# View frontend errors
+tail -f backend/logs/frontend.log | jq .
+
+# View performance issues
+tail -f backend/logs/performance.log | jq 'select(.duration_ms > 100)'
+```
+
+**Log Rotation**:
+- Automatic rotation at 10MB
+- Keeps 5 backup files (e.g., `app.log.1`, `app.log.2`, etc.)
+- Old logs are automatically compressed and deleted
+
+**Important Notes**:
+- Logs directory is in `.gitignore` - logs are not committed
+- In production, logs should be shipped to a centralized logging service (e.g., CloudWatch, DataDog)
+- Request IDs allow tracing a single request across all log files
+- Frontend errors only sent to backend in production mode
 
 ## Package Status State Machine
 

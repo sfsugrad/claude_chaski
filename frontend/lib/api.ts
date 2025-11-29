@@ -43,6 +43,7 @@ export interface UserResponse {
   default_address: string | null
   default_address_lat: number | null
   default_address_lng: number | null
+  preferred_language: string
   created_at: string
   average_rating: number | null
   total_ratings: number

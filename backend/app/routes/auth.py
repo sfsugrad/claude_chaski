@@ -17,6 +17,7 @@ from app.utils.auth import get_password_hash, verify_password, create_access_tok
 from app.utils.dependencies import get_current_user
 from app.utils.email import send_verification_email, send_welcome_email, send_password_reset_email, generate_verification_token
 from app.utils.oauth import oauth
+from app.utils.sms import send_verification_code
 from app.services.audit_service import (
     log_login_success,
     log_login_failed,
@@ -72,6 +73,7 @@ class UserRegister(BaseModel):
     default_address: str | None = None
     default_address_lat: float | None = None
     default_address_lng: float | None = None
+    preferred_language: str = Field(default='en', pattern="^(en|fr|es)$")
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -98,6 +100,7 @@ class UserResponse(BaseModel):
     default_address: str | None = None
     default_address_lat: float | None = None
     default_address_lng: float | None = None
+    preferred_language: str = 'en'
     created_at: datetime
     average_rating: float | None = None
     total_ratings: int = 0
@@ -172,6 +175,7 @@ async def register(request: Request, user_data: UserRegister, db: Session = Depe
         default_address=user_data.default_address,
         default_address_lat=user_data.default_address_lat,
         default_address_lng=user_data.default_address_lng,
+        preferred_language=user_data.preferred_language,
         verification_token=verification_token,
         verification_token_expires_at=verification_token_expires_at
     )
@@ -436,22 +440,29 @@ async def resend_verification_email(request: Request, email: EmailStr, db: Sessi
 
 
 @router.get("/google/login")
-async def google_login(request: Request):
+async def google_login(request: Request, locale: str = 'en'):
     """
     Initiate Google OAuth login flow.
 
     Redirects user to Google's authentication page.
+    Accepts locale parameter to preserve user's language preference.
     """
     redirect_uri = settings.GOOGLE_REDIRECT_URI
-    return await oauth.google.authorize_redirect(request, redirect_uri)
+    # Pass locale through OAuth state to preserve it
+    return await oauth.google.authorize_redirect(
+        request,
+        redirect_uri,
+        state=locale  # Store locale in OAuth state
+    )
 
 
 @router.get("/google/callback")
-async def google_callback(request: Request, db: Session = Depends(get_db)):
+async def google_callback(request: Request, state: str = 'en', db: Session = Depends(get_db)):
     """
     Handle Google OAuth callback.
 
     Creates or logs in user based on their Google account.
+    Accepts state parameter containing the user's locale preference.
     """
     try:
         # Get the authorization token
@@ -482,13 +493,16 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
         if not user:
             # Create new user with Google account
             # Default role is 'sender', user can change it later
+            # Use locale from OAuth state for new user's preferred language
+            user_locale = state if state in ['en', 'fr', 'es'] else 'en'
             user = User(
                 email=email,
                 hashed_password=get_password_hash(secrets.token_urlsafe(32)),  # Random password
                 full_name=full_name or email.split('@')[0],
                 role=UserRole.SENDER,
                 is_verified=True,  # Google emails are already verified
-                verification_token=None
+                verification_token=None,
+                preferred_language=user_locale
             )
             db.add(user)
             db.commit()
@@ -511,7 +525,9 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
         log_oauth_login(db, user, "google", is_new_user, request)
 
         # Redirect to frontend with token in httpOnly cookie
-        frontend_url = f"{settings.FRONTEND_URL}/auth/callback"
+        # Use user's preferred language for the redirect
+        preferred_lang = user.preferred_language or 'en'
+        frontend_url = f"{settings.FRONTEND_URL}/{preferred_lang}/auth/callback"
         response = RedirectResponse(url=frontend_url)
         set_auth_cookie(response, access_token)
         return response
@@ -608,3 +624,148 @@ async def logout(response: Response):
     """
     clear_auth_cookie(response)
     return {"message": "Logged out successfully"}
+
+
+# Phone Verification Models
+class PhoneVerifyRequest(BaseModel):
+    code: str = Field(..., min_length=6, max_length=6, description="6-digit verification code")
+
+
+@router.post("/phone/send-code", status_code=status.HTTP_200_OK)
+@limiter.limit("3/minute")
+async def send_phone_verification_code(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Send verification code to user's phone number via SMS.
+    Rate limited to 3 requests per minute.
+    """
+    if not current_user.phone_number:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No phone number associated with this account"
+        )
+
+    if current_user.phone_verified:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Phone number is already verified"
+        )
+
+    # Generate 6-digit code
+    code = ''.join([str(secrets.randbelow(10)) for _ in range(6)])
+
+    # Set expiration time (10 minutes)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+
+    # Update user with verification code
+    current_user.phone_verification_code = code
+    current_user.phone_verification_code_expires_at = expires_at
+    db.commit()
+
+    # Send SMS with verification code
+    await send_verification_code(current_user.phone_number, code)
+
+    logger.info(f"Phone verification code sent to user {current_user.id}")
+
+    return {
+        "message": "Verification code sent to your phone number",
+        "expires_in_minutes": 10
+    }
+
+
+@router.post("/phone/verify", status_code=status.HTTP_200_OK)
+async def verify_phone_number(
+    verify_data: PhoneVerifyRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Verify phone number using the code sent via SMS.
+    """
+    if current_user.phone_verified:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Phone number is already verified"
+        )
+
+    if not current_user.phone_verification_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No verification code found. Please request a new code."
+        )
+
+    # Check if code has expired
+    if (current_user.phone_verification_code_expires_at and
+        current_user.phone_verification_code_expires_at < datetime.now(timezone.utc)):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Verification code has expired. Please request a new code."
+        )
+
+    # Verify code
+    if current_user.phone_verification_code != verify_data.code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid verification code"
+        )
+
+    # Mark phone as verified
+    current_user.phone_verified = True
+    current_user.phone_verification_code = None
+    current_user.phone_verification_code_expires_at = None
+    db.commit()
+
+    logger.info(f"Phone number verified for user {current_user.id}")
+
+    return {
+        "message": "Phone number verified successfully",
+        "phone_verified": True
+    }
+
+
+@router.post("/phone/resend-code", status_code=status.HTTP_200_OK)
+@limiter.limit("2/minute")
+async def resend_phone_verification_code(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Resend verification code to user's phone number.
+    Rate limited to 2 requests per minute.
+    """
+    if not current_user.phone_number:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No phone number associated with this account"
+        )
+
+    if current_user.phone_verified:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Phone number is already verified"
+        )
+
+    # Generate new 6-digit code
+    code = ''.join([str(secrets.randbelow(10)) for _ in range(6)])
+
+    # Set expiration time (10 minutes)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+
+    # Update user with new verification code
+    current_user.phone_verification_code = code
+    current_user.phone_verification_code_expires_at = expires_at
+    db.commit()
+
+    # Send SMS with verification code
+    await send_verification_code(current_user.phone_number, code)
+
+    logger.info(f"Phone verification code resent to user {current_user.id}")
+
+    return {
+        "message": "Verification code resent to your phone number",
+        "expires_in_minutes": 10
+    }

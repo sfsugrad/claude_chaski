@@ -3,8 +3,12 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useTranslations, useLocale } from 'next-intl'
+import PhoneInput from 'react-phone-number-input'
+import 'react-phone-number-input/style.css'
 import { authAPI } from '@/lib/api'
 import GoogleSignInButton from '@/components/GoogleSignInButton'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
 import { Button, Input, Card, CardBody, Alert } from '@/components/ui'
 
@@ -35,6 +39,20 @@ const PhoneIcon = () => (
 
 export default function RegisterPage() {
   const router = useRouter()
+  const locale = useLocale()
+  const t = useTranslations('auth')
+  const tCommon = useTranslations('common')
+
+  // Map locale to country code for phone input
+  const getDefaultCountry = (locale: string) => {
+    const countryMap: { [key: string]: string } = {
+      'en': 'US',
+      'fr': 'FR',
+      'es': 'ES'
+    }
+    return countryMap[locale] || 'US'
+  }
+
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -46,6 +64,7 @@ export default function RegisterPage() {
     default_address: '',
     default_address_lat: 0,
     default_address_lng: 0,
+    preferred_language: 'en',
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -71,28 +90,40 @@ export default function RegisterPage() {
 
   const validateForm = () => {
     if (!formData.email || !formData.password || !formData.full_name) {
-      setError('Please fill in all required fields')
+      setError(t('allFieldsRequired'))
+      return false
+    }
+
+    if (!formData.phone_number) {
+      setError(t('phoneRequired'))
+      return false
+    }
+
+    // Validate phone number format (E.164 format: + followed by 1-15 digits)
+    const phoneRegex = /^\+[1-9]\d{1,14}$/
+    if (!phoneRegex.test(formData.phone_number)) {
+      setError(t('invalidPhoneNumber'))
       return false
     }
 
     if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters')
+      setError(t('passwordMinLength'))
       return false
     }
 
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match')
+      setError(t('passwordsNoMatch'))
       return false
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(formData.email)) {
-      setError('Please enter a valid email address')
+      setError(t('invalidEmail'))
       return false
     }
 
     if (formData.max_deviation_km < 1 || formData.max_deviation_km > 50) {
-      setError('Maximum deviation must be between 1 and 50 km')
+      setError(t('deviationRange'))
       return false
     }
 
@@ -129,7 +160,7 @@ export default function RegisterPage() {
       if (err.response?.data?.detail) {
         setError(err.response.data.detail)
       } else {
-        setError('Registration failed. Please try again.')
+        setError(t('registrationFailed'))
       }
     } finally {
       setLoading(false)
@@ -144,6 +175,11 @@ export default function RegisterPage() {
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary-100 rounded-full opacity-50 blur-3xl" />
       </div>
 
+      {/* Language Switcher */}
+      <div className="absolute top-8 right-8 z-10">
+        <LanguageSwitcher />
+      </div>
+
       <div className="max-w-md w-full space-y-8 relative z-10">
         {/* Header */}
         <div className="text-center">
@@ -151,10 +187,10 @@ export default function RegisterPage() {
             <span className="text-3xl font-bold text-gradient">Chaski</span>
           </Link>
           <h1 className="text-2xl font-bold text-surface-900">
-            Create your account
+            {t('registerTitle')}
           </h1>
           <p className="mt-2 text-surface-500">
-            Join Chaski and start sending or delivering packages
+            {t('registerSubtitle')}
           </p>
         </div>
 
@@ -175,7 +211,7 @@ export default function RegisterPage() {
                   <div className="w-full border-t border-surface-200"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-3 bg-white text-surface-400">Or register with email</span>
+                  <span className="px-3 bg-white text-surface-400">{t('orRegisterWithEmail')}</span>
                 </div>
               </div>
             </div>
@@ -183,57 +219,57 @@ export default function RegisterPage() {
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Full Name */}
               <Input
-                label="Full Name"
+                label={t('fullName')}
                 id="full_name"
                 name="full_name"
                 type="text"
                 required
                 value={formData.full_name}
                 onChange={handleChange}
-                placeholder="John Doe"
+                placeholder={t('fullNamePlaceholder')}
                 leftIcon={<UserIcon />}
                 autoComplete="name"
               />
 
               {/* Email */}
               <Input
-                label="Email Address"
+                label={t('email')}
                 id="email"
                 name="email"
                 type="email"
                 required
                 value={formData.email}
                 onChange={handleChange}
-                placeholder="you@example.com"
+                placeholder={t('emailPlaceholder')}
                 leftIcon={<MailIcon />}
                 autoComplete="email"
               />
 
               {/* Password */}
               <Input
-                label="Password"
+                label={t('password')}
                 id="password"
                 name="password"
                 type="password"
                 required
                 value={formData.password}
                 onChange={handleChange}
-                placeholder="Minimum 8 characters"
+                placeholder={t('passwordPlaceholder')}
                 leftIcon={<LockIcon />}
-                helperText="Must be at least 8 characters"
+                helperText={t('passwordHelper')}
                 autoComplete="new-password"
               />
 
               {/* Confirm Password */}
               <Input
-                label="Confirm Password"
+                label={t('confirmPassword')}
                 id="confirmPassword"
                 name="confirmPassword"
                 type="password"
                 required
                 value={formData.confirmPassword}
                 onChange={handleChange}
-                placeholder="Re-enter your password"
+                placeholder={t('confirmPasswordPlaceholder')}
                 leftIcon={<LockIcon />}
                 autoComplete="new-password"
               />
@@ -241,7 +277,7 @@ export default function RegisterPage() {
               {/* Role */}
               <div className="form-group">
                 <label htmlFor="role" className="label">
-                  I want to
+                  {t('roleLabel')}
                 </label>
                 <select
                   id="role"
@@ -250,41 +286,67 @@ export default function RegisterPage() {
                   onChange={handleChange}
                   className="select"
                 >
-                  <option value="sender">Send packages</option>
-                  <option value="courier">Deliver packages</option>
-                  <option value="both">Both send and deliver</option>
+                  <option value="sender">{t('roleSender')}</option>
+                  <option value="courier">{t('roleCourier')}</option>
+                  <option value="both">{t('roleBoth')}</option>
                 </select>
               </div>
 
               {/* Phone Number */}
-              <Input
-                label="Phone Number"
-                id="phone_number"
-                name="phone_number"
-                type="tel"
-                value={formData.phone_number}
-                onChange={handleChange}
-                placeholder="+1234567890"
-                leftIcon={<PhoneIcon />}
-                helperText="Optional - for delivery updates"
-              />
+              <div className="form-group">
+                <label htmlFor="phone_number" className="label">
+                  {t('phoneNumber')}
+                </label>
+                <PhoneInput
+                  international
+                  defaultCountry={getDefaultCountry(locale) as any}
+                  value={formData.phone_number}
+                  onChange={(value) => setFormData(prev => ({ ...prev, phone_number: value || '' }))}
+                  className="phone-input"
+                  placeholder={t('phonePlaceholder')}
+                />
+                <p className="helper-text">
+                  {t('phoneHelper')}
+                </p>
+              </div>
+
+              {/* Preferred Language */}
+              <div className="form-group">
+                <label htmlFor="preferred_language" className="label">
+                  {t('preferredLanguage')}
+                </label>
+                <select
+                  id="preferred_language"
+                  name="preferred_language"
+                  value={formData.preferred_language}
+                  onChange={handleChange}
+                  className="select"
+                >
+                  <option value="en">English</option>
+                  <option value="fr">Français</option>
+                  <option value="es">Español</option>
+                </select>
+                <p className="helper-text">
+                  {t('preferredLanguageHelper')}
+                </p>
+              </div>
 
               {/* Default Address (for senders) */}
               {(formData.role === 'sender' || formData.role === 'both') && (
                 <div className="form-group">
                   <label htmlFor="default_address" className="label">
-                    Default Pickup Address
+                    {t('defaultAddress')}
                   </label>
                   <AddressAutocomplete
                     id="default_address"
                     name="default_address"
                     value={formData.default_address}
                     onChange={handleAddressChange}
-                    placeholder="Start typing to search..."
+                    placeholder={t('addressPlaceholder')}
                     className="input"
                   />
                   <p className="helper-text">
-                    Optional - This will be pre-filled when you create new packages
+                    {t('addressHelper')}
                   </p>
                 </div>
               )}
@@ -293,7 +355,7 @@ export default function RegisterPage() {
               {(formData.role === 'courier' || formData.role === 'both') && (
                 <div className="form-group">
                   <label htmlFor="max_deviation_km" className="label">
-                    Maximum Route Deviation (km)
+                    {t('maxDeviation')}
                   </label>
                   <input
                     id="max_deviation_km"
@@ -306,7 +368,7 @@ export default function RegisterPage() {
                     className="input"
                   />
                   <p className="helper-text">
-                    How far you&apos;re willing to deviate from your route (1-50 km)
+                    {t('maxDeviationHelper')}
                   </p>
                 </div>
               )}
@@ -319,7 +381,7 @@ export default function RegisterPage() {
                 fullWidth
                 isLoading={loading}
               >
-                Create Account
+                {t('createAccount')}
               </Button>
             </form>
           </CardBody>
@@ -328,12 +390,12 @@ export default function RegisterPage() {
         {/* Login Link */}
         <div className="text-center">
           <p className="text-sm text-surface-500">
-            Already have an account?{' '}
+            {t('haveAccount')}{' '}
             <Link
               href="/login"
               className="font-semibold text-primary-600 hover:text-primary-700 transition-colors"
             >
-              Sign in
+              {t('signIn')}
             </Link>
           </p>
         </div>

@@ -3,11 +3,14 @@
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import { verificationAPI } from '@/lib/api'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
 
 function VerifyEmailContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const t = useTranslations('auth')
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
   const [message, setMessage] = useState('')
   const hasVerified = useRef(false)
@@ -22,7 +25,7 @@ function VerifyEmailContent() {
 
       if (!token) {
         setStatus('error')
-        setMessage('Invalid verification link')
+        setMessage(t('invalidVerificationLink'))
         return
       }
 
@@ -31,7 +34,7 @@ function VerifyEmailContent() {
 
         if (response.data) {
           setStatus('success')
-          setMessage('Your email has been verified successfully!')
+          setMessage(t('emailVerifiedSuccess'))
 
           // Redirect to login after 3 seconds
           setTimeout(() => {
@@ -43,7 +46,7 @@ function VerifyEmailContent() {
         if (error.response?.data?.detail) {
           setMessage(error.response.data.detail)
         } else {
-          setMessage('Email verification failed. The link may be invalid or expired.')
+          setMessage(t('verificationError'))
         }
       }
     }
@@ -53,10 +56,15 @@ function VerifyEmailContent() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      {/* Language Switcher */}
+      <div className="absolute top-8 right-8 z-10">
+        <LanguageSwitcher />
+      </div>
+
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-            Email Verification
+            {t('emailVerified')}
           </h2>
         </div>
 
@@ -64,7 +72,7 @@ function VerifyEmailContent() {
           {status === 'loading' && (
             <div className="text-center">
               <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-              <p className="text-gray-600">Verifying your email...</p>
+              <p className="text-gray-600">{t('verifyingEmail')}</p>
             </div>
           )}
 
@@ -86,11 +94,11 @@ function VerifyEmailContent() {
                 </svg>
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Success!
+                {t('success')}
               </h3>
               <p className="text-gray-600 mb-4">{message}</p>
               <p className="text-sm text-gray-500">
-                Redirecting to login page...
+                {t('redirectingToLogin')}
               </p>
             </div>
           )}
@@ -113,7 +121,7 @@ function VerifyEmailContent() {
                 </svg>
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Verification Failed
+                {t('verificationFailed')}
               </h3>
               <p className="text-gray-600 mb-6">{message}</p>
               <div className="space-y-2">
@@ -121,13 +129,13 @@ function VerifyEmailContent() {
                   href="/login"
                   className="block w-full px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-500"
                 >
-                  Go to Login
+                  {t('goToLogin')}
                 </Link>
                 <Link
                   href="/register"
                   className="block w-full px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-500"
                 >
-                  Register Again
+                  {t('registerAgain')}
                 </Link>
               </div>
             </div>
@@ -139,12 +147,14 @@ function VerifyEmailContent() {
 }
 
 export default function VerifyEmailPage() {
+  const tCommon = useTranslations('common')
+
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600">{tCommon('loading')}</p>
         </div>
       </div>
     }>

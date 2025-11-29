@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
+import { useLocale } from 'next-intl'
+import PhoneInput from 'react-phone-number-input'
+import 'react-phone-number-input/style.css'
 import { authAPI, adminAPI, AdminUser, AdminPackage, UserResponse } from '@/lib/api'
 
 type User = AdminUser
@@ -19,7 +22,18 @@ interface Package {
 export default function UserDetailPage() {
   const router = useRouter()
   const params = useParams()
+  const locale = useLocale()
   const userId = params.id as string
+
+  // Map locale to country code for phone input
+  const getDefaultCountry = (locale: string) => {
+    const countryMap: { [key: string]: string } = {
+      'en': 'US',
+      'fr': 'FR',
+      'es': 'ES'
+    }
+    return countryMap[locale] || 'US'
+  }
 
   const [user, setUser] = useState<User | null>(null)
   const [packages, setPackages] = useState<Package[]>([])
@@ -343,12 +357,12 @@ export default function UserDetailPage() {
               <div>
                 <label className="text-sm font-medium text-gray-500">Phone Number</label>
                 {isEditing ? (
-                  <input
-                    type="tel"
+                  <PhoneInput
+                    international
+                    defaultCountry={getDefaultCountry(locale) as any}
                     value={editedUser.phone_number || ''}
-                    onChange={(e) => setEditedUser({ ...editedUser, phone_number: e.target.value })}
-                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    placeholder="+1234567890"
+                    onChange={(value) => setEditedUser({ ...editedUser, phone_number: value || '' })}
+                    className="mt-1 phone-input"
                   />
                 ) : (
                   <p className="text-gray-900 mt-1">{user.phone_number || 'Not provided'}</p>

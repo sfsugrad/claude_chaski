@@ -2,11 +2,13 @@
 
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { authAPI } from '@/lib/api'
 
 function AuthCallbackContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const t = useTranslations('auth')
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -37,7 +39,7 @@ function AuthCallbackContent() {
       } catch (err: any) {
         console.error('Auth callback error:', err)
         // If we can't get user info, authentication likely failed
-        setError('Authentication failed. Please try again.')
+        setError(t('authenticationFailed'))
         setTimeout(() => {
           router.push('/login?error=auth_failed')
         }, 2000)
@@ -45,7 +47,7 @@ function AuthCallbackContent() {
     }
 
     handleCallback()
-  }, [searchParams, router])
+  }, [searchParams, router, t])
 
   if (error) {
     return (
@@ -67,7 +69,7 @@ function AuthCallbackContent() {
             </svg>
           </div>
           <p className="text-red-600 font-medium">{error}</p>
-          <p className="text-gray-500 text-sm mt-2">Redirecting to login...</p>
+          <p className="text-gray-500 text-sm mt-2">{t('redirectingToLoginError')}</p>
         </div>
       </div>
     )
@@ -77,19 +79,21 @@ function AuthCallbackContent() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center">
       <div className="text-center">
         <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-        <p className="text-gray-600">Completing sign in...</p>
+        <p className="text-gray-600">{t('completingSignIn')}</p>
       </div>
     </div>
   )
 }
 
 export default function AuthCallbackPage() {
+  const tCommon = useTranslations('common')
+
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600">{tCommon('loading')}</p>
         </div>
       </div>
     }>

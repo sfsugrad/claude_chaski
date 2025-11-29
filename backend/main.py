@@ -8,7 +8,16 @@ from slowapi.errors import RateLimitExceeded
 from app.config import settings
 from app.database import engine
 from app.models import base
-from app.routes import auth, packages, couriers, matching, admin, notifications, ratings, ws, messages, delivery_proof, payments, payouts, tracking, analytics, bids, notes
+from app.routes import auth, packages, couriers, matching, admin, notifications, ratings, ws, messages, delivery_proof, payments, payouts, tracking, analytics, bids, notes, logs
+from app.utils.logging_config import setup_logging
+from app.middleware.logging_middleware import (
+    RequestLoggingMiddleware,
+    PerformanceMonitoringMiddleware,
+    UserActivityLoggingMiddleware
+)
+
+# Initialize logging system
+setup_logging()
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -114,6 +123,11 @@ app.add_middleware(
     max_age=600,  # Cache preflight requests for 10 minutes
 )
 
+# Logging middleware
+app.add_middleware(UserActivityLoggingMiddleware)
+app.add_middleware(PerformanceMonitoringMiddleware)
+app.add_middleware(RequestLoggingMiddleware)
+
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(packages.router, prefix="/api/packages", tags=["Packages"])
@@ -130,6 +144,7 @@ app.include_router(tracking.router, prefix="/api/tracking", tags=["Tracking"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(bids.router, prefix="/api/bids", tags=["Bids"])
 app.include_router(notes.router, prefix="/api/packages", tags=["Package Notes"])
+app.include_router(logs.router, prefix="/api/logs", tags=["Logging"])
 app.include_router(ws.router, prefix="/api", tags=["WebSocket"])
 
 @app.get("/")

@@ -3,8 +3,10 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { useTranslations, useLocale } from 'next-intl'
 import { authAPI } from '@/lib/api'
 import GoogleSignInButton from '@/components/GoogleSignInButton'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { Button, Input, Card, CardBody, Alert } from '@/components/ui'
 
 // Icons
@@ -23,6 +25,8 @@ const LockIcon = () => (
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const locale = useLocale()
+  const t = useTranslations('auth')
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -34,15 +38,15 @@ function LoginForm() {
 
   useEffect(() => {
     if (searchParams.get('registered') === 'true') {
-      setSuccessMessage('Registration successful! Please log in.')
+      setSuccessMessage(t('registrationSuccess'))
     }
     if (searchParams.get('verified') === 'true') {
-      setSuccessMessage('Email verified successfully! You can now log in.')
+      setSuccessMessage(t('emailVerifiedSuccess'))
     }
     if (searchParams.get('reset') === 'true') {
-      setSuccessMessage('Password reset successful! Please log in with your new password.')
+      setSuccessMessage(t('passwordResetSuccess'))
     }
-  }, [searchParams])
+  }, [searchParams, t])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target
@@ -58,7 +62,7 @@ function LoginForm() {
     setSuccessMessage('')
 
     if (!formData.email || !formData.password) {
-      setError('Please fill in all fields')
+      setError(t('allFieldsRequired'))
       return
     }
 
@@ -71,16 +75,23 @@ function LoginForm() {
         remember_me: formData.rememberMe,
       })
 
-      // Cookie is set by the server, now get user info to check role
+      // Cookie is set by the server, now get user info to check role and language preference
       try {
         const userResponse = await authAPI.getCurrentUser()
         const userRole = userResponse.data?.role
+        const preferredLang = userResponse.data?.preferred_language || 'en'
 
-        // Redirect based on role
+        // Determine destination based on role
+        let destination = '/dashboard'
         if (userRole === 'ADMIN' || userRole === 'admin') {
-          router.push('/admin')
+          destination = '/admin'
+        }
+
+        // Redirect to preferred language if different from current locale
+        if (preferredLang !== locale) {
+          router.push(`/${preferredLang}${destination}`)
         } else {
-          router.push('/dashboard')
+          router.push(destination)
         }
       } catch {
         // If we can't get user info, default to dashboard
@@ -90,7 +101,7 @@ function LoginForm() {
       if (err.response?.data?.detail) {
         setError(err.response.data.detail)
       } else {
-        setError('Login failed. Please check your credentials.')
+        setError(t('loginFailed'))
       }
     } finally {
       setLoading(false)
@@ -105,6 +116,11 @@ function LoginForm() {
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary-100 rounded-full opacity-50 blur-3xl" />
       </div>
 
+      {/* Language Switcher */}
+      <div className="absolute top-8 right-8 z-10">
+        <LanguageSwitcher />
+      </div>
+
       <div className="max-w-md w-full space-y-8 relative z-10">
         {/* Header */}
         <div className="text-center">
@@ -112,10 +128,10 @@ function LoginForm() {
             <span className="text-3xl font-bold text-gradient">Chaski</span>
           </Link>
           <h1 className="text-2xl font-bold text-surface-900">
-            Sign in to your account
+            {t('loginTitle')}
           </h1>
           <p className="mt-2 text-surface-500">
-            Welcome back! Enter your details to continue.
+            {t('loginSubtitle')}
           </p>
         </div>
 
@@ -142,7 +158,7 @@ function LoginForm() {
                   <div className="w-full border-t border-surface-200"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-3 bg-white text-surface-400">Or continue with email</span>
+                  <span className="px-3 bg-white text-surface-400">{t('orContinueWithEmail')}</span>
                 </div>
               </div>
             </div>
@@ -150,14 +166,14 @@ function LoginForm() {
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Email */}
               <Input
-                label="Email Address"
+                label={t('email')}
                 id="email"
                 name="email"
                 type="email"
                 required
                 value={formData.email}
                 onChange={handleChange}
-                placeholder="you@example.com"
+                placeholder={t('emailPlaceholder')}
                 leftIcon={<MailIcon />}
                 autoComplete="email"
               />
@@ -166,13 +182,13 @@ function LoginForm() {
               <div className="form-group">
                 <div className="flex justify-between items-center mb-1.5">
                   <label htmlFor="password" className="text-sm font-medium text-surface-700">
-                    Password
+                    {t('password')}
                   </label>
                   <Link
                     href="/forgot-password"
                     className="text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors"
                   >
-                    Forgot password?
+                    {t('forgotPassword')}
                   </Link>
                 </div>
                 <div className="input-group">
@@ -187,7 +203,7 @@ function LoginForm() {
                     value={formData.password}
                     onChange={handleChange}
                     className="input pl-10"
-                    placeholder="Enter your password"
+                    placeholder={t('enterPassword')}
                     autoComplete="current-password"
                   />
                 </div>
@@ -207,7 +223,7 @@ function LoginForm() {
                   htmlFor="rememberMe"
                   className="ml-2 block text-sm text-surface-600"
                 >
-                  Remember me for 7 days
+                  {t('rememberMe')}
                 </label>
               </div>
 
@@ -219,7 +235,7 @@ function LoginForm() {
                 fullWidth
                 isLoading={loading}
               >
-                Sign In
+                {t('signIn')}
               </Button>
             </form>
           </CardBody>
@@ -228,12 +244,12 @@ function LoginForm() {
         {/* Register Link */}
         <div className="text-center">
           <p className="text-sm text-surface-500">
-            Don&apos;t have an account?{' '}
+            {t('noAccount')}{' '}
             <Link
               href="/register"
               className="font-semibold text-primary-600 hover:text-primary-700 transition-colors"
             >
-              Create one now
+              {t('createAccount')}
             </Link>
           </p>
         </div>
@@ -242,16 +258,21 @@ function LoginForm() {
   )
 }
 
+function LoadingFallback() {
+  const t = useTranslations('common')
+  return (
+    <div className="min-h-screen bg-surface-50 flex items-center justify-center">
+      <div className="text-center">
+        <div className="inline-block animate-spin rounded-full h-10 w-10 border-2 border-surface-200 border-t-primary-600 mb-4"></div>
+        <p className="text-surface-500 text-sm">{t('loading')}</p>
+      </div>
+    </div>
+  )
+}
+
 export default function LoginPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-surface-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-10 w-10 border-2 border-surface-200 border-t-primary-600 mb-4"></div>
-          <p className="text-surface-500 text-sm">Loading...</p>
-        </div>
-      </div>
-    }>
+    <Suspense fallback={<LoadingFallback />}>
       <LoginForm />
     </Suspense>
   )

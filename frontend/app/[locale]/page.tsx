@@ -1,5 +1,9 @@
+'use client'
+
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import { Card, CardBody, Button } from '@/components/ui'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
 
 // Icons
 const PackageIcon = () => (
@@ -33,6 +37,9 @@ const MoneyIcon = () => (
 )
 
 export default function Home() {
+  const t = useTranslations('home')
+  const tAuth = useTranslations('auth')
+
   return (
     <main className="min-h-screen bg-surface-50">
       {/* Hero Section */}
@@ -44,25 +51,28 @@ export default function Home() {
           <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-primary-50 rounded-full opacity-50 blur-3xl" />
         </div>
 
+        {/* Language Switcher */}
+        <div className="absolute top-8 right-8 z-10">
+          <LanguageSwitcher />
+        </div>
+
         <div className="relative page-container py-20 lg:py-32">
           <div className="text-center max-w-4xl mx-auto">
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-surface-900 tracking-tight mb-6">
-              Connect <span className="text-gradient">Senders</span> with
-              <br className="hidden sm:block" /> <span className="text-gradient">Couriers</span> Going Your Way
+              {t('heroTitle')}
             </h1>
             <p className="text-lg sm:text-xl text-surface-500 mb-10 max-w-2xl mx-auto">
-              Chaski is a smart logistics platform that matches package senders with travelers
-              already heading in the same direction. Save money, reduce carbon footprint.
+              {t('heroSubtitle')}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/register">
                 <Button variant="primary" size="lg" className="w-full sm:w-auto">
-                  Get Started Free
+                  {t('heroCtaPrimary')}
                 </Button>
               </Link>
               <Link href="/login">
                 <Button variant="outline" size="lg" className="w-full sm:w-auto">
-                  Sign In
+                  {tAuth('signIn')}
                 </Button>
               </Link>
             </div>
@@ -74,9 +84,9 @@ export default function Home() {
       <section className="py-20 bg-white">
         <div className="page-container">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-surface-900 mb-4">Choose Your Role</h2>
+            <h2 className="text-3xl font-bold text-surface-900 mb-4">{t('chooseRoleTitle')}</h2>
             <p className="text-surface-500 max-w-xl mx-auto">
-              Whether you need to send packages or earn money on your travels, we&apos;ve got you covered.
+              {t('chooseRoleDescription')}
             </p>
           </div>
 
@@ -87,14 +97,13 @@ export default function Home() {
                 <div className="inline-flex items-center justify-center w-20 h-20 bg-primary-50 rounded-2xl mb-6">
                   <PackageIcon />
                 </div>
-                <h3 className="text-2xl font-bold text-surface-900 mb-3">I&apos;m a Sender</h3>
+                <h3 className="text-2xl font-bold text-surface-900 mb-3">{t('senderCardTitle')}</h3>
                 <p className="text-surface-500 mb-8">
-                  Need to send a package? Find verified couriers traveling along your route
-                  at a fraction of traditional shipping costs.
+                  {t('senderCardDescription')}
                 </p>
                 <Link href="/sender">
                   <Button variant="primary" size="lg">
-                    Send a Package
+                    {t('senderButtonText')}
                   </Button>
                 </Link>
               </CardBody>
@@ -106,14 +115,13 @@ export default function Home() {
                 <div className="inline-flex items-center justify-center w-20 h-20 bg-secondary-50 rounded-2xl mb-6">
                   <CarIcon />
                 </div>
-                <h3 className="text-2xl font-bold text-surface-900 mb-3">I&apos;m a Courier</h3>
+                <h3 className="text-2xl font-bold text-surface-900 mb-3">{t('courierCardTitle')}</h3>
                 <p className="text-surface-500 mb-8">
-                  Already traveling? Earn money by delivering packages along your route.
-                  Set your own schedule and rates.
+                  {t('courierCardDescription')}
                 </p>
                 <Link href="/courier">
                   <Button variant="secondary" size="lg">
-                    Find Packages
+                    {t('courierButtonText')}
                   </Button>
                 </Link>
               </CardBody>
@@ -126,9 +134,9 @@ export default function Home() {
       <section className="py-20 bg-surface-50">
         <div className="page-container">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-surface-900 mb-4">Why Choose Chaski?</h2>
+            <h2 className="text-3xl font-bold text-surface-900 mb-4">{t('featuresTitle')}</h2>
             <p className="text-surface-500 max-w-xl mx-auto">
-              Our platform is designed to make package delivery simple, safe, and affordable.
+              {t('featuresDescription')}
             </p>
           </div>
 
@@ -139,9 +147,9 @@ export default function Home() {
                 <div className="inline-flex items-center justify-center w-14 h-14 bg-success-50 text-success-600 rounded-xl mb-4">
                   <ShieldIcon />
                 </div>
-                <h3 className="text-lg font-semibold text-surface-900 mb-2">Verified & Secure</h3>
+                <h3 className="text-lg font-semibold text-surface-900 mb-2">{t('featureVerifiedTitle')}</h3>
                 <p className="text-surface-500 text-sm">
-                  All couriers are verified. Real-time tracking and secure payments protect every delivery.
+                  {t('featureVerifiedDescription')}
                 </p>
               </CardBody>
             </Card>
@@ -152,9 +160,9 @@ export default function Home() {
                 <div className="inline-flex items-center justify-center w-14 h-14 bg-primary-50 text-primary-600 rounded-xl mb-4">
                   <ClockIcon />
                 </div>
-                <h3 className="text-lg font-semibold text-surface-900 mb-2">Fast Delivery</h3>
+                <h3 className="text-lg font-semibold text-surface-900 mb-2">{t('featureFastTitle')}</h3>
                 <p className="text-surface-500 text-sm">
-                  Smart route matching finds couriers already going your way for faster, more efficient delivery.
+                  {t('featureFastDescription')}
                 </p>
               </CardBody>
             </Card>
@@ -165,9 +173,9 @@ export default function Home() {
                 <div className="inline-flex items-center justify-center w-14 h-14 bg-secondary-50 text-secondary-600 rounded-xl mb-4">
                   <MoneyIcon />
                 </div>
-                <h3 className="text-lg font-semibold text-surface-900 mb-2">Save Money</h3>
+                <h3 className="text-lg font-semibold text-surface-900 mb-2">{t('featureSaveMoneyTitle')}</h3>
                 <p className="text-surface-500 text-sm">
-                  Skip expensive shipping companies. Pay fair prices directly to trusted local couriers.
+                  {t('featureSaveMoneyDescription')}
                 </p>
               </CardBody>
             </Card>
@@ -181,10 +189,10 @@ export default function Home() {
           <Card className="bg-gradient-to-r from-primary-600 to-primary-700 border-0">
             <CardBody className="py-12 px-8 text-center">
               <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">
-                Ready to Get Started?
+                {t('ctaTitle')}
               </h2>
               <p className="text-primary-100 mb-8 max-w-xl mx-auto">
-                Join thousands of users who are already saving money and earning on Chaski.
+                {t('ctaDescription')}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link href="/register">
@@ -193,7 +201,7 @@ export default function Home() {
                     size="lg"
                     className="bg-white text-primary-700 border-white hover:bg-primary-50"
                   >
-                    Create Free Account
+                    {t('ctaButton')}
                   </Button>
                 </Link>
                 <Link href="/login">
@@ -202,7 +210,7 @@ export default function Home() {
                     size="lg"
                     className="text-white hover:bg-primary-500"
                   >
-                    Sign In
+                    {tAuth('signIn')}
                   </Button>
                 </Link>
               </div>
@@ -217,14 +225,14 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
             <div className="text-gradient font-bold text-xl">Chaski</div>
             <p className="text-sm text-surface-400">
-              &copy; {new Date().getFullYear()} Chaski. All rights reserved.
+              &copy; {new Date().getFullYear()} Chaski. {t('footerRights')}
             </p>
             <div className="flex gap-6">
               <Link href="/login" className="text-sm text-surface-500 hover:text-primary-600 transition-colors">
-                Login
+                {tAuth('login')}
               </Link>
               <Link href="/register" className="text-sm text-surface-500 hover:text-primary-600 transition-colors">
-                Register
+                {tAuth('register')}
               </Link>
             </div>
           </div>

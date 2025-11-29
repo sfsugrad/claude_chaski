@@ -23,6 +23,11 @@ class User(Base):
     verification_token = Column(String, nullable=True)
     verification_token_expires_at = Column(DateTime(timezone=True), nullable=True)
 
+    # Phone verification fields
+    phone_verified = Column(Boolean, default=False)
+    phone_verification_code = Column(String, nullable=True)
+    phone_verification_code_expires_at = Column(DateTime(timezone=True), nullable=True)
+
     # Password reset fields
     password_reset_token = Column(String, nullable=True)
     password_reset_token_expires_at = Column(DateTime(timezone=True), nullable=True)
@@ -34,6 +39,9 @@ class User(Base):
 
     # Courier-specific fields
     max_deviation_km = Column(Integer, default=5)  # Default 5km deviation
+
+    # Language preference (en, fr, es)
+    preferred_language = Column(String(5), default='en', nullable=False)
 
     # Stripe customer ID (for senders to save payment methods)
     stripe_customer_id = Column(String(255), nullable=True, unique=True)

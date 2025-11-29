@@ -280,6 +280,51 @@
   }
 
   /* ----------------------------------------
+     Phone Input (react-phone-number-input)
+     ---------------------------------------- */
+  .PhoneInput {
+    @apply w-full flex items-center gap-2
+           px-4 py-2.5
+           bg-white
+           border border-surface-300 rounded-lg
+           transition-all duration-200
+           hover:border-surface-400;
+  }
+
+  .PhoneInput:focus-within {
+    @apply outline-none ring-2 ring-primary-500 border-primary-500;
+  }
+
+  .PhoneInputInput {
+    @apply flex-1 min-w-0
+           text-sm text-surface-900
+           bg-transparent
+           border-0
+           placeholder:text-surface-400
+           focus:outline-none focus:ring-0;
+    padding: 0 !important;
+  }
+
+  .PhoneInputCountry {
+    @apply flex items-center gap-1;
+  }
+
+  .PhoneInputCountrySelect {
+    @apply border-0 bg-transparent
+           text-sm text-surface-900
+           cursor-pointer
+           focus:outline-none focus:ring-0;
+  }
+
+  .PhoneInputCountryIcon {
+    @apply flex-shrink-0;
+  }
+
+  .PhoneInputCountrySelectArrow {
+    @apply text-surface-400 ml-1;
+  }
+
+  /* ----------------------------------------
      Cards
      ---------------------------------------- */
   .card {

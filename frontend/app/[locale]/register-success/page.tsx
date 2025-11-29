@@ -1,14 +1,23 @@
 'use client'
 
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
 
 export default function RegisterSuccessPage() {
+  const t = useTranslations('auth')
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      {/* Language Switcher */}
+      <div className="absolute top-8 right-8 z-10">
+        <LanguageSwitcher />
+      </div>
+
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-            Registration Successful!
+            {t('registerSuccessTitle')}
           </h2>
         </div>
 
@@ -31,31 +40,28 @@ export default function RegisterSuccessPage() {
             </div>
 
             <h3 className="text-xl font-semibold text-gray-900 mb-4">
-              Check Your Email
+              {t('checkYourEmail')}
             </h3>
 
             <p className="text-gray-600 mb-6">
-              We've sent a verification link to your email address. Please click
-              the link to verify your account and complete the registration
-              process.
+              {t('verificationEmailSent')}
             </p>
 
             <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-6">
               <p className="text-sm text-blue-800">
-                <strong>Important:</strong> The verification link will expire in 24
-                hours. If you don't see the email, please check your spam folder.
+                <strong>{t('importantNote')}</strong> {t('linkExpiresIn24')}
               </p>
             </div>
 
             <div className="space-y-3">
               <p className="text-sm text-gray-500">
-                Didn't receive the email?
+                {t('didntReceive')}
               </p>
               <Link
                 href="/resend-verification"
                 className="inline-block text-blue-600 hover:text-blue-500 font-medium"
               >
-                Resend verification email
+                {t('resendVerificationLink')}
               </Link>
             </div>
 
@@ -64,7 +70,7 @@ export default function RegisterSuccessPage() {
                 href="/"
                 className="text-blue-600 hover:text-blue-500 font-medium"
               >
-                ← Back to Home
+                {t('backToHome')}
               </Link>
             </div>
           </div>
