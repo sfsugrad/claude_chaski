@@ -4,6 +4,7 @@ from fastapi import status
 from app.models.package import Package, PackageStatus
 from app.models.user import User, UserRole
 from app.utils.auth import get_password_hash
+from app.utils.tracking_id import generate_tracking_id
 
 
 class TestCreatePackage:
@@ -34,7 +35,7 @@ class TestCreatePackage:
         assert data["dropoff_contact_name"] == test_package_data["dropoff_contact_name"]
         assert data["dropoff_contact_phone"] == test_package_data["dropoff_contact_phone"]
         assert data["price"] == test_package_data["price"]
-        assert data["status"] == "open_for_bids"
+        assert data["status"].lower() == "open_for_bids"
         assert "id" in data
         assert "sender_id" in data
         assert "created_at" in data
@@ -49,7 +50,7 @@ class TestCreatePackage:
 
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
-        assert data["status"] == "open_for_bids"
+        assert data["status"].lower() == "open_for_bids"
 
     def test_create_package_without_optional_fields(self, client, authenticated_sender):
         """Test package creation without optional fields"""
@@ -322,7 +323,7 @@ class TestGetPackageById:
     """Tests for get specific package endpoint"""
 
     def test_get_package_by_id_success(self, client, authenticated_sender, test_package_data):
-        """Test getting a specific package by ID"""
+        """Test getting a specific package by tracking_id"""
         # Create a package
         create_response = client.post(
             "/api/packages",
@@ -330,10 +331,11 @@ class TestGetPackageById:
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
         package_id = create_response.json()["id"]
+        tracking_id = create_response.json()["tracking_id"]
 
         # Get the package
         response = client.get(
-            f"/api/packages/{package_id}",
+            f"/api/packages/{tracking_id}",
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
 
@@ -345,7 +347,7 @@ class TestGetPackageById:
     def test_get_package_by_id_not_found(self, client, authenticated_sender):
         """Test getting a non-existent package"""
         response = client.get(
-            "/api/packages/99999",
+            "/api/packages/xxxx-xxxx-xxxx-xxxx",
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
 
@@ -363,6 +365,7 @@ class TestGetPackageById:
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
         package_id = create_response.json()["id"]
+        tracking_id = create_response.json()["tracking_id"]
 
         # Change the package status to MATCHED (non-pending) so couriers can't browse it
         # Couriers are allowed to view PENDING packages to decide whether to accept
@@ -372,7 +375,7 @@ class TestGetPackageById:
 
         # User 2 (with both role, which includes courier) tries to access it
         response = client.get(
-            f"/api/packages/{package_id}",
+            f"/api/packages/{tracking_id}",
             headers={"Authorization": f"Bearer {authenticated_both_role}"}
         )
 
@@ -757,6 +760,7 @@ class TestUpdatePackageStatus:
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
         package_id = create_response.json()["id"]
+        tracking_id = create_response.json()["tracking_id"]
 
         # Manually assign courier and set status to PENDING_PICKUP (simulating bid acceptance)
         package = db_session.query(Package).filter(Package.id == package_id).first()
@@ -767,14 +771,14 @@ class TestUpdatePackageStatus:
 
         # Courier updates status to in_transit
         response = client.put(
-            f"/api/packages/{package_id}/status",
-            json={"status": "in_transit"},
+            f"/api/packages/{tracking_id}/status",
+            json={"status": "IN_TRANSIT"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
 
-        assert response.status_code == status.HTTP_200_OK
+        assert response.status_code == status.HTTP_200_OK, f"Expected 200 but got {response.status_code}: {response.json()}"
         data = response.json()
-        assert data["status"] == "in_transit"
+        assert data["status"].upper() == "IN_TRANSIT"
         assert "successfully" in data["message"].lower()
 
     def test_update_package_status_invalid_status(self, client, db_session, authenticated_sender, authenticated_courier, test_package_data):
@@ -786,6 +790,7 @@ class TestUpdatePackageStatus:
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
         package_id = create_response.json()["id"]
+        tracking_id = create_response.json()["tracking_id"]
 
         package = db_session.query(Package).filter(Package.id == package_id).first()
         courier = db_session.query(User).filter(User.email == "courier@example.com").first()
@@ -794,7 +799,7 @@ class TestUpdatePackageStatus:
 
         # Try to update with invalid status
         response = client.put(
-            f"/api/packages/{package_id}/status",
+            f"/api/packages/{tracking_id}/status",
             json={"status": "invalid_status"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
@@ -810,12 +815,12 @@ class TestUpdatePackageStatus:
             json=test_package_data,
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
-        package_id = create_response.json()["id"]
+        tracking_id = create_response.json()["tracking_id"]
 
         # Non-assigned courier tries to update
         response = client.put(
-            f"/api/packages/{package_id}/status",
-            json={"status": "in_transit"},
+            f"/api/packages/{tracking_id}/status",
+            json={"status": "IN_TRANSIT"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
 
@@ -830,12 +835,12 @@ class TestUpdatePackageStatus:
             json=test_package_data,
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
-        package_id = create_response.json()["id"]
+        tracking_id = create_response.json()["tracking_id"]
 
         # Sender tries to update status
         response = client.put(
-            f"/api/packages/{package_id}/status",
-            json={"status": "in_transit"},
+            f"/api/packages/{tracking_id}/status",
+            json={"status": "IN_TRANSIT"},
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
 
@@ -844,8 +849,8 @@ class TestUpdatePackageStatus:
     def test_update_package_status_package_not_found(self, client, authenticated_courier):
         """Test updating status of non-existent package"""
         response = client.put(
-            "/api/packages/99999/status",
-            json={"status": "in_transit"},
+            "/api/packages/xxxx-xxxx-xxxx-xxxx/status",
+            json={"status": "IN_TRANSIT"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
 
@@ -854,8 +859,8 @@ class TestUpdatePackageStatus:
     def test_update_package_status_without_authentication(self, client):
         """Test updating status without authentication"""
         response = client.put(
-            "/api/packages/1/status",
-            json={"status": "in_transit"}
+            "/api/packages/xxxx-xxxx-xxxx-xxxx/status",
+            json={"status": "IN_TRANSIT"}
         )
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
@@ -877,7 +882,8 @@ class TestPackageIntegration:
         )
         assert create_response.status_code == status.HTTP_201_CREATED
         package_id = create_response.json()["id"]
-        assert create_response.json()["status"] == "open_for_bids"
+        tracking_id = create_response.json()["tracking_id"]
+        assert create_response.json()["status"].lower() == "open_for_bids"
 
         # Step 2: Assign courier and set to BID_SELECTED (simulating bid acceptance)
         package = db_session.query(Package).filter(Package.id == package_id).first()
@@ -888,38 +894,38 @@ class TestPackageIntegration:
 
         # Step 3: Courier confirms pending pickup
         pending_pickup_response = client.put(
-            f"/api/packages/{package_id}/status",
-            json={"status": "pending_pickup"},
+            f"/api/packages/{tracking_id}/status",
+            json={"status": "PENDING_PICKUP"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
         assert pending_pickup_response.status_code == status.HTTP_200_OK
-        assert pending_pickup_response.json()["status"] == "pending_pickup"
+        assert pending_pickup_response.json()["status"].lower() == "pending_pickup"
 
         # Step 4: Courier marks in transit (picks up package)
         transit_response = client.put(
-            f"/api/packages/{package_id}/status",
-            json={"status": "in_transit"},
+            f"/api/packages/{tracking_id}/status",
+            json={"status": "IN_TRANSIT"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
         assert transit_response.status_code == status.HTTP_200_OK
-        assert transit_response.json()["status"] == "in_transit"
+        assert transit_response.json()["status"].lower() == "in_transit"
 
         # Step 5: Courier delivers package
         delivery_response = client.put(
-            f"/api/packages/{package_id}/status",
-            json={"status": "delivered"},
+            f"/api/packages/{tracking_id}/status",
+            json={"status": "DELIVERED"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
         assert delivery_response.status_code == status.HTTP_200_OK
-        assert delivery_response.json()["status"] == "delivered"
+        assert delivery_response.json()["status"].lower() == "delivered"
 
         # Step 6: Verify final state
         final_response = client.get(
-            f"/api/packages/{package_id}",
+            f"/api/packages/{tracking_id}",
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
         assert final_response.status_code == status.HTTP_200_OK
-        assert final_response.json()["status"] == "delivered"
+        assert final_response.json()["status"].lower() == "delivered"
 
     def test_multiple_users_multiple_packages(self, client, authenticated_sender, authenticated_both_role, test_package_data):
         """Test multiple users creating and managing their packages independently"""
@@ -979,17 +985,18 @@ class TestCancelPackage:
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
         package_id = create_response.json()["id"]
+        tracking_id = create_response.json()["tracking_id"]
 
         # Cancel the package
         response = client.put(
-            f"/api/packages/{package_id}/cancel",
+            f"/api/packages/{tracking_id}/cancel",
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["id"] == package_id
-        assert data["status"] == "canceled"
+        assert data["status"].lower() == "canceled"
 
     def test_cancel_matched_package_success(self, client, db_session, authenticated_sender, test_package_data):
         """Test successful cancellation of a matched package by sender"""
@@ -1000,6 +1007,7 @@ class TestCancelPackage:
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
         package_id = create_response.json()["id"]
+        tracking_id = create_response.json()["tracking_id"]
 
         # Change status to matched
         package = db_session.query(Package).filter(Package.id == package_id).first()
@@ -1008,13 +1016,13 @@ class TestCancelPackage:
 
         # Cancel the package
         response = client.put(
-            f"/api/packages/{package_id}/cancel",
+            f"/api/packages/{tracking_id}/cancel",
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data["status"] == "canceled"
+        assert data["status"].lower() == "canceled"
 
     def test_cancel_package_as_admin(self, client, authenticated_sender, authenticated_admin, test_package_data):
         """Test admin can cancel any pending package"""
@@ -1025,16 +1033,17 @@ class TestCancelPackage:
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
         package_id = create_response.json()["id"]
+        tracking_id = create_response.json()["tracking_id"]
 
         # Admin cancels the package
         response = client.put(
-            f"/api/packages/{package_id}/cancel",
+            f"/api/packages/{tracking_id}/cancel",
             headers={"Authorization": f"Bearer {authenticated_admin}"}
         )
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data["status"] == "canceled"
+        assert data["status"].lower() == "canceled"
 
     def test_cancel_package_fails_for_in_transit_status_first(self, client, db_session, authenticated_sender, test_package_data):
         """Test that in_transit packages cannot be cancelled"""
@@ -1045,6 +1054,7 @@ class TestCancelPackage:
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
         package_id = create_response.json()["id"]
+        tracking_id = create_response.json()["tracking_id"]
 
         # Change status to in_transit
         package = db_session.query(Package).filter(Package.id == package_id).first()
@@ -1053,7 +1063,7 @@ class TestCancelPackage:
 
         # Try to cancel
         response = client.put(
-            f"/api/packages/{package_id}/cancel",
+            f"/api/packages/{tracking_id}/cancel",
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
 
@@ -1069,6 +1079,7 @@ class TestCancelPackage:
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
         package_id = create_response.json()["id"]
+        tracking_id = create_response.json()["tracking_id"]
 
         # Change status to in_transit
         package = db_session.query(Package).filter(Package.id == package_id).first()
@@ -1077,7 +1088,7 @@ class TestCancelPackage:
 
         # Try to cancel
         response = client.put(
-            f"/api/packages/{package_id}/cancel",
+            f"/api/packages/{tracking_id}/cancel",
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
 
@@ -1093,6 +1104,7 @@ class TestCancelPackage:
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
         package_id = create_response.json()["id"]
+        tracking_id = create_response.json()["tracking_id"]
 
         # Change status to delivered
         package = db_session.query(Package).filter(Package.id == package_id).first()
@@ -1101,7 +1113,7 @@ class TestCancelPackage:
 
         # Try to cancel
         response = client.put(
-            f"/api/packages/{package_id}/cancel",
+            f"/api/packages/{tracking_id}/cancel",
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
 
@@ -1117,6 +1129,7 @@ class TestCancelPackage:
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
         package_id = create_response.json()["id"]
+        tracking_id = create_response.json()["tracking_id"]
 
         # Change status to cancelled
         package = db_session.query(Package).filter(Package.id == package_id).first()
@@ -1125,7 +1138,7 @@ class TestCancelPackage:
 
         # Try to cancel again
         response = client.put(
-            f"/api/packages/{package_id}/cancel",
+            f"/api/packages/{tracking_id}/cancel",
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
 
@@ -1139,11 +1152,11 @@ class TestCancelPackage:
             json=test_package_data,
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
-        package_id = create_response.json()["id"]
+        tracking_id = create_response.json()["tracking_id"]
 
         # User 2 tries to cancel
         response = client.put(
-            f"/api/packages/{package_id}/cancel",
+            f"/api/packages/{tracking_id}/cancel",
             headers={"Authorization": f"Bearer {authenticated_both_role}"}
         )
 
@@ -1158,11 +1171,11 @@ class TestCancelPackage:
             json=test_package_data,
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
-        package_id = create_response.json()["id"]
+        tracking_id = create_response.json()["tracking_id"]
 
         # Courier tries to cancel
         response = client.put(
-            f"/api/packages/{package_id}/cancel",
+            f"/api/packages/{tracking_id}/cancel",
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
 
@@ -1171,7 +1184,7 @@ class TestCancelPackage:
     def test_cancel_package_not_found(self, client, authenticated_sender):
         """Test cancelling a non-existent package"""
         response = client.put(
-            "/api/packages/99999/cancel",
+            "/api/packages/xxxx-xxxx-xxxx-xxxx/cancel",
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
 
@@ -1186,10 +1199,10 @@ class TestCancelPackage:
             json=test_package_data,
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
-        package_id = create_response.json()["id"]
+        tracking_id = create_response.json()["tracking_id"]
 
         # Try to cancel without auth
-        response = client.put(f"/api/packages/{package_id}/cancel")
+        response = client.put(f"/api/packages/{tracking_id}/cancel")
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
@@ -1260,6 +1273,7 @@ class TestStrictStatusTransitions:
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
         package_id = create_response.json()["id"]
+        tracking_id = create_response.json()["tracking_id"]
 
         # Manually set to MATCHED with courier
         package = db_session.query(Package).filter(Package.id == package_id).first()
@@ -1270,8 +1284,8 @@ class TestStrictStatusTransitions:
 
         # Try to skip to DELIVERED
         response = client.put(
-            f"/api/packages/{package_id}/status",
-            json={"status": "delivered"},
+            f"/api/packages/{tracking_id}/status",
+            json={"status": "DELIVERED"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
 
@@ -1287,6 +1301,7 @@ class TestStrictStatusTransitions:
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
         package_id = create_response.json()["id"]
+        tracking_id = create_response.json()["tracking_id"]
 
         # Manually set to MATCHED with courier
         package = db_session.query(Package).filter(Package.id == package_id).first()
@@ -1297,8 +1312,8 @@ class TestStrictStatusTransitions:
 
         # Try to skip to IN_TRANSIT
         response = client.put(
-            f"/api/packages/{package_id}/status",
-            json={"status": "in_transit"},
+            f"/api/packages/{tracking_id}/status",
+            json={"status": "IN_TRANSIT"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
 
@@ -1314,6 +1329,7 @@ class TestStrictStatusTransitions:
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
         package_id = create_response.json()["id"]
+        tracking_id = create_response.json()["tracking_id"]
 
         # Set to BID_SELECTED with courier
         package = db_session.query(Package).filter(Package.id == package_id).first()
@@ -1324,8 +1340,8 @@ class TestStrictStatusTransitions:
 
         # Try to skip to DELIVERED (should fail - need PENDING_PICKUP, IN_TRANSIT first)
         response = client.put(
-            f"/api/packages/{package_id}/status",
-            json={"status": "delivered"},
+            f"/api/packages/{tracking_id}/status",
+            json={"status": "DELIVERED"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
 
@@ -1341,6 +1357,7 @@ class TestStrictStatusTransitions:
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
         package_id = create_response.json()["id"]
+        tracking_id = create_response.json()["tracking_id"]
 
         # Set to BID_SELECTED with courier
         package = db_session.query(Package).filter(Package.id == package_id).first()
@@ -1351,13 +1368,13 @@ class TestStrictStatusTransitions:
 
         # Transition to PENDING_PICKUP
         response = client.put(
-            f"/api/packages/{package_id}/status",
-            json={"status": "pending_pickup"},
+            f"/api/packages/{tracking_id}/status",
+            json={"status": "PENDING_PICKUP"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
 
         assert response.status_code == status.HTTP_200_OK
-        assert response.json()["status"] == "pending_pickup"
+        assert response.json()["status"].lower() == "pending_pickup"
 
     def test_valid_strict_progression_pending_pickup_to_in_transit(self, client, db_session, authenticated_sender, authenticated_courier, test_package_data):
         """Test valid transition from PENDING_PICKUP to IN_TRANSIT."""
@@ -1368,6 +1385,7 @@ class TestStrictStatusTransitions:
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
         package_id = create_response.json()["id"]
+        tracking_id = create_response.json()["tracking_id"]
 
         # Set to PENDING_PICKUP with courier
         package = db_session.query(Package).filter(Package.id == package_id).first()
@@ -1378,13 +1396,13 @@ class TestStrictStatusTransitions:
 
         # Transition to IN_TRANSIT
         response = client.put(
-            f"/api/packages/{package_id}/status",
-            json={"status": "in_transit"},
+            f"/api/packages/{tracking_id}/status",
+            json={"status": "IN_TRANSIT"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
 
         assert response.status_code == status.HTTP_200_OK
-        assert response.json()["status"] == "in_transit"
+        assert response.json()["status"].lower() == "in_transit"
 
     def test_valid_strict_progression_in_transit_to_delivered_no_proof_required(self, client, db_session, authenticated_sender, authenticated_courier, test_package_data):
         """Test valid transition from IN_TRANSIT to DELIVERED when proof not required."""
@@ -1396,6 +1414,7 @@ class TestStrictStatusTransitions:
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
         package_id = create_response.json()["id"]
+        tracking_id = create_response.json()["tracking_id"]
 
         # Set to IN_TRANSIT with courier
         package = db_session.query(Package).filter(Package.id == package_id).first()
@@ -1406,13 +1425,13 @@ class TestStrictStatusTransitions:
 
         # Transition to DELIVERED
         response = client.put(
-            f"/api/packages/{package_id}/status",
-            json={"status": "delivered"},
+            f"/api/packages/{tracking_id}/status",
+            json={"status": "DELIVERED"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
 
         assert response.status_code == status.HTTP_200_OK
-        assert response.json()["status"] == "delivered"
+        assert response.json()["status"].lower() == "delivered"
 
     def test_delivered_blocked_when_proof_required(self, client, db_session, authenticated_sender, authenticated_courier, test_package_data):
         """Test that DELIVERED is blocked via status endpoint when proof is required."""
@@ -1423,6 +1442,7 @@ class TestStrictStatusTransitions:
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
         package_id = create_response.json()["id"]
+        tracking_id = create_response.json()["tracking_id"]
 
         # Set to IN_TRANSIT with courier
         package = db_session.query(Package).filter(Package.id == package_id).first()
@@ -1433,8 +1453,8 @@ class TestStrictStatusTransitions:
 
         # Try to transition to DELIVERED (should fail - need proof)
         response = client.put(
-            f"/api/packages/{package_id}/status",
-            json={"status": "delivered"},
+            f"/api/packages/{tracking_id}/status",
+            json={"status": "DELIVERED"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
 
@@ -1450,6 +1470,7 @@ class TestStrictStatusTransitions:
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
         package_id = create_response.json()["id"]
+        tracking_id = create_response.json()["tracking_id"]
 
         # Set to DELIVERED with courier
         package = db_session.query(Package).filter(Package.id == package_id).first()
@@ -1460,8 +1481,8 @@ class TestStrictStatusTransitions:
 
         # Try to transition to any other status
         response = client.put(
-            f"/api/packages/{package_id}/status",
-            json={"status": "in_transit"},
+            f"/api/packages/{tracking_id}/status",
+            json={"status": "IN_TRANSIT"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
 
@@ -1477,6 +1498,7 @@ class TestStrictStatusTransitions:
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
         package_id = create_response.json()["id"]
+        tracking_id = create_response.json()["tracking_id"]
 
         # Set to PICKED_UP with courier
         package = db_session.query(Package).filter(Package.id == package_id).first()
@@ -1487,8 +1509,8 @@ class TestStrictStatusTransitions:
 
         # Try to cancel via status endpoint
         response = client.put(
-            f"/api/packages/{package_id}/status",
-            json={"status": "canceled"},
+            f"/api/packages/{tracking_id}/status",
+            json={"status": "CANCELED"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
 
@@ -1503,11 +1525,11 @@ class TestStrictStatusTransitions:
             json=test_package_data,
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
-        package_id = create_response.json()["id"]
+        tracking_id = create_response.json()["tracking_id"]
 
         # Get package
         response = client.get(
-            f"/api/packages/{package_id}",
+            f"/api/packages/{tracking_id}",
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
 
@@ -1515,8 +1537,8 @@ class TestStrictStatusTransitions:
         data = response.json()
         assert "allowed_next_statuses" in data
         # PENDING allows MATCHED and CANCELLED
-        assert "bid_selected" in data["allowed_next_statuses"]
-        assert "canceled" in data["allowed_next_statuses"]
+        assert "bid_selected" in [s.lower() for s in data["allowed_next_statuses"]]
+        assert "canceled" in [s.lower() for s in data["allowed_next_statuses"]]
 
     def test_package_response_includes_requires_proof(self, client, authenticated_sender, test_package_data):
         """Test that package response includes requires_proof field."""
@@ -1542,6 +1564,7 @@ class TestStrictStatusTransitions:
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
         package_id = create_response.json()["id"]
+        tracking_id = create_response.json()["tracking_id"]
 
         # Set to PENDING_PICKUP with courier
         package = db_session.query(Package).filter(Package.id == package_id).first()
@@ -1552,8 +1575,8 @@ class TestStrictStatusTransitions:
 
         # Transition to IN_TRANSIT
         response = client.put(
-            f"/api/packages/{package_id}/status",
-            json={"status": "in_transit"},
+            f"/api/packages/{tracking_id}/status",
+            json={"status": "IN_TRANSIT"},
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
 
@@ -1561,7 +1584,7 @@ class TestStrictStatusTransitions:
 
         # Get package and verify timestamps
         get_response = client.get(
-            f"/api/packages/{package_id}",
+            f"/api/packages/{tracking_id}",
             headers={"Authorization": f"Bearer {authenticated_sender}"}
         )
 
@@ -1592,6 +1615,7 @@ class TestCourierPackageAccess:
         db_session.commit()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             description="Pending package for courier view",
             size="small",
@@ -1610,14 +1634,14 @@ class TestCourierPackageAccess:
 
         # Courier tries to view the pending package
         response = client.get(
-            f"/api/packages/{package.id}",
+            f"/api/packages/{package.tracking_id}",
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["id"] == package.id
-        assert data["status"] == "open_for_bids"
+        assert data["status"].upper() == "OPEN_FOR_BIDS"
 
     def test_courier_cannot_view_accepted_package_not_assigned(self, client, db_session, authenticated_courier, test_package_data):
         """Courier should NOT be able to view accepted packages they're not assigned to."""
@@ -1648,6 +1672,7 @@ class TestCourierPackageAccess:
 
         # Create an accepted package assigned to other courier
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=other_courier.id,
             description="Accepted package",
@@ -1667,7 +1692,7 @@ class TestCourierPackageAccess:
 
         # Our test courier tries to view the package
         response = client.get(
-            f"/api/packages/{package.id}",
+            f"/api/packages/{package.tracking_id}",
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
 
@@ -1692,6 +1717,7 @@ class TestCourierPackageAccess:
         db_session.commit()
 
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             description="Pending package for both role view",
             size="medium",
@@ -1710,7 +1736,7 @@ class TestCourierPackageAccess:
 
         # User with 'both' role tries to view the pending package
         response = client.get(
-            f"/api/packages/{package.id}",
+            f"/api/packages/{package.tracking_id}",
             headers={"Authorization": f"Bearer {authenticated_both_role}"}
         )
 
@@ -1740,6 +1766,7 @@ class TestCourierPackageAccess:
 
         # Create a package assigned to the courier
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender.id,
             courier_id=courier.id,
             description="Assigned package",
@@ -1759,7 +1786,7 @@ class TestCourierPackageAccess:
 
         # Assigned courier views the package
         response = client.get(
-            f"/api/packages/{package.id}",
+            f"/api/packages/{package.tracking_id}",
             headers={"Authorization": f"Bearer {authenticated_courier}"}
         )
 

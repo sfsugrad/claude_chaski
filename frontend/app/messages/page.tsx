@@ -234,7 +234,7 @@ function MessagesPageContent() {
                             </p>
                           </div>
                           <Link
-                            href={`/packages/${selectedPackageId}`}
+                            href={`/packages/${selectedConversation.tracking_id}`}
                             className="text-xs text-primary-600 hover:text-primary-800"
                           >
                             View Package
@@ -245,7 +245,7 @@ function MessagesPageContent() {
 
                     <div className="flex-1 overflow-hidden">
                       <ChatWindow
-                        packageId={selectedPackageId}
+                        trackingId={selectedConversation?.tracking_id || ''}
                         currentUserId={user.id}
                         otherUserName={selectedConversation?.other_user_name}
                         className="h-full border-0 rounded-none"

@@ -30,9 +30,17 @@ from app.services.route_deactivation_service import is_route_expired
 router = APIRouter()
 
 
+def get_package_by_tracking_id(db: Session, tracking_id: str) -> Package | None:
+    """Get a package by tracking_id, with fallback to numeric ID."""
+    package = db.query(Package).filter(Package.tracking_id == tracking_id).first()
+    if not package and tracking_id.isdigit():
+        package = db.query(Package).filter(Package.id == int(tracking_id)).first()
+    return package
+
+
 # Request/Response models
 class BidCreate(BaseModel):
-    package_id: int
+    tracking_id: str
     proposed_price: float = Field(..., gt=0, description="Proposed delivery price")
     estimated_delivery_hours: Optional[int] = Field(None, gt=0, description="Estimated hours to deliver")
     estimated_pickup_time: Optional[datetime] = Field(None, description="Estimated pickup time")
@@ -125,14 +133,15 @@ async def create_bid(
         )
 
     # Get package
-    package = db.query(Package).filter(
-        and_(
-            Package.id == bid_data.package_id,
-            Package.is_active == True
-        )
-    ).first()
+    package = get_package_by_tracking_id(db, bid_data.tracking_id)
 
     if not package:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Package not found"
+        )
+
+    if not package.is_active:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Package not found"
@@ -155,7 +164,7 @@ async def create_bid(
     # Check for existing active bid (exclude withdrawn, rejected, expired)
     existing_bid = db.query(CourierBid).filter(
         and_(
-            CourierBid.package_id == bid_data.package_id,
+            CourierBid.package_id == package.id,
             CourierBid.courier_id == current_user.id,
             CourierBid.status.in_([BidStatus.PENDING, BidStatus.SELECTED])
         )
@@ -208,7 +217,7 @@ async def create_bid(
 
     # Create bid
     bid = CourierBid(
-        package_id=bid_data.package_id,
+        package_id=package.id,
         courier_id=current_user.id,
         route_id=bid_data.route_id,
         proposed_price=bid_data.proposed_price,
@@ -490,9 +499,9 @@ async def get_my_bids(
     return [get_courier_bid_response(bid, current_user, db) for bid in bids]
 
 
-@router.get("/package/{package_id}", response_model=PackageBidsResponse)
+@router.get("/package/{tracking_id}", response_model=PackageBidsResponse)
 async def get_package_bids(
-    package_id: int,
+    tracking_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -504,14 +513,15 @@ async def get_package_bids(
     - Couriers can only see their own bids
     - Admin can see all bids
     """
-    package = db.query(Package).filter(
-        and_(
-            Package.id == package_id,
-            Package.is_active == True
-        )
-    ).first()
+    package = get_package_by_tracking_id(db, tracking_id)
 
     if not package:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Package not found"
+        )
+
+    if not package.is_active:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Package not found"
@@ -524,13 +534,13 @@ async def get_package_bids(
     if is_sender or is_admin:
         # Get all bids
         bids = db.query(CourierBid).filter(
-            CourierBid.package_id == package_id
+            CourierBid.package_id == package.id
         ).order_by(CourierBid.created_at.desc()).all()
     else:
         # Courier can only see their own bid
         bids = db.query(CourierBid).filter(
             and_(
-                CourierBid.package_id == package_id,
+                CourierBid.package_id == package.id,
                 CourierBid.courier_id == current_user.id
             )
         ).all()

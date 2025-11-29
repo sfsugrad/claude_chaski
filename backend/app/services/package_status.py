@@ -17,8 +17,8 @@ ALLOWED_TRANSITIONS = {
     PackageStatus.NEW: [PackageStatus.OPEN_FOR_BIDS, PackageStatus.CANCELED],
     PackageStatus.OPEN_FOR_BIDS: [PackageStatus.BID_SELECTED, PackageStatus.CANCELED],
     PackageStatus.BID_SELECTED: [PackageStatus.PENDING_PICKUP, PackageStatus.OPEN_FOR_BIDS, PackageStatus.CANCELED],
-    PackageStatus.PENDING_PICKUP: [PackageStatus.IN_TRANSIT, PackageStatus.FAILED, PackageStatus.CANCELED],
-    PackageStatus.IN_TRANSIT: [PackageStatus.DELIVERED, PackageStatus.FAILED],
+    PackageStatus.PENDING_PICKUP: [PackageStatus.IN_TRANSIT, PackageStatus.CANCELED],
+    PackageStatus.IN_TRANSIT: [PackageStatus.DELIVERED, PackageStatus.FAILED],  # FAILED is admin-only
     PackageStatus.DELIVERED: [],  # Terminal state
     PackageStatus.CANCELED: [],  # Terminal state
     PackageStatus.FAILED: [PackageStatus.OPEN_FOR_BIDS],  # Admin only retry
@@ -61,7 +61,7 @@ def validate_transition(
     Args:
         current: Current package status
         target: Target package status
-        is_admin: Whether the actor is an admin (required for FAILED → OPEN_FOR_BIDS)
+        is_admin: Whether the actor is an admin (required for FAILED transitions)
 
     Returns:
         Tuple of (is_valid, error_message)
@@ -73,6 +73,19 @@ def validate_transition(
     if current == PackageStatus.FAILED and target == PackageStatus.OPEN_FOR_BIDS:
         if not is_admin:
             return False, "Only administrators can retry failed packages"
+        return True, ""
+
+    # Special case: Transitioning TO FAILED requires admin
+    # Only allowed from IN_TRANSIT (package must be picked up and in transit)
+    if target == PackageStatus.FAILED:
+        if not is_admin:
+            return False, "Only administrators can mark packages as failed"
+        # Verify the package is in IN_TRANSIT status
+        if current != PackageStatus.IN_TRANSIT:
+            return False, (
+                f"Cannot mark package as failed from {STATUS_LABELS[current]} status. "
+                "Package must be In Transit."
+            )
         return True, ""
 
     if target not in ALLOWED_TRANSITIONS.get(current, []):
@@ -105,6 +118,10 @@ def get_allowed_next_statuses(current: PackageStatus, is_admin: bool = False) ->
     # If not admin and current is FAILED, they can't transition
     if current == PackageStatus.FAILED and not is_admin:
         return []
+
+    # FAILED status is only available for admins
+    if not is_admin:
+        allowed = [s for s in allowed if s != PackageStatus.FAILED]
 
     return [s.value for s in allowed]
 
@@ -282,12 +299,13 @@ def is_terminal_state(status: PackageStatus) -> bool:
     return status in TERMINAL_STATES
 
 
-def can_cancel(status_or_package) -> bool:
+def can_cancel(status_or_package, is_admin: bool = False) -> bool:
     """
     Check if a package/status can be canceled.
 
     Args:
         status_or_package: Either a PackageStatus enum or a Package object
+        is_admin: If True, allows cancellation of IN_TRANSIT and FAILED states
 
     Returns:
         Boolean indicating if cancellation is allowed
@@ -298,40 +316,49 @@ def can_cancel(status_or_package) -> bool:
     else:
         status = status_or_package
 
-    # Cannot cancel terminal states
+    # Cannot cancel terminal states (DELIVERED, CANCELED) - even admins cannot
     if status in TERMINAL_STATES:
         return False
 
-    # Cannot cancel FAILED (must retry or leave as is)
+    # Admins can cancel IN_TRANSIT and FAILED states
+    if is_admin:
+        return True
+
+    # Regular users cannot cancel FAILED (must retry or leave as is)
     if status == PackageStatus.FAILED:
         return False
 
-    # Cannot cancel IN_TRANSIT (package is already with courier)
+    # Regular users cannot cancel IN_TRANSIT (package is already with courier)
     if status == PackageStatus.IN_TRANSIT:
         return False
 
     return True
 
 
-def can_cancel_with_reason(package: Package) -> Tuple[bool, str]:
+def can_cancel_with_reason(package: Package, is_admin: bool = False) -> Tuple[bool, str]:
     """
     Check if a package can be canceled, with error message.
 
     Args:
         package: The package to check
+        is_admin: If True, allows cancellation of IN_TRANSIT and FAILED states
 
     Returns:
         Tuple of (can_cancel, error_message)
     """
-    # Cannot cancel terminal states
+    # Cannot cancel terminal states (DELIVERED, CANCELED) - even admins cannot
     if package.status in TERMINAL_STATES:
         return False, f"Cannot cancel a package that is already {STATUS_LABELS[package.status]}"
 
-    # Cannot cancel FAILED (must retry or leave as is)
+    # Admins can cancel IN_TRANSIT and FAILED states
+    if is_admin:
+        return True, ""
+
+    # Regular users cannot cancel FAILED (must retry or leave as is)
     if package.status == PackageStatus.FAILED:
         return False, "Cannot cancel a failed package. Contact admin to retry or resolve."
 
-    # Cannot cancel IN_TRANSIT (package is already with courier)
+    # Regular users cannot cancel IN_TRANSIT (package is already with courier)
     if package.status == PackageStatus.IN_TRANSIT:
         return False, "Cannot cancel a package that is in transit"
 

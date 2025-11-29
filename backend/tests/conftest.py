@@ -6,6 +6,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.utils.tracking_id import generate_tracking_id
+
 # Ensure the application uses the in-memory SQLite database during tests
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 os.environ.setdefault("DATABASE_URL", SQLALCHEMY_DATABASE_URL)

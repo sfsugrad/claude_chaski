@@ -30,11 +30,26 @@ from typing import List
 from datetime import datetime
 from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut, GeocoderServiceError
+from app.utils.tracking_id import generate_tracking_id, is_valid_tracking_id
 
 router = APIRouter()
 
 # Initialize geocoder
 geolocator = Nominatim(user_agent="chaski")
+
+
+def get_package_by_tracking_id(db: Session, tracking_id: str) -> Package | None:
+    """
+    Get a package by tracking_id, with fallback to numeric ID for backwards compatibility.
+    """
+    # Try tracking_id first
+    package = db.query(Package).filter(Package.tracking_id == tracking_id).first()
+
+    # Fallback to numeric ID
+    if not package and tracking_id.isdigit():
+        package = db.query(Package).filter(Package.id == int(tracking_id)).first()
+
+    return package
 
 class PackageCreate(BaseModel):
     description: str = Field(..., min_length=1, max_length=500)
@@ -56,6 +71,7 @@ class PackageCreate(BaseModel):
 
 class PackageResponse(BaseModel):
     id: int
+    tracking_id: str
     sender_id: int
     courier_id: int | None
     sender_name: str | None = None
@@ -104,6 +120,7 @@ def package_to_response(package: Package, db: Session, is_admin: bool = False) -
 
     return PackageResponse(
         id=package.id,
+        tracking_id=package.tracking_id,
         sender_id=package.sender_id,
         courier_id=package.courier_id,
         sender_name=sender.full_name if sender else None,
@@ -185,6 +202,7 @@ async def create_package(
 
     # Create package with NEW status, then auto-transition to OPEN_FOR_BIDS
     new_package = Package(
+        tracking_id=generate_tracking_id(),
         sender_id=sender_id,
         description=package_data.description,
         size=package_size,
@@ -263,16 +281,16 @@ async def get_packages(
     return [package_to_response(pkg, db) for pkg in unique_packages]
 
 
-@router.get("/{package_id}", response_model=PackageResponse)
+@router.get("/{tracking_id}", response_model=PackageResponse)
 async def get_package(
-    package_id: int,
+    tracking_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get specific package details"""
+    """Get specific package details by tracking ID"""
     from app.models.user import UserRole
 
-    package = db.query(Package).filter(Package.id == package_id).first()
+    package = get_package_by_tracking_id(db, tracking_id)
 
     if not package:
         raise HTTPException(
@@ -319,21 +337,21 @@ class StatusUpdate(BaseModel):
     status: str
 
 
-@router.put("/{package_id}", response_model=PackageResponse)
+@router.put("/{tracking_id}", response_model=PackageResponse)
 async def update_package(
     request: Request,
-    package_id: int,
+    tracking_id: str,
     package_update: PackageUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Update package details.
+    Update package details by tracking ID.
 
     Only the sender who created the package or an admin can update it.
     Only pending packages can be edited.
     """
-    package = db.query(Package).filter(Package.id == package_id).first()
+    package = get_package_by_tracking_id(db, tracking_id)
 
     if not package:
         raise HTTPException(
@@ -406,15 +424,15 @@ async def update_package(
 
     # Audit log package update
     if changes:
-        log_package_update(db, current_user, package_id, changes, request)
+        log_package_update(db, current_user, package.id, changes, request)
 
     return package
 
 
-@router.put("/{package_id}/status")
+@router.put("/{tracking_id}/status")
 async def update_package_status(
     request: Request,
-    package_id: int,
+    tracking_id: str,
     status_update: StatusUpdate,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
@@ -426,9 +444,9 @@ async def update_package_status(
     Only the assigned courier can update status for delivery operations.
     Status progression: PENDING_PICKUP → IN_TRANSIT → DELIVERED
 
-    FAILED status can be set from PENDING_PICKUP or IN_TRANSIT when delivery fails.
+    Note: FAILED status can only be set by administrators via the admin endpoint.
     """
-    package = db.query(Package).filter(Package.id == package_id).first()
+    package = get_package_by_tracking_id(db, tracking_id)
 
     if not package:
         raise HTTPException(
@@ -488,7 +506,7 @@ async def update_package_status(
     db.commit()
 
     # Audit log status change
-    log_package_status_change(db, current_user, package_id, old_status.value, new_status.value, request)
+    log_package_status_change(db, current_user, package.id, old_status.value, new_status.value, request)
 
     # Get sender info for notifications
     sender = db.query(User).filter(User.id == package.sender_id).first()
@@ -549,21 +567,23 @@ async def update_package_status(
     return {"message": "Package status updated successfully", "status": new_status.value}
 
 
-@router.put("/{package_id}/cancel", response_model=PackageResponse)
+@router.put("/{tracking_id}/cancel", response_model=PackageResponse)
 async def cancel_package(
     request: Request,
-    package_id: int,
+    tracking_id: str,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Cancel a package.
+    Cancel a package by tracking ID.
 
     Only the sender who created the package or an admin can cancel it.
-    Cannot cancel packages that are IN_TRANSIT, DELIVERED, CANCELED, or FAILED.
+    - Senders cannot cancel packages that are IN_TRANSIT, DELIVERED, CANCELED, or FAILED.
+    - Admins can cancel packages in any non-terminal state (including IN_TRANSIT and FAILED).
+    - Nobody can cancel packages that are already DELIVERED or CANCELED (terminal states).
     """
-    package = db.query(Package).filter(Package.id == package_id).first()
+    package = get_package_by_tracking_id(db, tracking_id)
 
     if not package:
         raise HTTPException(
@@ -581,8 +601,8 @@ async def cancel_package(
             detail="You don't have permission to cancel this package"
         )
 
-    # Validate cancellation is allowed
-    can_cancel_pkg, error = can_cancel_with_reason(package)
+    # Validate cancellation is allowed (admins can cancel IN_TRANSIT and FAILED)
+    can_cancel_pkg, error = can_cancel_with_reason(package, is_admin=is_admin)
     if not can_cancel_pkg:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -591,6 +611,7 @@ async def cancel_package(
 
     # Store courier_id before cancelling (for notification)
     courier_id = package.courier_id
+    cancelled_by = "admin" if is_admin else "sender"
 
     package.status = PackageStatus.CANCELED
     package.updated_at = datetime.utcnow()
@@ -598,7 +619,7 @@ async def cancel_package(
     db.refresh(package)
 
     # Audit log package cancellation
-    log_package_cancel(db, current_user, package_id, "User cancelled", request)
+    log_package_cancel(db, current_user, package.id, f"Cancelled by {cancelled_by}", request)
 
     # Notify the courier if package was matched
     if courier_id:
@@ -609,7 +630,7 @@ async def cancel_package(
                 db=db,
                 user_id=courier_id,
                 notification_type=NotificationType.PACKAGE_CANCELLED,
-                message=f"Package '{package.description[:50]}' has been cancelled by the sender",
+                message=f"Package '{package.description[:50]}' has been cancelled by {cancelled_by}",
                 package_id=package.id
             )
             # Send email to courier
@@ -618,16 +639,21 @@ async def cancel_package(
                 recipient_email=courier.email,
                 recipient_name=courier.full_name,
                 package_description=package.description,
-                cancellation_reason="Cancelled by sender",
+                cancellation_reason=f"Cancelled by {cancelled_by}",
                 package_id=package.id
             )
 
     # Create in-app notification for sender (confirmation) with WebSocket broadcast
+    cancel_message = (
+        f"Your package '{package.description[:50]}' has been cancelled by admin"
+        if is_admin and not is_sender
+        else f"Your package '{package.description[:50]}' has been cancelled"
+    )
     await create_notification_with_broadcast(
         db=db,
         user_id=package.sender_id,
         notification_type=NotificationType.PACKAGE_CANCELLED,
-        message=f"Your package '{package.description[:50]}' has been cancelled",
+        message=cancel_message,
         package_id=package.id
     )
 

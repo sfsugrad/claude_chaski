@@ -24,6 +24,7 @@ class Package(Base):
     __tablename__ = "packages"
 
     id = Column(Integer, primary_key=True, index=True)
+    tracking_id = Column(String(19), unique=True, index=True, nullable=False)  # Format: xxxx-xxxx-xxxx-xxxx
     sender_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     courier_id = Column(Integer, ForeignKey("users.id"), nullable=True)
 
@@ -79,7 +80,7 @@ class Package(Base):
     # courier = relationship("User", foreign_keys=[courier_id])
 
     def __repr__(self):
-        return f"<Package {self.id} - {self.status}>"
+        return f"<Package {self.tracking_id} - {self.status}>"
 
 
 class CourierRoute(Base):

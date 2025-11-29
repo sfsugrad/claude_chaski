@@ -1,10 +1,12 @@
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, desc
 from app.database import get_db
 from app.models.user import User, UserRole
 from app.models.package import Package, PackageStatus
+from app.models.message import Message
+from app.models.package_note import PackageNote, NoteAuthorType
 from app.models.audit_log import AuditLog, AuditAction
 from app.utils.dependencies import get_current_admin_user
 from app.services.audit_service import (
@@ -23,8 +25,9 @@ from app.services.audit_service import (
     log_audit,
 )
 from app.services.package_status import transition_package
+from app.services.user_service import can_deactivate_user
 from pydantic import BaseModel, EmailStr, Field
-from typing import List
+from typing import List, Optional
 
 router = APIRouter()
 
@@ -394,6 +397,10 @@ async def toggle_user_active(
     This provides soft delete functionality - inactive users cannot log in
     but their data is preserved in the database.
 
+    Deactivation is blocked if the user has active packages (not in terminal state).
+    Blocking states: NEW, OPEN_FOR_BIDS, BID_SELECTED, PENDING_PICKUP, IN_TRANSIT.
+    Allowed states: DELIVERED, CANCELED, FAILED.
+
     Args:
         user_id: User ID
         toggle_data: New active status
@@ -404,7 +411,7 @@ async def toggle_user_active(
         Updated user details
 
     Raises:
-        HTTPException: If user not found or trying to deactivate self
+        HTTPException: If user not found, trying to deactivate self, or has active packages
     """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -419,6 +426,19 @@ async def toggle_user_active(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You cannot deactivate your own account"
         )
+
+    # Check for active packages when deactivating
+    if not toggle_data.is_active:
+        can_deactivate, error, details = can_deactivate_user(db, user_id)
+        if not can_deactivate:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "message": error,
+                    "packages_as_sender": details.get("as_sender", []),
+                    "packages_as_courier": details.get("as_courier", []),
+                }
+            )
 
     user.is_active = toggle_data.is_active
     user.updated_at = datetime.now(timezone.utc)
@@ -1089,3 +1109,431 @@ async def retry_failed_package(
         status=package.status.value,
         message="Package has been returned to OPEN_FOR_BIDS status for new courier bids"
     )
+
+
+class MarkFailedRequest(BaseModel):
+    reason: str = Field(..., min_length=1, max_length=500, description="Reason for marking the package as failed")
+
+
+class PackageFailedResponse(BaseModel):
+    id: int
+    status: str
+    reason: str
+    message: str
+
+
+@router.post("/packages/{package_id}/fail", response_model=PackageFailedResponse)
+async def mark_package_failed(
+    package_id: int,
+    fail_request: MarkFailedRequest,
+    http_request: Request,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Mark a package as FAILED (admin only).
+
+    This endpoint is admin-only and allows marking packages as failed
+    when there are issues with the delivery. The package must be in
+    IN_TRANSIT status (package must be picked up and in transit).
+
+    Args:
+        package_id: The ID of the package to mark as failed
+        fail_request: Contains the reason for failure
+
+    Returns:
+        Updated package status information
+    """
+    # Get the package
+    package = db.query(Package).filter(Package.id == package_id).first()
+
+    if not package:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Package not found"
+        )
+
+    # Verify package is in IN_TRANSIT status
+    if package.status != PackageStatus.IN_TRANSIT:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Can only mark packages as failed from IN_TRANSIT status. Current status: {package.status.value}"
+        )
+
+    old_status = package.status
+
+    # Transition to FAILED (is_admin=True allows the transition)
+    package, error = transition_package(
+        db=db,
+        package=package,
+        target_status=PackageStatus.FAILED,
+        actor_id=admin.id,
+        is_admin=True
+    )
+
+    if error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error
+        )
+
+    # Log audit
+    log_audit(
+        db=db,
+        user=admin,
+        action=AuditAction.PACKAGE_STATUS_CHANGE,
+        resource_type="package",
+        resource_id=package.id,
+        details={
+            "previous_status": old_status.value,
+            "new_status": PackageStatus.FAILED.value,
+            "reason": fail_request.reason
+        },
+        success=True,
+        ip_address=http_request.client.host if http_request.client else None,
+        user_agent=http_request.headers.get("user-agent")
+    )
+
+    return PackageFailedResponse(
+        id=package.id,
+        status=package.status.value,
+        reason=fail_request.reason,
+        message=f"Package has been marked as FAILED. Reason: {fail_request.reason}"
+    )
+
+
+# ============================================================
+# Admin Messages & Notes Endpoints
+# ============================================================
+
+class AdminMessageResponse(BaseModel):
+    id: int
+    package_id: int
+    package_description: str
+    sender_id: int
+    sender_name: str
+    sender_email: str
+    content: str
+    is_read: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AdminMessageListResponse(BaseModel):
+    messages: List[AdminMessageResponse]
+    total: int
+
+
+class AdminNoteResponse(BaseModel):
+    id: int
+    package_id: int
+    package_description: str
+    author_id: Optional[int]
+    author_name: Optional[str]
+    author_email: Optional[str]
+    author_type: str
+    content: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AdminNoteListResponse(BaseModel):
+    notes: List[AdminNoteResponse]
+    total: int
+
+
+class AdminConversationSummary(BaseModel):
+    package_id: int
+    package_description: str
+    sender_id: int
+    sender_name: str
+    courier_id: Optional[int]
+    courier_name: Optional[str]
+    message_count: int
+    last_message_at: datetime
+    last_message_preview: str
+
+
+class AdminConversationListResponse(BaseModel):
+    conversations: List[AdminConversationSummary]
+    total: int
+
+
+@router.get("/messages", response_model=AdminMessageListResponse)
+async def get_all_messages(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    package_id: Optional[int] = None,
+    user_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Get all messages across all packages (admin only).
+
+    Query params:
+    - skip: Number of records to skip (pagination)
+    - limit: Maximum number of records to return (max 500)
+    - package_id: Filter by package ID
+    - user_id: Filter by sender user ID
+
+    Returns:
+        List of all messages with package and sender details
+    """
+    query = db.query(Message)
+
+    if package_id:
+        query = query.filter(Message.package_id == package_id)
+    if user_id:
+        query = query.filter(Message.sender_id == user_id)
+
+    total = query.count()
+    messages = query.order_by(desc(Message.created_at)).offset(skip).limit(limit).all()
+
+    result = []
+    for msg in messages:
+        package = db.query(Package).filter(Package.id == msg.package_id).first()
+        sender = db.query(User).filter(User.id == msg.sender_id).first()
+
+        result.append(AdminMessageResponse(
+            id=msg.id,
+            package_id=msg.package_id,
+            package_description=package.description[:50] + "..." if package and len(package.description) > 50 else (package.description if package else "Unknown"),
+            sender_id=msg.sender_id,
+            sender_name=sender.full_name if sender else "Unknown",
+            sender_email=sender.email if sender else "Unknown",
+            content=msg.content,
+            is_read=msg.is_read,
+            created_at=msg.created_at
+        ))
+
+    return AdminMessageListResponse(messages=result, total=total)
+
+
+@router.get("/conversations", response_model=AdminConversationListResponse)
+async def get_all_conversations(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Get all package conversations (admin only).
+
+    Returns a summary of all packages that have messages, with the message count
+    and last message preview.
+
+    Returns:
+        List of conversation summaries
+    """
+    # Get packages with messages, grouped by package
+    packages_with_messages = db.query(
+        Message.package_id,
+        func.count(Message.id).label('message_count'),
+        func.max(Message.created_at).label('last_message_at'),
+        func.max(Message.id).label('last_message_id')
+    ).group_by(Message.package_id).subquery()
+
+    total = db.query(packages_with_messages).count()
+
+    # Get ordered list
+    conversations_query = db.query(
+        packages_with_messages.c.package_id,
+        packages_with_messages.c.message_count,
+        packages_with_messages.c.last_message_at,
+        packages_with_messages.c.last_message_id
+    ).order_by(desc(packages_with_messages.c.last_message_at)).offset(skip).limit(limit).all()
+
+    result = []
+    for pkg_id, msg_count, last_at, last_msg_id in conversations_query:
+        package = db.query(Package).filter(Package.id == pkg_id).first()
+        if not package:
+            continue
+
+        sender = db.query(User).filter(User.id == package.sender_id).first()
+        courier = db.query(User).filter(User.id == package.courier_id).first() if package.courier_id else None
+        last_message = db.query(Message).filter(Message.id == last_msg_id).first()
+
+        result.append(AdminConversationSummary(
+            package_id=pkg_id,
+            package_description=package.description[:50] + "..." if len(package.description) > 50 else package.description,
+            sender_id=package.sender_id,
+            sender_name=sender.full_name if sender else "Unknown",
+            courier_id=package.courier_id,
+            courier_name=courier.full_name if courier else None,
+            message_count=msg_count,
+            last_message_at=last_at,
+            last_message_preview=last_message.content[:100] + "..." if last_message and len(last_message.content) > 100 else (last_message.content if last_message else "")
+        ))
+
+    return AdminConversationListResponse(conversations=result, total=total)
+
+
+@router.get("/packages/{package_id}/messages", response_model=AdminMessageListResponse)
+async def get_package_messages_admin(
+    package_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Get all messages for a specific package (admin only).
+
+    Returns:
+        List of all messages for the package with sender details
+    """
+    package = db.query(Package).filter(Package.id == package_id).first()
+    if not package:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Package not found"
+        )
+
+    query = db.query(Message).filter(Message.package_id == package_id)
+    total = query.count()
+    messages = query.order_by(Message.created_at).offset(skip).limit(limit).all()
+
+    result = []
+    for msg in messages:
+        sender = db.query(User).filter(User.id == msg.sender_id).first()
+
+        result.append(AdminMessageResponse(
+            id=msg.id,
+            package_id=msg.package_id,
+            package_description=package.description[:50] + "..." if len(package.description) > 50 else package.description,
+            sender_id=msg.sender_id,
+            sender_name=sender.full_name if sender else "Unknown",
+            sender_email=sender.email if sender else "Unknown",
+            content=msg.content,
+            is_read=msg.is_read,
+            created_at=msg.created_at
+        ))
+
+    return AdminMessageListResponse(messages=result, total=total)
+
+
+@router.get("/notes", response_model=AdminNoteListResponse)
+async def get_all_notes(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    package_id: Optional[int] = None,
+    author_id: Optional[int] = None,
+    author_type: Optional[str] = None,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Get all package notes across all packages (admin only).
+
+    Query params:
+    - skip: Number of records to skip (pagination)
+    - limit: Maximum number of records to return (max 500)
+    - package_id: Filter by package ID
+    - author_id: Filter by author user ID
+    - author_type: Filter by author type (SENDER, COURIER, SYSTEM)
+
+    Returns:
+        List of all notes with package and author details
+    """
+    query = db.query(PackageNote)
+
+    if package_id:
+        query = query.filter(PackageNote.package_id == package_id)
+    if author_id:
+        query = query.filter(PackageNote.author_id == author_id)
+    if author_type:
+        try:
+            note_type = NoteAuthorType(author_type.upper())
+            query = query.filter(PackageNote.author_type == note_type)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid author_type. Must be one of: SENDER, COURIER, SYSTEM"
+            )
+
+    total = query.count()
+    notes = query.order_by(desc(PackageNote.created_at)).offset(skip).limit(limit).all()
+
+    result = []
+    for note in notes:
+        package = db.query(Package).filter(Package.id == note.package_id).first()
+        author = db.query(User).filter(User.id == note.author_id).first() if note.author_id else None
+
+        author_name = None
+        author_email = None
+        if author:
+            author_name = author.full_name
+            author_email = author.email
+        elif note.author_type == NoteAuthorType.SYSTEM:
+            author_name = "System"
+
+        result.append(AdminNoteResponse(
+            id=note.id,
+            package_id=note.package_id,
+            package_description=package.description[:50] + "..." if package and len(package.description) > 50 else (package.description if package else "Unknown"),
+            author_id=note.author_id,
+            author_name=author_name,
+            author_email=author_email,
+            author_type=note.author_type.value,
+            content=note.content,
+            created_at=note.created_at
+        ))
+
+    return AdminNoteListResponse(notes=result, total=total)
+
+
+@router.get("/packages/{package_id}/notes", response_model=AdminNoteListResponse)
+async def get_package_notes_admin(
+    package_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Get all notes for a specific package (admin only).
+
+    Returns:
+        List of all notes for the package with author details
+    """
+    package = db.query(Package).filter(Package.id == package_id).first()
+    if not package:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Package not found"
+        )
+
+    query = db.query(PackageNote).filter(PackageNote.package_id == package_id)
+    total = query.count()
+    notes = query.order_by(PackageNote.created_at).offset(skip).limit(limit).all()
+
+    result = []
+    for note in notes:
+        author = db.query(User).filter(User.id == note.author_id).first() if note.author_id else None
+
+        author_name = None
+        author_email = None
+        if author:
+            author_name = author.full_name
+            author_email = author.email
+        elif note.author_type == NoteAuthorType.SYSTEM:
+            author_name = "System"
+
+        result.append(AdminNoteResponse(
+            id=note.id,
+            package_id=note.package_id,
+            package_description=package.description[:50] + "..." if len(package.description) > 50 else package.description,
+            author_id=note.author_id,
+            author_name=author_name,
+            author_email=author_email,
+            author_type=note.author_type.value,
+            content=note.content,
+            created_at=note.created_at
+        ))
+
+    return AdminNoteListResponse(notes=result, total=total)

@@ -39,7 +39,7 @@ export default function SenderDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
-  const [cancellingId, setCancellingId] = useState<number | null>(null)
+  const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [pendingRatings, setPendingRatings] = useState<PendingRating[]>([])
   const [showRatingModal, setShowRatingModal] = useState(false)
   const [currentRatingIndex, setCurrentRatingIndex] = useState(0)
@@ -114,14 +114,14 @@ export default function SenderDashboard() {
     }
   }
 
-  const handleCancelPackage = async (packageId: number) => {
+  const handleCancelPackage = async (trackingId: string) => {
     if (!confirm('Are you sure you want to cancel this package? This action cannot be undone.')) {
       return
     }
 
-    setCancellingId(packageId)
+    setCancellingId(trackingId)
     try {
-      await packagesAPI.cancel(packageId)
+      await packagesAPI.cancel(trackingId)
       await loadPackages()
     } catch (err: any) {
       alert(err.response?.data?.detail || 'Failed to cancel package')
@@ -301,7 +301,7 @@ export default function SenderDashboard() {
                   <PackageCard
                     pkg={pkg}
                     onCancel={handleCancelPackage}
-                    cancelling={cancellingId === pkg.id}
+                    cancelling={cancellingId === pkg.tracking_id}
                     canCancel={canCancel(pkg.status)}
                   />
                 </SlideIn>
@@ -316,7 +316,7 @@ export default function SenderDashboard() {
 
 interface PackageCardProps {
   pkg: PackageResponse
-  onCancel: (id: number) => void
+  onCancel: (trackingId: string) => void
   cancelling: boolean
   canCancel: boolean
 }
@@ -455,7 +455,7 @@ function PackageCard({ pkg, onCancel, cancelling, canCancel }: PackageCardProps)
                 </span>
               )}
               <span className="text-sm text-gray-500">
-                Package #{pkg.id}
+                Package {pkg.tracking_id}
               </span>
               {pkg.price && (
                 <span className="text-sm font-semibold text-green-600">
@@ -531,7 +531,7 @@ function PackageCard({ pkg, onCancel, cancelling, canCancel }: PackageCardProps)
 
           {/* Actions */}
           <div className="flex flex-col gap-2 ml-4">
-            <Link href={`/packages/${pkg.id}`}>
+            <Link href={`/packages/${pkg.tracking_id}`}>
               <Button variant="ghost" size="sm">
                 View Details
               </Button>
@@ -540,7 +540,7 @@ function PackageCard({ pkg, onCancel, cancelling, canCancel }: PackageCardProps)
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => onCancel(pkg.id)}
+                onClick={() => onCancel(pkg.tracking_id)}
                 disabled={cancelling}
                 className="text-error-600 hover:text-error-700 hover:bg-error-50"
               >

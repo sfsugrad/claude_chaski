@@ -5,7 +5,7 @@ import { messagesAPI, MessageResponse } from '@/lib/api'
 import { useWebSocketContext } from '@/contexts/WebSocketContext'
 
 interface ChatWindowProps {
-  packageId: number
+  trackingId: string
   currentUserId: number
   otherUserName?: string
   onNewMessage?: (message: MessageResponse) => void
@@ -38,7 +38,7 @@ function formatTime(dateString: string): string {
 }
 
 export default function ChatWindow({
-  packageId,
+  trackingId,
   currentUserId,
   otherUserName = 'User',
   onNewMessage,
@@ -62,18 +62,18 @@ export default function ChatWindow({
   const loadMessages = useCallback(async () => {
     try {
       setError(null)
-      const response = await messagesAPI.getPackageMessages(packageId)
+      const response = await messagesAPI.getPackageMessages(trackingId)
       setMessages(response.data.messages)
 
       // Mark messages as read
-      await messagesAPI.markAllAsRead(packageId)
+      await messagesAPI.markAllAsRead(trackingId)
     } catch (err) {
       setError('Failed to load messages')
       console.error('Failed to load messages:', err)
     } finally {
       setLoading(false)
     }
-  }, [packageId])
+  }, [trackingId])
 
   useEffect(() => {
     loadMessages()
@@ -86,7 +86,7 @@ export default function ChatWindow({
   // Subscribe to WebSocket message events
   useEffect(() => {
     const unsubscribe = onMessageReceived((message: any) => {
-      if (message.package_id === packageId) {
+      if (message.tracking_id === trackingId) {
         setMessages(prev => {
           // Avoid duplicates
           if (prev.some(m => m.id === message.id)) return prev
@@ -97,7 +97,7 @@ export default function ChatWindow({
       }
     })
     return unsubscribe
-  }, [onMessageReceived, packageId])
+  }, [onMessageReceived, trackingId])
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -109,7 +109,7 @@ export default function ChatWindow({
     setSending(true)
 
     try {
-      const response = await messagesAPI.sendMessage(packageId, content)
+      const response = await messagesAPI.sendMessage(trackingId, content)
       setMessages(prev => [...prev, response.data])
       onNewMessage?.(response.data)
     } catch (err) {

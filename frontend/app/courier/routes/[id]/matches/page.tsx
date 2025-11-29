@@ -231,14 +231,14 @@ export default function RouteMatchesPage() {
                         </button>
                       ) : getBidStatus(existingBid) === 'selected' ? (
                         <Link
-                          href={`/packages/${pkg.package_id}`}
+                          href={`/packages/${pkg.tracking_id}`}
                           className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium whitespace-nowrap text-center"
                         >
                           View Package
                         </Link>
                       ) : null}
                       <Link
-                        href={`/messages?package=${pkg.package_id}`}
+                        href={`/messages?package=${pkg.tracking_id}`}
                         className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium whitespace-nowrap text-center flex items-center justify-center gap-2"
                       >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -263,7 +263,7 @@ export default function RouteMatchesPage() {
             setShowBidModal(false)
             setSelectedPackage(null)
           }}
-          packageId={selectedPackage.package_id}
+          trackingId={selectedPackage.tracking_id}
           packageDescription={selectedPackage.description}
           senderPrice={selectedPackage.price}
           routeId={routeId}

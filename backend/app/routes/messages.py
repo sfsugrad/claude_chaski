@@ -12,6 +12,14 @@ from app.utils.dependencies import get_current_user
 router = APIRouter()
 
 
+def get_package_by_tracking_id(db: Session, tracking_id: str) -> Package | None:
+    """Get a package by tracking_id, with fallback to numeric ID."""
+    package = db.query(Package).filter(Package.tracking_id == tracking_id).first()
+    if not package and tracking_id.isdigit():
+        package = db.query(Package).filter(Package.id == int(tracking_id)).first()
+    return package
+
+
 # Request/Response Models
 class MessageCreate(BaseModel):
     content: str = Field(..., min_length=1, max_length=2000)
@@ -37,6 +45,7 @@ class MessageListResponse(BaseModel):
 
 class ConversationSummary(BaseModel):
     package_id: int
+    tracking_id: str
     package_description: str
     other_user_id: int
     other_user_name: str
@@ -53,6 +62,10 @@ class ConversationListResponse(BaseModel):
 def check_message_access(package: Package, user: User) -> bool:
     """Check if user has access to messages for this package."""
     from app.models.user import UserRole
+
+    # Admin has access to all messages
+    if user.role == UserRole.ADMIN:
+        return True
 
     # Sender always has access
     if user.id == package.sender_id:
@@ -175,6 +188,7 @@ async def get_conversations(
 
         conversations.append(ConversationSummary(
             package_id=package.id,
+            tracking_id=package.tracking_id,
             package_description=package.description[:50] + "..." if len(package.description) > 50 else package.description,
             other_user_id=other_user.id,
             other_user_name=other_user.full_name,
@@ -213,20 +227,20 @@ async def get_unread_message_count(
     return {"unread_count": count}
 
 
-@router.get("/package/{package_id}", response_model=MessageListResponse)
+@router.get("/package/{tracking_id}", response_model=MessageListResponse)
 async def get_package_messages(
-    package_id: int,
+    tracking_id: str,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Get all messages for a specific package.
+    Get all messages for a specific package by tracking ID.
     Only the sender and courier of the package can access messages.
     """
     # Get the package
-    package = db.query(Package).filter(Package.id == package_id).first()
+    package = get_package_by_tracking_id(db, tracking_id)
     if not package:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -241,11 +255,11 @@ async def get_package_messages(
         )
 
     # Get total count
-    total = db.query(Message).filter(Message.package_id == package_id).count()
+    total = db.query(Message).filter(Message.package_id == package.id).count()
 
     # Get messages ordered by created_at (oldest first for chat display)
     messages = db.query(Message).filter(
-        Message.package_id == package_id
+        Message.package_id == package.id
     ).order_by(Message.created_at).offset(skip).limit(limit).all()
 
     # Build response with sender names
@@ -268,21 +282,21 @@ async def get_package_messages(
     )
 
 
-@router.post("/package/{package_id}", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/package/{tracking_id}", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
 async def send_message(
-    package_id: int,
+    tracking_id: str,
     message_data: MessageCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Send a message for a specific package.
+    Send a message for a specific package by tracking ID.
     Only the sender and courier of the package can send messages.
     """
     from app.services.websocket_manager import broadcast_message
 
     # Get the package
-    package = db.query(Package).filter(Package.id == package_id).first()
+    package = get_package_by_tracking_id(db, tracking_id)
     if not package:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -298,7 +312,7 @@ async def send_message(
 
     # Create the message
     message = Message(
-        package_id=package_id,
+        package_id=package.id,
         sender_id=current_user.id,
         content=message_data.content
     )
@@ -332,7 +346,7 @@ async def send_message(
     if current_user.id == package.sender_id:
         # Sender is sending - notify all couriers who have messaged about this package
         courier_ids = db.query(Message.sender_id).filter(
-            Message.package_id == package_id,
+            Message.package_id == package.id,
             Message.sender_id != package.sender_id
         ).distinct().all()
         for (courier_id,) in courier_ids:
@@ -384,15 +398,15 @@ async def mark_message_read(
     )
 
 
-@router.put("/package/{package_id}/read-all")
+@router.put("/package/{tracking_id}/read-all")
 async def mark_all_messages_read(
-    package_id: int,
+    tracking_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Mark all messages in a conversation as read."""
     # Get the package
-    package = db.query(Package).filter(Package.id == package_id).first()
+    package = get_package_by_tracking_id(db, tracking_id)
     if not package:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -408,7 +422,7 @@ async def mark_all_messages_read(
 
     # Mark all messages from the other user as read
     updated_count = db.query(Message).filter(
-        Message.package_id == package_id,
+        Message.package_id == package.id,
         Message.sender_id != current_user.id,
         Message.is_read == False
     ).update({"is_read": True}, synchronize_session=False)

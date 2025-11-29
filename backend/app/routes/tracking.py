@@ -18,6 +18,14 @@ from app.services.redis_client import RedisClient, get_redis
 router = APIRouter()
 
 
+def get_package_by_tracking_id(db: Session, tracking_id: str) -> Package | None:
+    """Get a package by tracking_id, with fallback to numeric ID."""
+    package = db.query(Package).filter(Package.tracking_id == tracking_id).first()
+    if not package and tracking_id.isdigit():
+        package = db.query(Package).filter(Package.id == int(tracking_id)).first()
+    return package
+
+
 # Pydantic models
 class LocationUpdateRequest(BaseModel):
     """Request model for location update."""
@@ -119,9 +127,9 @@ async def get_tracking_service(
 
 
 # Courier endpoints
-@router.post("/sessions/{package_id}/start", response_model=TrackingSessionResponse)
+@router.post("/sessions/{tracking_id}/start", response_model=TrackingSessionResponse)
 async def start_tracking(
-    package_id: int,
+    tracking_id: str,
     request: StartTrackingRequest,
     current_user: User = Depends(get_current_user),
     tracking_service: TrackingService = Depends(get_tracking_service),
@@ -132,7 +140,7 @@ async def start_tracking(
     Only the assigned courier can start tracking.
     """
     # Verify package exists and user is the courier
-    package = db.query(Package).filter(Package.id == package_id).first()
+    package = get_package_by_tracking_id(db, tracking_id)
     if not package:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -152,7 +160,7 @@ async def start_tracking(
         )
 
     session = await tracking_service.start_tracking_session(
-        package_id=package_id,
+        package_id=package.id,
         courier_id=current_user.id,
         initial_latitude=request.initial_latitude,
         initial_longitude=request.initial_longitude,
@@ -290,9 +298,9 @@ async def report_delay(
 
 
 # Public/sender endpoints
-@router.get("/packages/{package_id}/location", response_model=LocationResponse)
+@router.get("/packages/{tracking_id}/location", response_model=LocationResponse)
 async def get_current_location(
-    package_id: int,
+    tracking_id: str,
     current_user: User = Depends(get_current_user),
     tracking_service: TrackingService = Depends(get_tracking_service),
     db: Session = Depends(get_db)
@@ -302,7 +310,7 @@ async def get_current_location(
     Available to sender and courier.
     """
     # Verify package exists and user has access
-    package = db.query(Package).filter(Package.id == package_id).first()
+    package = get_package_by_tracking_id(db, tracking_id)
     if not package:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -315,7 +323,7 @@ async def get_current_location(
             detail="You don't have access to this package's tracking"
         )
 
-    location = await tracking_service.get_current_location(package_id)
+    location = await tracking_service.get_current_location(package.id)
     if not location:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -333,9 +341,9 @@ async def get_current_location(
     )
 
 
-@router.get("/packages/{package_id}/session", response_model=TrackingSessionResponse)
+@router.get("/packages/{tracking_id}/session", response_model=TrackingSessionResponse)
 async def get_active_session(
-    package_id: int,
+    tracking_id: str,
     current_user: User = Depends(get_current_user),
     tracking_service: TrackingService = Depends(get_tracking_service),
     db: Session = Depends(get_db)
@@ -345,7 +353,7 @@ async def get_active_session(
     Available to sender and courier.
     """
     # Verify package exists and user has access
-    package = db.query(Package).filter(Package.id == package_id).first()
+    package = get_package_by_tracking_id(db, tracking_id)
     if not package:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -358,7 +366,7 @@ async def get_active_session(
             detail="You don't have access to this package's tracking"
         )
 
-    session = await tracking_service.get_active_session(package_id)
+    session = await tracking_service.get_active_session(package.id)
     if not session:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

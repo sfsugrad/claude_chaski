@@ -111,7 +111,7 @@ export default function PackageDetailPage() {
       setCurrentUser(userResponse.data)
 
       // Get package details
-      const packageResponse = await packagesAPI.getById(parseInt(packageId))
+      const packageResponse = await packagesAPI.getByTrackingId(packageId)
       const packageData = packageResponse.data
       setPkg(packageData)
 
@@ -137,11 +137,11 @@ export default function PackageDetailPage() {
 
       // Load unread message count for this package
       try {
-        const messagesResponse = await messagesAPI.getPackageMessages(parseInt(packageId), 0, 1)
+        const messagesResponse = await messagesAPI.getPackageMessages(packageId, 0, 1)
         // Get unread count from conversations API
         const conversationsResponse = await messagesAPI.getConversations()
         const thisConversation = conversationsResponse.data.conversations.find(
-          c => c.package_id === parseInt(packageId)
+          c => c.package_id === packageData.id
         )
         if (thisConversation) {
           setUnreadMessageCount(thisConversation.unread_count)
@@ -159,7 +159,7 @@ export default function PackageDetailPage() {
 
       if (isSender || isAdmin || isCourier) {
         try {
-          const notesResponse = await notesAPI.getPackageNotes(parseInt(packageId))
+          const notesResponse = await notesAPI.getPackageNotes(packageId)
           setNotes(notesResponse.data)
         } catch (err) {
           console.error('Error loading notes:', err)
@@ -169,7 +169,7 @@ export default function PackageDetailPage() {
       // Load package ratings if delivered
       if (packageData.status.toLowerCase() === 'delivered') {
         try {
-          const ratingsResponse = await ratingsAPI.getPackageRatings(parseInt(packageId))
+          const ratingsResponse = await ratingsAPI.getPackageRatings(packageId)
           setPackageRatings(ratingsResponse.data)
 
           // Check if current user can rate
@@ -313,7 +313,7 @@ export default function PackageDetailPage() {
 
   const handleSave = async () => {
     try {
-      await packagesAPI.update(parseInt(packageId), editedPackage)
+      await packagesAPI.update(packageId, editedPackage)
       alert('Package updated successfully')
       setIsEditing(false)
       await loadPackageData()
@@ -341,7 +341,7 @@ export default function PackageDetailPage() {
 
     setSubmittingNote(true)
     try {
-      const response = await notesAPI.addNote(pkg.id, newNoteContent.trim())
+      const response = await notesAPI.addNote(pkg.tracking_id, newNoteContent.trim())
       setNotes([...notes, response.data])
       setNewNoteContent('')
     } catch (err: any) {
@@ -410,7 +410,7 @@ export default function PackageDetailPage() {
                   ← Back
                 </Link>
                 <h1 className="text-2xl font-bold text-surface-900">
-                  Package #{pkg.id}
+                  Package {pkg.tracking_id}
                 </h1>
                 <Badge variant={getStatusVariant(pkg.status)}>
                   {pkg.status.replace('_', ' ').toUpperCase()}
@@ -742,7 +742,7 @@ export default function PackageDetailPage() {
                     Review bids from couriers and select your preferred one.
                   </p>
                   <BidsList
-                    packageId={pkg.id}
+                    trackingId={pkg.tracking_id}
                     isSender={true}
                     onBidSelected={loadPackageData}
                   />
@@ -852,7 +852,7 @@ export default function PackageDetailPage() {
               {showChat && (
                 <div className="border-t border-surface-200">
                   <ChatWindow
-                    packageId={pkg.id}
+                    trackingId={pkg.tracking_id}
                     currentUserId={currentUser.id}
                     otherUserName={otherUserName || (currentUser.id === pkg.sender_id ? 'Courier' : 'Sender')}
                     className="rounded-none border-0"
@@ -1038,7 +1038,7 @@ export default function PackageDetailPage() {
         <BidOptionsModal
           isOpen={showBidOptionsModal}
           onClose={() => setShowBidOptionsModal(false)}
-          packageId={pkg.id}
+          trackingId={pkg.tracking_id}
           packageDescription={pkg.description}
           senderPrice={pkg.price}
           onBidPlaced={() => {

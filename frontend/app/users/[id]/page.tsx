@@ -269,10 +269,10 @@ export default function UserDetailPage() {
                     <tr key={pkg.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Link
-                          href={`/packages/${pkg.id}`}
+                          href={`/packages/${pkg.tracking_id}`}
                           className="text-purple-600 hover:text-purple-800 font-medium"
                         >
-                          #{pkg.id}
+                          {pkg.tracking_id}
                         </Link>
                       </td>
                       <td className="px-6 py-4">

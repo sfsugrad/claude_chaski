@@ -6,7 +6,7 @@ import { bidsAPI, BidCreate } from '@/lib/api'
 interface BidModalProps {
   isOpen: boolean
   onClose: () => void
-  packageId: number
+  trackingId: string
   packageDescription: string
   suggestedPrice: number | null
   routeId?: number
@@ -16,7 +16,7 @@ interface BidModalProps {
 export default function BidModal({
   isOpen,
   onClose,
-  packageId,
+  trackingId,
   packageDescription,
   suggestedPrice,
   routeId,
@@ -44,7 +44,7 @@ export default function BidModal({
 
     try {
       const bidData: BidCreate = {
-        package_id: packageId,
+        tracking_id: trackingId,
         proposed_price: parseFloat(proposedPrice),
         route_id: routeId,
       }

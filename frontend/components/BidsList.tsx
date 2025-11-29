@@ -6,13 +6,13 @@ import BidCard from './BidCard'
 import CountdownTimer from './CountdownTimer'
 
 interface BidsListProps {
-  packageId: number
+  trackingId: string
   isSender: boolean
   onBidSelected?: () => void
 }
 
 export default function BidsList({
-  packageId,
+  trackingId,
   isSender,
   onBidSelected,
 }: BidsListProps) {
@@ -24,7 +24,7 @@ export default function BidsList({
 
   const fetchBids = async () => {
     try {
-      const response = await bidsAPI.getPackageBids(packageId)
+      const response = await bidsAPI.getPackageBids(trackingId)
       setBidsData(response.data)
       setError('')
     } catch (err: unknown) {
@@ -40,7 +40,7 @@ export default function BidsList({
     // Poll for updates every 30 seconds
     const interval = setInterval(fetchBids, 30000)
     return () => clearInterval(interval)
-  }, [packageId])
+  }, [trackingId])
 
   const handleSelectBid = async (bidId: number) => {
     if (!confirm('Are you sure you want to select this bid? Other bids will be rejected.')) {

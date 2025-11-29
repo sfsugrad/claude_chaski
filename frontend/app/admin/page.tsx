@@ -180,7 +180,22 @@ export default function AdminPage() {
       alert(`User ${action}d successfully`)
     } catch (err: any) {
       console.error('Error toggling user status:', err)
-      const errorMessage = err.response?.data?.detail || `Failed to ${action} user`
+      const detail = err.response?.data?.detail
+      let errorMessage = `Failed to ${action} user`
+      if (detail) {
+        if (typeof detail === 'string') {
+          errorMessage = detail
+        } else if (detail.message) {
+          // Handle structured error responses (e.g., active packages blocking deactivation)
+          errorMessage = detail.message
+          if (detail.packages_as_sender?.length || detail.packages_as_courier?.length) {
+            const senderIds = detail.packages_as_sender?.join(', ') || ''
+            const courierIds = detail.packages_as_courier?.join(', ') || ''
+            if (senderIds) errorMessage += `\n\nPackages as sender: #${senderIds}`
+            if (courierIds) errorMessage += `\n\nPackages as courier: #${courierIds}`
+          }
+        }
+      }
       alert(errorMessage)
     }
   }
@@ -1013,10 +1028,10 @@ export default function AdminPage() {
                         <tr key={pkg.id} className={!pkg.is_active ? 'bg-gray-50 opacity-60' : ''}>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <a
-                              href={`/packages/${pkg.id}`}
+                              href={`/packages/${pkg.tracking_id}`}
                               className="text-purple-600 hover:text-purple-700 font-semibold"
                             >
-                              #{pkg.id}
+                              {pkg.tracking_id}
                             </a>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">

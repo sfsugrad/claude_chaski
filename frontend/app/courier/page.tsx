@@ -29,8 +29,8 @@ export default function CourierDashboard() {
   const [showRatingModal, setShowRatingModal] = useState(false)
   const [currentRatingIndex, setCurrentRatingIndex] = useState(0)
   const [assignedPackages, setAssignedPackages] = useState<PackageResponse[]>([])
-  const [confirmingPickupId, setConfirmingPickupId] = useState<number | null>(null)
-  const [markingDeliveredId, setMarkingDeliveredId] = useState<number | null>(null)
+  const [confirmingPickupId, setConfirmingPickupId] = useState<string | null>(null)
+  const [markingDeliveredId, setMarkingDeliveredId] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -121,13 +121,13 @@ export default function CourierDashboard() {
     }
   }
 
-  const handleConfirmPickup = async (packageId: number, bidId: number | null) => {
+  const handleConfirmPickup = async (trackingId: string, bidId: number | null) => {
     if (!bidId) {
       alert('No bid selected for this package')
       return
     }
 
-    setConfirmingPickupId(packageId)
+    setConfirmingPickupId(trackingId)
     try {
       await bidsAPI.confirmPickup(bidId)
       await loadAssignedPackages()
@@ -139,12 +139,12 @@ export default function CourierDashboard() {
     }
   }
 
-  const handleMarkDelivered = async (packageId: number) => {
+  const handleMarkDelivered = async (trackingId: string) => {
     if (!confirm('Mark this package as delivered?')) return
 
-    setMarkingDeliveredId(packageId)
+    setMarkingDeliveredId(trackingId)
     try {
-      await packagesAPI.updateStatus(packageId, 'DELIVERED')
+      await packagesAPI.updateStatus(trackingId, 'DELIVERED')
       await loadAssignedPackages()
     } catch (err: any) {
       const errorMessage = err.response?.data?.detail || 'Failed to mark as delivered'
@@ -368,28 +368,28 @@ export default function CourierDashboard() {
                             <Button
                               variant="success"
                               size="sm"
-                              onClick={() => handleConfirmPickup(pkg.id, pkg.selected_bid_id)}
-                              disabled={confirmingPickupId === pkg.id}
+                              onClick={() => handleConfirmPickup(pkg.tracking_id, pkg.selected_bid_id)}
+                              disabled={confirmingPickupId === pkg.tracking_id}
                             >
-                              {confirmingPickupId === pkg.id ? 'Confirming...' : 'Confirm Pickup'}
+                              {confirmingPickupId === pkg.tracking_id ? 'Confirming...' : 'Confirm Pickup'}
                             </Button>
                           )}
                           {pkg.status.toLowerCase() === 'in_transit' && (
                             <Button
                               variant="success"
                               size="sm"
-                              onClick={() => handleMarkDelivered(pkg.id)}
-                              disabled={markingDeliveredId === pkg.id}
+                              onClick={() => handleMarkDelivered(pkg.tracking_id)}
+                              disabled={markingDeliveredId === pkg.tracking_id}
                             >
-                              {markingDeliveredId === pkg.id ? 'Marking...' : 'Mark Delivered'}
+                              {markingDeliveredId === pkg.tracking_id ? 'Marking...' : 'Mark Delivered'}
                             </Button>
                           )}
-                          <Link href={`/packages/${pkg.id}`}>
+                          <Link href={`/packages/${pkg.tracking_id}`}>
                             <Button variant="secondary" size="sm">
                               View Details
                             </Button>
                           </Link>
-                          <Link href={`/messages?package=${pkg.id}`}>
+                          <Link href={`/messages?package=${pkg.tracking_id}`}>
                             <Button variant="primary" size="sm">
                               Message Sender
                             </Button>

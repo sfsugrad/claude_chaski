@@ -30,6 +30,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def get_package_by_tracking_id(db: Session, tracking_id: str) -> Package | None:
+    """Get a package by tracking_id, with fallback to numeric ID."""
+    package = db.query(Package).filter(Package.tracking_id == tracking_id).first()
+    if not package and tracking_id.isdigit():
+        package = db.query(Package).filter(Package.id == int(tracking_id)).first()
+    return package
+
+
 # Pydantic models
 class UploadUrlRequest(BaseModel):
     """Request for pre-signed upload URL."""
@@ -110,9 +118,9 @@ def _can_view_proof(user: User, package: Package) -> bool:
     )
 
 
-@router.post("/upload-url/{package_id}", response_model=UploadUrlResponse)
+@router.post("/upload-url/{tracking_id}", response_model=UploadUrlResponse)
 async def get_upload_url(
-    package_id: int,
+    tracking_id: str,
     request: UploadUrlRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -123,12 +131,9 @@ async def get_upload_url(
     Only the assigned courier can upload proof.
     """
     # Get package
-    package = db.query(Package).filter(
-        Package.id == package_id,
-        Package.is_active == True
-    ).first()
+    package = get_package_by_tracking_id(db, tracking_id)
 
-    if not package:
+    if not package or not package.is_active:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Package not found"
@@ -150,7 +155,7 @@ async def get_upload_url(
 
     # Check if proof already exists
     existing_proof = db.query(DeliveryProof).filter(
-        DeliveryProof.package_id == package_id
+        DeliveryProof.package_id == package.id
     ).first()
 
     if existing_proof:
@@ -162,7 +167,7 @@ async def get_upload_url(
     try:
         storage = get_file_storage()
         result = await storage.generate_presigned_upload_url(
-            package_id=package_id,
+            package_id=package.id,
             file_type=request.file_type,
             content_type=request.content_type
         )
@@ -174,9 +179,9 @@ async def get_upload_url(
         )
 
 
-@router.post("/{package_id}", response_model=DeliveryProofResponse)
+@router.post("/{tracking_id}", response_model=DeliveryProofResponse)
 async def create_delivery_proof(
-    package_id: int,
+    tracking_id: str,
     proof_data: DeliveryProofCreate,
     background_tasks: BackgroundTasks,
     request: Request,
@@ -189,12 +194,9 @@ async def create_delivery_proof(
     This marks the package as delivered and triggers payment processing.
     """
     # Get package
-    package = db.query(Package).filter(
-        Package.id == package_id,
-        Package.is_active == True
-    ).first()
+    package = get_package_by_tracking_id(db, tracking_id)
 
-    if not package:
+    if not package or not package.is_active:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Package not found"
@@ -216,7 +218,7 @@ async def create_delivery_proof(
 
     # Check if proof already exists
     existing_proof = db.query(DeliveryProof).filter(
-        DeliveryProof.package_id == package_id
+        DeliveryProof.package_id == package.id
     ).first()
 
     if existing_proof:
@@ -248,7 +250,7 @@ async def create_delivery_proof(
             signature_bytes = base64.b64decode(sig_data)
             signature_s3_key = await storage.upload_file(
                 file_data=signature_bytes,
-                package_id=package_id,
+                package_id=package.id,
                 file_type="signature",
                 content_type="image/png"
             )
@@ -267,7 +269,7 @@ async def create_delivery_proof(
 
     # Create delivery proof
     proof = DeliveryProof(
-        package_id=package_id,
+        package_id=package.id,
         courier_id=current_user.id,
         photo_s3_key=proof_data.photo_s3_key,
         signature_s3_key=signature_s3_key,
@@ -317,7 +319,7 @@ async def create_delivery_proof(
         user_id=package.sender_id,
         notification_type=NotificationType.DELIVERY_PROOF_SUBMITTED,
         message=f"Delivery proof submitted for your package to {package.dropoff_address}",
-        package_id=package_id
+        package_id=package.id
     )
 
     # Auto-trigger payment processing
@@ -325,7 +327,7 @@ async def create_delivery_proof(
         background_tasks.add_task(
             _process_payment_after_delivery,
             db,
-            package_id,
+            package.id,
             package.sender_id
         )
 
@@ -418,9 +420,9 @@ async def _process_payment_after_delivery(
             pass
 
 
-@router.get("/{package_id}", response_model=DeliveryProofResponse)
+@router.get("/{tracking_id}", response_model=DeliveryProofResponse)
 async def get_delivery_proof(
-    package_id: int,
+    tracking_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -430,7 +432,7 @@ async def get_delivery_proof(
     Accessible by sender, assigned courier, or admin.
     """
     # Get package
-    package = db.query(Package).filter(Package.id == package_id).first()
+    package = get_package_by_tracking_id(db, tracking_id)
 
     if not package:
         raise HTTPException(
@@ -447,7 +449,7 @@ async def get_delivery_proof(
 
     # Get proof
     proof = db.query(DeliveryProof).filter(
-        DeliveryProof.package_id == package_id
+        DeliveryProof.package_id == package.id
     ).first()
 
     if not proof:
@@ -492,14 +494,14 @@ async def get_delivery_proof(
     )
 
 
-@router.get("/{package_id}/photo")
+@router.get("/{tracking_id}/photo")
 async def get_proof_photo_url(
-    package_id: int,
+    tracking_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get signed URL for proof photo."""
-    package = db.query(Package).filter(Package.id == package_id).first()
+    package = get_package_by_tracking_id(db, tracking_id)
 
     if not package:
         raise HTTPException(
@@ -514,7 +516,7 @@ async def get_proof_photo_url(
         )
 
     proof = db.query(DeliveryProof).filter(
-        DeliveryProof.package_id == package_id
+        DeliveryProof.package_id == package.id
     ).first()
 
     if not proof or not proof.photo_s3_key:
@@ -534,14 +536,14 @@ async def get_proof_photo_url(
         )
 
 
-@router.get("/{package_id}/signature")
+@router.get("/{tracking_id}/signature")
 async def get_proof_signature_url(
-    package_id: int,
+    tracking_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get signed URL for proof signature."""
-    package = db.query(Package).filter(Package.id == package_id).first()
+    package = get_package_by_tracking_id(db, tracking_id)
 
     if not package:
         raise HTTPException(
@@ -556,7 +558,7 @@ async def get_proof_signature_url(
         )
 
     proof = db.query(DeliveryProof).filter(
-        DeliveryProof.package_id == package_id
+        DeliveryProof.package_id == package.id
     ).first()
 
     if not proof or not proof.signature_s3_key:

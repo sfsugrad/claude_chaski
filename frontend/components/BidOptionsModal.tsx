@@ -7,7 +7,7 @@ import BidModal from './BidModal'
 interface BidOptionsModalProps {
   isOpen: boolean
   onClose: () => void
-  packageId: number
+  trackingId: string
   packageDescription: string
   senderPrice: number | null
   routeId?: number
@@ -17,7 +17,7 @@ interface BidOptionsModalProps {
 export default function BidOptionsModal({
   isOpen,
   onClose,
-  packageId,
+  trackingId,
   packageDescription,
   senderPrice,
   routeId,
@@ -39,7 +39,7 @@ export default function BidOptionsModal({
 
     try {
       const bidData: BidCreate = {
-        package_id: packageId,
+        tracking_id: trackingId,
         proposed_price: senderPrice,
         route_id: routeId,
       }
@@ -83,7 +83,7 @@ export default function BidOptionsModal({
       <BidModal
         isOpen={true}
         onClose={handleBidModalClose}
-        packageId={packageId}
+        trackingId={trackingId}
         packageDescription={packageDescription}
         suggestedPrice={senderPrice}
         routeId={routeId}

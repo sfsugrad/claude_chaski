@@ -44,6 +44,7 @@ def calculate_detour(route_line: LineString, pickup_point: Point, dropoff_point:
 
 class MatchedPackageResponse(BaseModel):
     package_id: int
+    tracking_id: str
     sender_id: int
     description: str
     size: str
@@ -152,6 +153,7 @@ async def get_packages_along_route(
 
             matched_packages.append(MatchedPackageResponse(
                 package_id=package.id,
+                tracking_id=package.tracking_id,
                 sender_id=package.sender_id,
                 description=package.description,
                 size=package.size.value,

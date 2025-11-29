@@ -78,6 +78,7 @@ export interface PackageCreate {
 
 export interface PackageResponse {
   id: number
+  tracking_id: string
   sender_id: number
   courier_id: number | null
   sender_name: string | null
@@ -167,15 +168,15 @@ export const authAPI = {
 export const packagesAPI = {
   create: (data: PackageCreate) => api.post<PackageResponse>('/packages', data),
   getAll: () => api.get<PackageResponse[]>('/packages'),
-  getById: (id: number) => api.get<PackageResponse>(`/packages/${id}`),
-  update: (id: number, data: Partial<PackageCreate>) =>
-    api.put<PackageResponse>(`/packages/${id}`, data),
-  updateStatus: (id: number, status: string) =>
-    api.put(`/packages/${id}/status`, { status }),
-  cancel: (id: number) => api.put<PackageResponse>(`/packages/${id}/cancel`),
+  getByTrackingId: (trackingId: string) => api.get<PackageResponse>(`/packages/${trackingId}`),
+  update: (trackingId: string, data: Partial<PackageCreate>) =>
+    api.put<PackageResponse>(`/packages/${trackingId}`, data),
+  updateStatus: (trackingId: string, status: string) =>
+    api.put(`/packages/${trackingId}/status`, { status }),
+  cancel: (trackingId: string) => api.put<PackageResponse>(`/packages/${trackingId}/cancel`),
   // Acceptance for matched packages - both sender and courier must accept
-  accept: (id: number) => api.post<PackageResponse>(`/packages/${id}/accept`),
-  getAcceptanceStatus: (id: number) => api.get<AcceptanceStatus>(`/packages/${id}/acceptance-status`),
+  accept: (trackingId: string) => api.post<PackageResponse>(`/packages/${trackingId}/accept`),
+  getAcceptanceStatus: (trackingId: string) => api.get<AcceptanceStatus>(`/packages/${trackingId}/acceptance-status`),
 }
 
 // Route Types
@@ -209,6 +210,7 @@ export interface RouteResponse {
 
 export interface MatchedPackage {
   package_id: number
+  tracking_id: string
   sender_id: number
   description: string
   size: string
@@ -310,7 +312,7 @@ export const notificationsAPI = {
 
 // Rating Types
 export interface RatingCreate {
-  package_id: number
+  tracking_id: string
   score: number
   comment?: string
 }
@@ -356,8 +358,8 @@ export const ratingsAPI = {
     api.get<RatingListResponse>(`/ratings/user/${userId}?skip=${skip}&limit=${limit}`),
   getUserRatingSummary: (userId: number) =>
     api.get<UserRatingSummary>(`/ratings/user/${userId}/summary`),
-  getPackageRatings: (packageId: number) =>
-    api.get<RatingResponse[]>(`/ratings/package/${packageId}`),
+  getPackageRatings: (trackingId: string) =>
+    api.get<RatingResponse[]>(`/ratings/package/${trackingId}`),
   getMyPendingRatings: () =>
     api.get<PendingRating[]>('/ratings/my-pending'),
 }
@@ -380,6 +382,7 @@ export interface MessageListResponse {
 
 export interface ConversationSummary {
   package_id: number
+  tracking_id: string
   package_description: string
   other_user_id: number
   other_user_name: string
@@ -401,14 +404,14 @@ export interface MessageUnreadCountResponse {
 export const messagesAPI = {
   getConversations: (skip: number = 0, limit: number = 20) =>
     api.get<ConversationListResponse>(`/messages/conversations?skip=${skip}&limit=${limit}`),
-  getPackageMessages: (packageId: number, skip: number = 0, limit: number = 50) =>
-    api.get<MessageListResponse>(`/messages/package/${packageId}?skip=${skip}&limit=${limit}`),
-  sendMessage: (packageId: number, content: string) =>
-    api.post<MessageResponse>(`/messages/package/${packageId}`, { content }),
+  getPackageMessages: (trackingId: string, skip: number = 0, limit: number = 50) =>
+    api.get<MessageListResponse>(`/messages/package/${trackingId}?skip=${skip}&limit=${limit}`),
+  sendMessage: (trackingId: string, content: string) =>
+    api.post<MessageResponse>(`/messages/package/${trackingId}`, { content }),
   markAsRead: (messageId: number) =>
     api.put<MessageResponse>(`/messages/${messageId}/read`),
-  markAllAsRead: (packageId: number) =>
-    api.put(`/messages/package/${packageId}/read-all`),
+  markAllAsRead: (trackingId: string) =>
+    api.put(`/messages/package/${trackingId}/read-all`),
   getUnreadCount: () =>
     api.get<MessageUnreadCountResponse>('/messages/unread-count'),
 }
@@ -564,23 +567,23 @@ export interface UploadUrlResponse {
 
 // Delivery Proof API
 export const proofAPI = {
-  getUploadUrl: (packageId: number, fileType: 'photo' | 'signature', contentType: string = 'image/jpeg') =>
-    api.post<UploadUrlResponse>(`/proof/upload-url/${packageId}`, {
+  getUploadUrl: (trackingId: string, fileType: 'photo' | 'signature', contentType: string = 'image/jpeg') =>
+    api.post<UploadUrlResponse>(`/proof/upload-url/${trackingId}`, {
       file_type: fileType,
       content_type: contentType,
     }),
 
-  create: (packageId: number, data: DeliveryProofCreate) =>
-    api.post<DeliveryProofResponse>(`/proof/${packageId}`, data),
+  create: (trackingId: string, data: DeliveryProofCreate) =>
+    api.post<DeliveryProofResponse>(`/proof/${trackingId}`, data),
 
-  get: (packageId: number) =>
-    api.get<DeliveryProofResponse>(`/proof/${packageId}`),
+  get: (trackingId: string) =>
+    api.get<DeliveryProofResponse>(`/proof/${trackingId}`),
 
-  getPhotoUrl: (packageId: number) =>
-    api.get<{ url: string; expires_in: number }>(`/proof/${packageId}/photo`),
+  getPhotoUrl: (trackingId: string) =>
+    api.get<{ url: string; expires_in: number }>(`/proof/${trackingId}/photo`),
 
-  getSignatureUrl: (packageId: number) =>
-    api.get<{ url: string; expires_in: number }>(`/proof/${packageId}/signature`),
+  getSignatureUrl: (trackingId: string) =>
+    api.get<{ url: string; expires_in: number }>(`/proof/${trackingId}/signature`),
 
   uploadToS3: async (uploadUrl: string, fields: Record<string, string>, file: File): Promise<void> => {
     const formData = new FormData()
@@ -819,8 +822,8 @@ export interface ReportDelayRequest {
 // Tracking API
 export const trackingAPI = {
   // Courier endpoints
-  startTracking: (packageId: number, data?: StartTrackingRequest) =>
-    api.post<TrackingSession>(`/tracking/sessions/${packageId}/start`, data || {}),
+  startTracking: (trackingId: string, data?: StartTrackingRequest) =>
+    api.post<TrackingSession>(`/tracking/sessions/${trackingId}/start`, data || {}),
 
   endTracking: (sessionId: number) =>
     api.post<TrackingSession>(`/tracking/sessions/${sessionId}/end`),
@@ -832,11 +835,11 @@ export const trackingAPI = {
     api.post<TrackingEvent>(`/tracking/sessions/${sessionId}/delay`, data),
 
   // Public/sender endpoints
-  getCurrentLocation: (packageId: number) =>
-    api.get<LocationUpdate>(`/tracking/packages/${packageId}/location`),
+  getCurrentLocation: (trackingId: string) =>
+    api.get<LocationUpdate>(`/tracking/packages/${trackingId}/location`),
 
-  getActiveSession: (packageId: number) =>
-    api.get<TrackingSession>(`/tracking/packages/${packageId}/session`),
+  getActiveSession: (trackingId: string) =>
+    api.get<TrackingSession>(`/tracking/packages/${trackingId}/session`),
 
   getLocationHistory: (sessionId: number, limit: number = 100, since?: string) =>
     api.get<LocationHistory[]>(
@@ -996,7 +999,7 @@ export const analyticsAPI = {
 export type BidStatus = 'pending' | 'selected' | 'rejected' | 'withdrawn' | 'expired'
 
 export interface BidCreate {
-  package_id: number
+  tracking_id: string
   proposed_price: number
   estimated_delivery_hours?: number
   estimated_pickup_time?: string
@@ -1045,8 +1048,8 @@ export const bidsAPI = {
     api.get<BidResponse[]>(`/bids/my-bids${status ? `?status_filter=${status}` : ''}`),
 
   // Get all bids for a package
-  getPackageBids: (packageId: number) =>
-    api.get<PackageBidsResponse>(`/bids/package/${packageId}`),
+  getPackageBids: (trackingId: string) =>
+    api.get<PackageBidsResponse>(`/bids/package/${trackingId}`),
 
   // Courier confirms pickup (transitions package to PENDING_PICKUP)
   confirmPickup: (bidId: number) =>
@@ -1073,10 +1076,10 @@ export interface PackageNoteResponse {
 // Notes API
 export const notesAPI = {
   // Get all notes for a package
-  getPackageNotes: (packageId: number) =>
-    api.get<PackageNoteResponse[]>(`/packages/${packageId}/notes`),
+  getPackageNotes: (trackingId: string) =>
+    api.get<PackageNoteResponse[]>(`/packages/${trackingId}/notes`),
 
   // Add a note to a package
-  addNote: (packageId: number, content: string) =>
-    api.post<PackageNoteResponse>(`/packages/${packageId}/notes`, { content }),
+  addNote: (trackingId: string, content: string) =>
+    api.post<PackageNoteResponse>(`/packages/${trackingId}/notes`, { content }),
 }

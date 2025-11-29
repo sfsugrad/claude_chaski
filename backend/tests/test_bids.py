@@ -17,6 +17,7 @@ from app.models.user import User, UserRole
 from app.models.package import Package, PackageStatus
 from app.models.bid import CourierBid, BidStatus
 from app.utils.auth import get_password_hash, create_access_token
+from app.utils.tracking_id import generate_tracking_id
 
 
 @pytest.fixture
@@ -95,6 +96,7 @@ def both_role_user(db_session):
 def pending_package(db_session, sender_user):
     """Create a pending package."""
     package = Package(
+        tracking_id=generate_tracking_id(),
         sender_id=sender_user.id,
         description="Test package for bidding",
         size="medium",
@@ -119,6 +121,7 @@ def pending_package(db_session, sender_user):
 def bidding_package(db_session, sender_user):
     """Create a package already in bidding status."""
     package = Package(
+        tracking_id=generate_tracking_id(),
         sender_id=sender_user.id,
         description="Package in bidding phase",
         size="small",
@@ -227,6 +230,7 @@ class TestCreateBid:
         """Cannot bid on own package."""
         # Create a package owned by the both-role user
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=both_role_user.id,
             description="Own package",
             size="small",
@@ -283,6 +287,7 @@ class TestCreateBid:
     def test_create_bid_on_delivered_package(self, client, db_session, courier_user, sender_user):
         """Cannot bid on a delivered package."""
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender_user.id,
             description="Delivered package",
             size="small",
@@ -517,6 +522,7 @@ class TestSelectBid:
     def test_select_bid_package_not_bidding(self, client, db_session, sender_user, courier_user):
         """Cannot select bid if package is not open for bids."""
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender_user.id,
             description="Package with bid already selected",
             size="small",
@@ -586,6 +592,7 @@ class TestGetMyBids:
 
         # Create another package for second bid
         package2 = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender_user.id,
             description="Another package",
             size="small",
@@ -773,6 +780,7 @@ class TestConfirmPickup:
     def test_confirm_pickup_wrong_package_status(self, client, db_session, courier_user, sender_user):
         """Cannot confirm pickup if package is not in BID_SELECTED status."""
         package = Package(
+            tracking_id=generate_tracking_id(),
             sender_id=sender_user.id,
             description="Package not in right status",
             size="small",

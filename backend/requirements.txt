@@ -32,6 +32,10 @@ pydantic-settings==2.7.0
 slowapi==0.1.9
 bleach==6.1.0
 
+# Redis and WebSockets
+redis==5.0.1
+websockets==12.0
+
 # Testing (optional)
 pytest==7.4.4
 httpx==0.26.0

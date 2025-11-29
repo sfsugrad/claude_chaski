@@ -14,9 +14,17 @@ from app.routes.notifications import create_notification_with_broadcast
 router = APIRouter()
 
 
+def get_package_by_tracking_id(db: Session, tracking_id: str) -> Package | None:
+    """Get a package by tracking_id, with fallback to numeric ID."""
+    package = db.query(Package).filter(Package.tracking_id == tracking_id).first()
+    if not package and tracking_id.isdigit():
+        package = db.query(Package).filter(Package.id == int(tracking_id)).first()
+    return package
+
+
 # Request/Response Models
 class RatingCreate(BaseModel):
-    package_id: int
+    tracking_id: str
     score: int = Field(..., ge=1, le=5, description="Rating score from 1 to 5")
     comment: str | None = Field(None, max_length=1000, description="Optional review comment")
 
@@ -64,7 +72,7 @@ async def create_rating(
     - One rating per user per package
     """
     # Get the package
-    package = db.query(Package).filter(Package.id == rating_data.package_id).first()
+    package = get_package_by_tracking_id(db, rating_data.tracking_id)
 
     if not package:
         raise HTTPException(
@@ -101,7 +109,7 @@ async def create_rating(
     existing_rating = db.query(Rating).filter(
         and_(
             Rating.rater_id == current_user.id,
-            Rating.package_id == rating_data.package_id
+            Rating.package_id == package.id
         )
     ).first()
 
@@ -115,7 +123,7 @@ async def create_rating(
     new_rating = Rating(
         rater_id=current_user.id,
         rated_user_id=rated_user_id,
-        package_id=rating_data.package_id,
+        package_id=package.id,
         score=rating_data.score,
         comment=rating_data.comment
     )
@@ -243,9 +251,9 @@ async def get_user_rating_summary(
     )
 
 
-@router.get("/package/{package_id}", response_model=list[RatingResponse])
+@router.get("/package/{tracking_id}", response_model=list[RatingResponse])
 async def get_package_ratings(
-    package_id: int,
+    tracking_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -253,7 +261,7 @@ async def get_package_ratings(
     Get all ratings for a specific package (both sender and courier ratings).
     """
     # Verify package exists
-    package = db.query(Package).filter(Package.id == package_id).first()
+    package = get_package_by_tracking_id(db, tracking_id)
     if not package:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -263,7 +271,7 @@ async def get_package_ratings(
     # Get ratings with rater information
     results = db.query(Rating, User.full_name).join(
         User, Rating.rater_id == User.id
-    ).filter(Rating.package_id == package_id).all()
+    ).filter(Rating.package_id == package.id).all()
 
     return [
         RatingResponse(

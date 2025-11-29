@@ -420,6 +420,8 @@ class TestAdminUserToggleActive:
 
     def test_deactivate_user_preserves_data(self, client, db_session, authenticated_admin, authenticated_sender, test_package_data):
         """Test deactivating user preserves their packages and data"""
+        from app.models.package import PackageStatus
+
         # Sender creates a package
         create_response = client.post(
             "/api/packages",
@@ -431,6 +433,11 @@ class TestAdminUserToggleActive:
         # Get sender user
         sender_user = db_session.query(User).filter(User.email == "test@example.com").first()
         user_id = sender_user.id
+
+        # Set package to terminal state (DELIVERED) so user can be deactivated
+        package = db_session.query(Package).filter(Package.id == package_id).first()
+        package.status = PackageStatus.DELIVERED
+        db_session.commit()
 
         # Deactivate sender
         response = client.put(
@@ -541,6 +548,359 @@ class TestAdminUserToggleActive:
         assert users[0].is_active is False
         assert users[1].is_active is False
         assert users[2].is_active is True
+
+    def test_cannot_deactivate_user_with_active_packages_as_sender(
+        self, client, db_session, authenticated_admin, test_user_data, test_package_data
+    ):
+        """Test admin cannot deactivate user who has active packages as sender"""
+        from app.models.package import Package, PackageStatus, PackageSize
+
+        # Create a user
+        client.post("/api/auth/register", json=test_user_data)
+        user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+
+        # Create an active package for this user
+        package = Package(
+            sender_id=user.id,
+            description="Test package",
+            size=PackageSize.SMALL,
+            weight_kg=2.5,
+            pickup_address="123 Main St",
+            pickup_lat=40.7128,
+            pickup_lng=-74.0060,
+            dropoff_address="456 Broadway",
+            dropoff_lat=40.7204,
+            dropoff_lng=-74.0014,
+            status=PackageStatus.OPEN_FOR_BIDS,
+            is_active=True
+        )
+        db_session.add(package)
+        db_session.commit()
+
+        # Try to deactivate user - should fail
+        response = client.put(
+            f"/api/admin/users/{user.id}/toggle-active",
+            json={"is_active": False},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        data = response.json()
+        assert "detail" in data
+        assert "packages_as_sender" in data["detail"]
+        assert package.id in data["detail"]["packages_as_sender"]
+
+        # Verify user is still active
+        db_session.refresh(user)
+        assert user.is_active is True
+
+    def test_cannot_deactivate_user_with_active_packages_as_courier(
+        self, client, db_session, authenticated_admin, test_user_data
+    ):
+        """Test admin cannot deactivate user who has active packages as courier"""
+        from app.models.package import Package, PackageStatus, PackageSize
+        from app.models.user import User, UserRole
+        from app.utils.auth import get_password_hash
+
+        # Create a sender user
+        sender = User(
+            email="sender@test.com",
+            hashed_password=get_password_hash("password"),
+            full_name="Sender User",
+            role=UserRole.SENDER,
+            is_active=True,
+            max_deviation_km=5
+        )
+        db_session.add(sender)
+
+        # Create a courier user
+        courier = User(
+            email="courier@test.com",
+            hashed_password=get_password_hash("password"),
+            full_name="Courier User",
+            role=UserRole.COURIER,
+            is_active=True,
+            max_deviation_km=5
+        )
+        db_session.add(courier)
+        db_session.commit()
+
+        # Create a package assigned to this courier
+        package = Package(
+            sender_id=sender.id,
+            courier_id=courier.id,
+            description="Test package",
+            size=PackageSize.SMALL,
+            weight_kg=2.5,
+            pickup_address="123 Main St",
+            pickup_lat=40.7128,
+            pickup_lng=-74.0060,
+            dropoff_address="456 Broadway",
+            dropoff_lat=40.7204,
+            dropoff_lng=-74.0014,
+            status=PackageStatus.IN_TRANSIT,
+            is_active=True
+        )
+        db_session.add(package)
+        db_session.commit()
+
+        # Try to deactivate courier - should fail
+        response = client.put(
+            f"/api/admin/users/{courier.id}/toggle-active",
+            json={"is_active": False},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        data = response.json()
+        assert "detail" in data
+        assert "packages_as_courier" in data["detail"]
+        assert package.id in data["detail"]["packages_as_courier"]
+
+        # Verify courier is still active
+        db_session.refresh(courier)
+        assert courier.is_active is True
+
+    def test_cannot_deactivate_user_with_packages_in_both_roles(
+        self, client, db_session, authenticated_admin
+    ):
+        """Test deactivation blocked when user has packages as both sender and courier"""
+        from app.models.package import Package, PackageStatus, PackageSize
+        from app.models.user import User, UserRole
+        from app.utils.auth import get_password_hash
+
+        # Create a hybrid user (both sender and courier)
+        hybrid_user = User(
+            email="hybrid@test.com",
+            hashed_password=get_password_hash("password"),
+            full_name="Hybrid User",
+            role=UserRole.BOTH,
+            is_active=True,
+            max_deviation_km=5
+        )
+        db_session.add(hybrid_user)
+
+        # Create another user to be sender for the courier package
+        other_user = User(
+            email="other@test.com",
+            hashed_password=get_password_hash("password"),
+            full_name="Other User",
+            role=UserRole.SENDER,
+            is_active=True,
+            max_deviation_km=5
+        )
+        db_session.add(other_user)
+        db_session.commit()
+
+        # Create package where hybrid is sender
+        package_as_sender = Package(
+            sender_id=hybrid_user.id,
+            description="Package as sender",
+            size=PackageSize.SMALL,
+            weight_kg=2.5,
+            pickup_address="123 Main St",
+            pickup_lat=40.7128,
+            pickup_lng=-74.0060,
+            dropoff_address="456 Broadway",
+            dropoff_lat=40.7204,
+            dropoff_lng=-74.0014,
+            status=PackageStatus.OPEN_FOR_BIDS,
+            is_active=True
+        )
+        db_session.add(package_as_sender)
+
+        # Create package where hybrid is courier
+        package_as_courier = Package(
+            sender_id=other_user.id,
+            courier_id=hybrid_user.id,
+            description="Package as courier",
+            size=PackageSize.MEDIUM,
+            weight_kg=5.0,
+            pickup_address="789 Oak St",
+            pickup_lat=40.7300,
+            pickup_lng=-74.0100,
+            dropoff_address="321 Elm St",
+            dropoff_lat=40.7400,
+            dropoff_lng=-74.0200,
+            status=PackageStatus.IN_TRANSIT,
+            is_active=True
+        )
+        db_session.add(package_as_courier)
+        db_session.commit()
+
+        # Try to deactivate hybrid user - should fail
+        response = client.put(
+            f"/api/admin/users/{hybrid_user.id}/toggle-active",
+            json={"is_active": False},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        data = response.json()
+        assert "detail" in data
+        assert package_as_sender.id in data["detail"]["packages_as_sender"]
+        assert package_as_courier.id in data["detail"]["packages_as_courier"]
+
+    def test_can_deactivate_user_with_only_delivered_packages(
+        self, client, db_session, authenticated_admin, test_user_data
+    ):
+        """Test admin can deactivate user who only has delivered packages"""
+        from app.models.package import Package, PackageStatus, PackageSize
+
+        # Create a user
+        client.post("/api/auth/register", json=test_user_data)
+        user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+
+        # Create a delivered package for this user
+        package = Package(
+            sender_id=user.id,
+            description="Delivered package",
+            size=PackageSize.SMALL,
+            weight_kg=2.5,
+            pickup_address="123 Main St",
+            pickup_lat=40.7128,
+            pickup_lng=-74.0060,
+            dropoff_address="456 Broadway",
+            dropoff_lat=40.7204,
+            dropoff_lng=-74.0014,
+            status=PackageStatus.DELIVERED,
+            is_active=True
+        )
+        db_session.add(package)
+        db_session.commit()
+
+        # Deactivate user - should succeed
+        response = client.put(
+            f"/api/admin/users/{user.id}/toggle-active",
+            json={"is_active": False},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["is_active"] is False
+
+    def test_can_deactivate_user_with_failed_packages(
+        self, client, db_session, authenticated_admin, test_user_data
+    ):
+        """Test admin can deactivate user who has failed packages"""
+        from app.models.package import Package, PackageStatus, PackageSize
+
+        # Create a user
+        client.post("/api/auth/register", json=test_user_data)
+        user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+
+        # Create a failed package for this user
+        package = Package(
+            sender_id=user.id,
+            description="Failed package",
+            size=PackageSize.SMALL,
+            weight_kg=2.5,
+            pickup_address="123 Main St",
+            pickup_lat=40.7128,
+            pickup_lng=-74.0060,
+            dropoff_address="456 Broadway",
+            dropoff_lat=40.7204,
+            dropoff_lng=-74.0014,
+            status=PackageStatus.FAILED,
+            is_active=True
+        )
+        db_session.add(package)
+        db_session.commit()
+
+        # Deactivate user - should succeed
+        response = client.put(
+            f"/api/admin/users/{user.id}/toggle-active",
+            json={"is_active": False},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["is_active"] is False
+
+    @pytest.mark.parametrize("blocking_status", [
+        PackageStatus.NEW,
+        PackageStatus.OPEN_FOR_BIDS,
+        PackageStatus.BID_SELECTED,
+        PackageStatus.PENDING_PICKUP,
+        PackageStatus.IN_TRANSIT,
+    ])
+    def test_deactivation_blocked_per_status(
+        self, client, db_session, authenticated_admin, test_user_data, blocking_status
+    ):
+        """Test deactivation is blocked for each non-terminal status"""
+        from app.models.package import Package, PackageSize
+
+        # Create a user
+        client.post("/api/auth/register", json=test_user_data)
+        user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+
+        # Create a package with the specified status
+        package = Package(
+            sender_id=user.id,
+            description=f"Package in {blocking_status.value}",
+            size=PackageSize.SMALL,
+            weight_kg=2.5,
+            pickup_address="123 Main St",
+            pickup_lat=40.7128,
+            pickup_lng=-74.0060,
+            dropoff_address="456 Broadway",
+            dropoff_lat=40.7204,
+            dropoff_lng=-74.0014,
+            status=blocking_status,
+            is_active=True
+        )
+        db_session.add(package)
+        db_session.commit()
+
+        # Try to deactivate user - should fail
+        response = client.put(
+            f"/api/admin/users/{user.id}/toggle-active",
+            json={"is_active": False},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert package.id in response.json()["detail"]["packages_as_sender"]
+
+    def test_reactivation_not_blocked_by_packages(
+        self, client, db_session, authenticated_admin, test_user_data
+    ):
+        """Test reactivating a user is not blocked by active packages"""
+        from app.models.package import Package, PackageStatus, PackageSize
+
+        # Create a user (inactive)
+        client.post("/api/auth/register", json=test_user_data)
+        user = db_session.query(User).filter(User.email == test_user_data["email"]).first()
+        user.is_active = False
+        db_session.commit()
+
+        # Create an active package for this user
+        package = Package(
+            sender_id=user.id,
+            description="Active package",
+            size=PackageSize.SMALL,
+            weight_kg=2.5,
+            pickup_address="123 Main St",
+            pickup_lat=40.7128,
+            pickup_lng=-74.0060,
+            dropoff_address="456 Broadway",
+            dropoff_lat=40.7204,
+            dropoff_lng=-74.0014,
+            status=PackageStatus.IN_TRANSIT,
+            is_active=True
+        )
+        db_session.add(package)
+        db_session.commit()
+
+        # Reactivate user - should succeed (check only on deactivation)
+        response = client.put(
+            f"/api/admin/users/{user.id}/toggle-active",
+            json={"is_active": True},
+            headers={"Authorization": f"Bearer {authenticated_admin}"}
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["is_active"] is True
 
 
 class TestAdminUserToggleVerified:
