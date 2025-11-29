@@ -39,3 +39,4 @@ wheels/
 
 # Logs
 *.log
+logs/

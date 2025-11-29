@@ -1,0 +1,189 @@
+### Chaski Matching API - REST Client Examples
+### Use this file with REST Client extension in VS Code or JetBrains HTTP Client
+
+@baseUrl = http://localhost:8000
+@token = {{$dotenv TOKEN}}
+
+### ===== AUTHENTICATION =====
+
+### 1. Login as Courier
+# @name login
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "courier@example.com",
+  "password": "yourpassword"
+}
+
+### Extract token from login response
+@authToken = {{login.response.body.access_token}}
+
+### 2. Get Current User Info
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{authToken}}
+
+### ===== COURIER ROUTES =====
+
+### 3. Create a Courier Route
+# @name createRoute
+POST {{baseUrl}}/api/couriers/routes
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "start_address": "San Francisco, CA",
+  "start_lat": 37.7749,
+  "start_lng": -122.4194,
+  "end_address": "San Jose, CA",
+  "end_lat": 37.3382,
+  "end_lng": -121.8863,
+  "max_deviation_km": 10,
+  "departure_time": "2025-12-01T10:00:00Z"
+}
+
+### Extract route ID
+@routeId = {{createRoute.response.body.id}}
+
+### 4. Get My Routes
+GET {{baseUrl}}/api/couriers/routes
+Authorization: Bearer {{authToken}}
+
+### 5. Get Specific Route
+GET {{baseUrl}}/api/couriers/routes/{{routeId}}
+Authorization: Bearer {{authToken}}
+
+### ===== MATCHING ALGORITHM =====
+
+### 6. Find Packages Along Route
+# @name getPackages
+GET {{baseUrl}}/api/matching/packages-along-route/{{routeId}}
+Authorization: Bearer {{authToken}}
+
+### 7. Find Packages Along Route (with specific ID)
+GET {{baseUrl}}/api/matching/packages-along-route/1
+Authorization: Bearer {{authToken}}
+
+### 8. Accept a Package
+# @name acceptPackage
+POST {{baseUrl}}/api/matching/accept-package/15
+Authorization: Bearer {{authToken}}
+
+### 9. Decline a Package
+POST {{baseUrl}}/api/matching/decline-package/15
+Authorization: Bearer {{authToken}}
+
+### 10. Get Optimized Route with All Packages
+GET {{baseUrl}}/api/matching/optimized-route/{{routeId}}
+Authorization: Bearer {{authToken}}
+
+### ===== PACKAGE MANAGEMENT =====
+
+### 11. View My Accepted Packages
+GET {{baseUrl}}/api/packages
+Authorization: Bearer {{authToken}}
+
+### 12. Get Package Details
+GET {{baseUrl}}/api/packages/15
+Authorization: Bearer {{authToken}}
+
+### 13. Update Package Status - Mark as Picked Up
+PUT {{baseUrl}}/api/packages/15/status
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "status": "picked_up"
+}
+
+### 14. Update Package Status - Mark as In Transit
+PUT {{baseUrl}}/api/packages/15/status
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "status": "in_transit"
+}
+
+### 15. Update Package Status - Mark as Delivered
+PUT {{baseUrl}}/api/packages/15/status
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "status": "delivered"
+}
+
+### ===== ERROR CASES =====
+
+### 16. Try to accept package as sender (should fail with 403)
+POST {{baseUrl}}/api/matching/accept-package/15
+Authorization: Bearer {{authToken}}
+
+### 17. Try to accept already matched package (should fail with 400)
+POST {{baseUrl}}/api/matching/accept-package/15
+Authorization: Bearer {{authToken}}
+
+### 18. Try to decline package not assigned to you (should fail with 403)
+POST {{baseUrl}}/api/matching/decline-package/99
+Authorization: Bearer {{authToken}}
+
+### 19. Try to view route without authentication (should fail with 401)
+GET {{baseUrl}}/api/matching/packages-along-route/1
+
+### 20. Try to view non-existent route (should fail with 404)
+GET {{baseUrl}}/api/matching/packages-along-route/99999
+Authorization: Bearer {{authToken}}
+
+### ===== COMPLETE WORKFLOW =====
+
+### 21. Complete Workflow - Create Route and Accept Package
+# Step 1: Create route
+POST {{baseUrl}}/api/couriers/routes
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "start_address": "San Francisco, CA",
+  "start_lat": 37.7749,
+  "start_lng": -122.4194,
+  "end_address": "San Jose, CA",
+  "end_lat": 37.3382,
+  "end_lng": -121.8863,
+  "max_deviation_km": 15
+}
+
+###
+# Step 2: Find packages (use route ID from previous response)
+GET {{baseUrl}}/api/matching/packages-along-route/1
+Authorization: Bearer {{authToken}}
+
+###
+# Step 3: Accept first package (use package_id from previous response)
+POST {{baseUrl}}/api/matching/accept-package/1
+Authorization: Bearer {{authToken}}
+
+###
+# Step 4: Get optimized route
+GET {{baseUrl}}/api/matching/optimized-route/1
+Authorization: Bearer {{authToken}}
+
+###
+# Step 5: Mark as picked up
+PUT {{baseUrl}}/api/packages/1/status
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "status": "picked_up"
+}
+
+###
+# Step 6: Mark as delivered
+PUT {{baseUrl}}/api/packages/1/status
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "status": "delivered"
+}

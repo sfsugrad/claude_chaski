@@ -1,0 +1,170 @@
+[
+  {
+    "rater_id": 3,
+    "rated_user_id": 4,
+    "package_id": 5,
+    "score": 5,
+    "comment": "Excellent service! Mike delivered my package quickly and safely. Highly recommended."
+  },
+  {
+    "rater_id": 4,
+    "rated_user_id": 3,
+    "package_id": 5,
+    "score": 5,
+    "comment": "Jane was very responsive and had the package ready on time. Great sender!"
+  },
+  {
+    "rater_id": 6,
+    "rated_user_id": 7,
+    "package_id": 6,
+    "score": 4,
+    "comment": "Emma handled the large furniture with care. Minor delay but overall good service."
+  },
+  {
+    "rater_id": 7,
+    "rated_user_id": 6,
+    "package_id": 6,
+    "score": 5,
+    "comment": "Alex was super helpful with the furniture pickup. Clear instructions and flexible timing."
+  },
+  {
+    "rater_id": 2,
+    "rated_user_id": 5,
+    "package_id": 7,
+    "score": 3,
+    "comment": "Delivery was okay but took longer than expected. Communication could be improved."
+  },
+  {
+    "rater_id": 5,
+    "rated_user_id": 2,
+    "package_id": 7,
+    "score": 4,
+    "comment": "John had the package ready. Pickup location was a bit hard to find."
+  },
+  {
+    "rater_id": 14,
+    "rated_user_id": 15,
+    "package_id": 17,
+    "score": 5,
+    "comment": "Premium Express lived up to their name. Fast and professional business delivery."
+  },
+  {
+    "rater_id": 15,
+    "rated_user_id": 14,
+    "package_id": 17,
+    "score": 5,
+    "comment": "Business Shipping Co is very organized. All packages were properly labeled and ready."
+  },
+  {
+    "rater_id": 14,
+    "rated_user_id": 15,
+    "package_id": 18,
+    "score": 5,
+    "comment": "Another flawless delivery. Consistent quality service."
+  },
+  {
+    "rater_id": 15,
+    "rated_user_id": 14,
+    "package_id": 18,
+    "score": 5,
+    "comment": "Professional as always. Looking forward to more deliveries."
+  },
+  {
+    "rater_id": 3,
+    "rated_user_id": 9,
+    "package_id": 10,
+    "score": 4,
+    "comment": "Lisa was courteous and delivered on time. Package was in perfect condition."
+  },
+  {
+    "rater_id": 9,
+    "rated_user_id": 3,
+    "package_id": 10,
+    "score": 4,
+    "comment": "Jane is a reliable sender. Good communication throughout."
+  },
+  {
+    "rater_id": 18,
+    "rated_user_id": 13,
+    "package_id": 21,
+    "score": 2,
+    "comment": "Package was delivered late and had minor damage. Disappointing experience."
+  },
+  {
+    "rater_id": 13,
+    "rated_user_id": 18,
+    "package_id": 21,
+    "score": 3,
+    "comment": "Package wasn't well protected. Had to handle it extra carefully."
+  },
+  {
+    "rater_id": 8,
+    "rated_user_id": 4,
+    "package_id": 2,
+    "score": 5,
+    "comment": "Mike is the best courier! Always on time and careful with packages."
+  },
+  {
+    "rater_id": 4,
+    "rated_user_id": 8,
+    "package_id": 2,
+    "score": 5,
+    "comment": "David is a great sender. Package was well-prepared and easy to transport."
+  },
+  {
+    "rater_id": 12,
+    "rated_user_id": 17,
+    "package_id": 11,
+    "score": 4,
+    "comment": "Good delivery for a minimum weight package. Quick and efficient."
+  },
+  {
+    "rater_id": 17,
+    "rated_user_id": 12,
+    "package_id": 11,
+    "score": 5,
+    "comment": "Maria had clear pickup instructions. Great first experience as a sender."
+  },
+  {
+    "rater_id": 2,
+    "rated_user_id": 9,
+    "package_id": 4,
+    "score": 5,
+    "comment": "Lisa handled my gift package perfectly. It arrived in pristine condition."
+  },
+  {
+    "rater_id": 9,
+    "rated_user_id": 2,
+    "package_id": 4,
+    "score": 5,
+    "comment": "John was great - package was beautifully wrapped and ready for pickup."
+  },
+  {
+    "rater_id": 6,
+    "rated_user_id": 5,
+    "package_id": 9,
+    "score": 4,
+    "comment": "Sarah delivered the sports equipment safely. Appreciated the extra care."
+  },
+  {
+    "rater_id": 5,
+    "rated_user_id": 6,
+    "package_id": 9,
+    "score": 4,
+    "comment": "Alex had everything organized. Heavy equipment but well-prepared for transport."
+  },
+  {
+    "rater_id": 3,
+    "rated_user_id": 5,
+    "package_id": 3,
+    "score": 1,
+    "comment": "Very poor service. Electronics were damaged and delivery was late. Never again."
+  },
+  {
+    "rater_id": 5,
+    "rated_user_id": 3,
+    "package_id": 3,
+    "score": 2,
+    "comment": "Package was poorly padded. Had issues during transport."
+  }
+]

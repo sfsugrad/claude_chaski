@@ -1,0 +1,238 @@
+[
+  {
+    "user_id": 2,
+    "package_id": 1,
+    "type": "route_match_found",
+    "message": "We found nearby couriers interested in 'Small envelope with documents'.",
+    "read": false
+  },
+  {
+    "user_id": 3,
+    "package_id": 2,
+    "type": "package_matched",
+    "message": "Courier Mike Courier is matched to 'Medium box with books'.",
+    "read": false
+  },
+  {
+    "user_id": 4,
+    "package_id": 2,
+    "type": "package_accepted",
+    "message": "You accepted pickup for 'Medium box with books' from Jane Sender.",
+    "read": true
+  },
+  {
+    "user_id": 8,
+    "package_id": 3,
+    "type": "package_picked_up",
+    "message": "Sarah Courier picked up 'Large package with electronics' and is en route.",
+    "read": false
+  },
+  {
+    "user_id": 5,
+    "package_id": 3,
+    "type": "package_picked_up",
+    "message": "You confirmed pickup for 'Large package with electronics'.",
+    "read": true
+  },
+  {
+    "user_id": 2,
+    "package_id": 4,
+    "type": "package_in_transit",
+    "message": "Your delivery 'Small gift package' is in transit with Lisa Courier.",
+    "read": false
+  },
+  {
+    "user_id": 3,
+    "package_id": 5,
+    "type": "package_delivered",
+    "message": "'Medium box with clothes' was delivered. Rate your courier when ready.",
+    "read": false
+  },
+  {
+    "user_id": 4,
+    "type": "system",
+    "message": "Reminder: update your availability to get more matches this afternoon.",
+    "read": true
+  },
+  {
+    "user_id": 5,
+    "package_id": 9,
+    "type": "route_match_found",
+    "message": "New package request 'Large box with sports equipment' matches your route.",
+    "read": false
+  },
+  {
+    "user_id": 2,
+    "package_id": 8,
+    "type": "package_cancelled",
+    "message": "'Medium box with medical supplies' was cancelled at sender's request.",
+    "read": true
+  },
+  {
+    "user_id": 5,
+    "package_id": 8,
+    "type": "package_cancelled",
+    "message": "Delivery for 'Medium box with medical supplies' was cancelled before pickup.",
+    "read": false
+  },
+  {
+    "user_id": 1,
+    "type": "system",
+    "message": "System maintenance scheduled tonight at 11 PM UTC.",
+    "read": false
+  },
+  {
+    "user_id": 12,
+    "package_id": 11,
+    "type": "route_match_found",
+    "message": "We found 3 couriers who can deliver your 'Minimum weight test package'.",
+    "read": false
+  },
+  {
+    "user_id": 13,
+    "package_id": 12,
+    "type": "package_matched",
+    "message": "You've been matched with 'Maximum weight test - heavy equipment'.",
+    "read": false
+  },
+  {
+    "user_id": 14,
+    "package_id": 14,
+    "type": "package_accepted",
+    "message": "Premium Express accepted your 'Business documents - batch 1' package.",
+    "read": true
+  },
+  {
+    "user_id": 15,
+    "package_id": 14,
+    "type": "package_accepted",
+    "message": "You accepted 'Business documents - batch 1' from Business Shipping Co.",
+    "read": true
+  },
+  {
+    "user_id": 14,
+    "package_id": 15,
+    "type": "package_picked_up",
+    "message": "'Business documents - batch 2' has been picked up by the courier.",
+    "read": false
+  },
+  {
+    "user_id": 14,
+    "package_id": 16,
+    "type": "package_in_transit",
+    "message": "'Business documents - batch 3' is currently in transit.",
+    "read": false
+  },
+  {
+    "user_id": 14,
+    "package_id": 17,
+    "type": "package_delivered",
+    "message": "'Business documents - batch 4' has been successfully delivered.",
+    "read": true
+  },
+  {
+    "user_id": 16,
+    "package_id": 19,
+    "type": "route_match_found",
+    "message": "Welcome! We found couriers for your first package 'First package - new sender'.",
+    "read": false
+  },
+  {
+    "user_id": 17,
+    "type": "system",
+    "message": "Welcome to Chaski! Complete your profile to start accepting deliveries.",
+    "read": false
+  },
+  {
+    "user_id": 18,
+    "package_id": 21,
+    "type": "package_matched",
+    "message": "Your package 'Frequent user package 1' has been matched with a courier.",
+    "read": true
+  },
+  {
+    "user_id": 18,
+    "package_id": 22,
+    "type": "package_picked_up",
+    "message": "'Frequent user package 2' has been picked up.",
+    "read": true
+  },
+  {
+    "user_id": 18,
+    "package_id": 23,
+    "type": "package_in_transit",
+    "message": "'Frequent user package 3' is on its way to the destination.",
+    "read": false
+  },
+  {
+    "user_id": 3,
+    "package_id": 24,
+    "type": "package_declined",
+    "message": "A courier declined 'Fragile artwork - handle with care'. Looking for another match.",
+    "read": false
+  },
+  {
+    "user_id": 4,
+    "package_id": 24,
+    "type": "package_declined",
+    "message": "You declined 'Fragile artwork - handle with care' from Jane Sender.",
+    "read": true
+  },
+  {
+    "user_id": 8,
+    "package_id": 25,
+    "type": "route_match_found",
+    "message": "Your route matches 'Time-sensitive legal documents - rush delivery'.",
+    "read": false
+  },
+  {
+    "user_id": 1,
+    "type": "system",
+    "message": "New feature: You can now track packages in real-time on the map.",
+    "read": false
+  },
+  {
+    "user_id": 1,
+    "type": "system",
+    "message": "15 new users registered this week. Platform growth is on track.",
+    "read": true
+  },
+  {
+    "user_id": 6,
+    "package_id": 6,
+    "type": "package_delivered",
+    "message": "'Extra large furniture piece' has been delivered successfully.",
+    "read": true
+  },
+  {
+    "user_id": 7,
+    "package_id": 6,
+    "type": "package_delivered",
+    "message": "You completed delivery of 'Extra large furniture piece'. Great job!",
+    "read": true
+  },
+  {
+    "user_id": 9,
+    "type": "system",
+    "message": "Your courier rating has increased to 4.8 stars!",
+    "read": false
+  },
+  {
+    "user_id": 5,
+    "type": "system",
+    "message": "Tip: Enable push notifications to get instant updates on your deliveries.",
+    "read": true
+  },
+  {
+    "user_id": 13,
+    "type": "system",
+    "message": "You've completed 10 deliveries. Keep up the excellent work!",
+    "read": false
+  },
+  {
+    "user_id": 15,
+    "type": "system",
+    "message": "Your premium courier status has been renewed for another month.",
+    "read": true
+  }
+]

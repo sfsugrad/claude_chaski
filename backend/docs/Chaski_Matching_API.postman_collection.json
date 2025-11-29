@@ -1,0 +1,582 @@
+{
+  "info": {
+    "name": "Chaski Matching API",
+    "description": "Complete API collection for the Chaski matching algorithm endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "routeId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "packageId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login as Courier",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('token', response.access_token);",
+                  "    console.log('Token saved:', response.access_token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"courier@example.com\",\n  \"password\": \"yourpassword\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Courier Routes",
+      "item": [
+        {
+          "name": "Create Courier Route",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('routeId', response.id);",
+                  "    console.log('Route ID saved:', response.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"start_address\": \"San Francisco, CA\",\n  \"start_lat\": 37.7749,\n  \"start_lng\": -122.4194,\n  \"end_address\": \"San Jose, CA\",\n  \"end_lat\": 37.3382,\n  \"end_lng\": -121.8863,\n  \"max_deviation_km\": 10,\n  \"departure_time\": \"2025-12-01T10:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/couriers/routes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "couriers", "routes"]
+            }
+          }
+        },
+        {
+          "name": "Get My Routes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/couriers/routes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "couriers", "routes"]
+            }
+          }
+        },
+        {
+          "name": "Get Specific Route",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/couriers/routes/{{routeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "couriers", "routes", "{{routeId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Matching Algorithm",
+      "item": [
+        {
+          "name": "Find Packages Along Route",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const packages = pm.response.json();",
+                  "    if (packages.length > 0) {",
+                  "        pm.collectionVariables.set('packageId', packages[0].package_id);",
+                  "        console.log('Package ID saved:', packages[0].package_id);",
+                  "        console.log('Found packages:', packages.length);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/matching/packages-along-route/{{routeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "matching", "packages-along-route", "{{routeId}}"]
+            }
+          }
+        },
+        {
+          "name": "Accept Package",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/matching/accept-package/{{packageId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "matching", "accept-package", "{{packageId}}"]
+            }
+          }
+        },
+        {
+          "name": "Decline Package",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/matching/decline-package/{{packageId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "matching", "decline-package", "{{packageId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Optimized Route",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/matching/optimized-route/{{routeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "matching", "optimized-route", "{{routeId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Package Management",
+      "item": [
+        {
+          "name": "Get My Packages",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/packages",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "packages"]
+            }
+          }
+        },
+        {
+          "name": "Get Package Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/packages/{{packageId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "packages", "{{packageId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Status - Picked Up",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"picked_up\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/packages/{{packageId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "packages", "{{packageId}}", "status"]
+            }
+          }
+        },
+        {
+          "name": "Update Status - In Transit",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"in_transit\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/packages/{{packageId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "packages", "{{packageId}}", "status"]
+            }
+          }
+        },
+        {
+          "name": "Update Status - Delivered",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"delivered\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/packages/{{packageId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "packages", "{{packageId}}", "status"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Complete Workflow",
+      "item": [
+        {
+          "name": "1. Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const response = pm.response.json();",
+                  "pm.collectionVariables.set('token', response.access_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"courier@example.com\",\n  \"password\": \"yourpassword\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "2. Create Route",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const response = pm.response.json();",
+                  "pm.collectionVariables.set('routeId', response.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"start_address\": \"San Francisco, CA\",\n  \"start_lat\": 37.7749,\n  \"start_lng\": -122.4194,\n  \"end_address\": \"San Jose, CA\",\n  \"end_lat\": 37.3382,\n  \"end_lng\": -121.8863,\n  \"max_deviation_km\": 15\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/couriers/routes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "couriers", "routes"]
+            }
+          }
+        },
+        {
+          "name": "3. Find Packages",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const packages = pm.response.json();",
+                  "if (packages.length > 0) {",
+                  "    pm.collectionVariables.set('packageId', packages[0].package_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/matching/packages-along-route/{{routeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "matching", "packages-along-route", "{{routeId}}"]
+            }
+          }
+        },
+        {
+          "name": "4. Accept Package",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/matching/accept-package/{{packageId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "matching", "accept-package", "{{packageId}}"]
+            }
+          }
+        },
+        {
+          "name": "5. Get Optimized Route",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/matching/optimized-route/{{routeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "matching", "optimized-route", "{{routeId}}"]
+            }
+          }
+        },
+        {
+          "name": "6. Mark Picked Up",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"picked_up\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/packages/{{packageId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "packages", "{{packageId}}", "status"]
+            }
+          }
+        },
+        {
+          "name": "7. Mark In Transit",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"in_transit\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/packages/{{packageId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "packages", "{{packageId}}", "status"]
+            }
+          }
+        },
+        {
+          "name": "8. Mark Delivered",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"delivered\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/packages/{{packageId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "packages", "{{packageId}}", "status"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

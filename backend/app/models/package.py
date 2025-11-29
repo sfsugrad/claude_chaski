@@ -5,12 +5,14 @@ from app.models.base import Base
 import enum
 
 class PackageStatus(str, enum.Enum):
-    PENDING = "pending"          # Package created, waiting for courier
-    MATCHED = "matched"          # Matched with a courier
-    PICKED_UP = "picked_up"      # Courier picked up the package
-    IN_TRANSIT = "in_transit"    # Package in transit
-    DELIVERED = "delivered"      # Package delivered
-    CANCELLED = "cancelled"      # Package delivery cancelled
+    NEW = "NEW"                      # Just created, auto-transitions to OPEN_FOR_BIDS
+    OPEN_FOR_BIDS = "OPEN_FOR_BIDS"  # Shown to couriers, accepting offers
+    BID_SELECTED = "BID_SELECTED"    # Sender chose a courier from bids
+    PENDING_PICKUP = "PENDING_PICKUP"  # Courier confirmed, awaiting pickup
+    IN_TRANSIT = "IN_TRANSIT"        # Courier confirmed pickup, package in transit
+    DELIVERED = "DELIVERED"          # Package delivered (terminal)
+    CANCELED = "CANCELED"            # Sender canceled or expired (terminal)
+    FAILED = "FAILED"                # Pickup/delivery failed (admin can retry)
 
 class PackageSize(str, enum.Enum):
     SMALL = "small"      # < 5kg, fits in a bag
@@ -22,6 +24,7 @@ class Package(Base):
     __tablename__ = "packages"
 
     id = Column(Integer, primary_key=True, index=True)
+    tracking_id = Column(String(19), unique=True, index=True, nullable=False)  # Format: xxxx-xxxx-xxxx-xxxx
     sender_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     courier_id = Column(Integer, ForeignKey("users.id"), nullable=True)
 
@@ -45,8 +48,12 @@ class Package(Base):
     dropoff_contact_phone = Column(String)
 
     # Status and pricing
-    status = Column(SQLEnum(PackageStatus), default=PackageStatus.PENDING)
+    status = Column(SQLEnum(PackageStatus), default=PackageStatus.NEW)
     price = Column(Float)  # Price sender is willing to pay
+    is_active = Column(Boolean, default=True)  # Soft delete flag
+
+    # Delivery proof configuration
+    requires_proof = Column(Boolean, default=True, nullable=False)
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -54,12 +61,26 @@ class Package(Base):
     pickup_time = Column(DateTime(timezone=True), nullable=True)
     delivery_time = Column(DateTime(timezone=True), nullable=True)
 
+    # Status transition timestamps
+    status_changed_at = Column(DateTime(timezone=True), nullable=True)
+    bid_selected_at = Column(DateTime(timezone=True), nullable=True)
+    pending_pickup_at = Column(DateTime(timezone=True), nullable=True)
+    in_transit_at = Column(DateTime(timezone=True), nullable=True)
+    failed_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Bidding fields
+    bid_deadline = Column(DateTime(timezone=True), nullable=True)
+    selected_bid_id = Column(Integer, ForeignKey("courier_bids.id", ondelete="SET NULL", use_alter=True), nullable=True)
+    bid_count = Column(Integer, default=0, nullable=False)
+    deadline_extensions = Column(Integer, default=0, nullable=False)  # Track extensions (max 2)
+    deadline_warning_sent = Column(Boolean, default=False, nullable=False)  # Track if 6-hour warning sent
+
     # Relationships
     # sender = relationship("User", foreign_keys=[sender_id])
     # courier = relationship("User", foreign_keys=[courier_id])
 
     def __repr__(self):
-        return f"<Package {self.id} - {self.status}>"
+        return f"<Package {self.tracking_id} - {self.status}>"
 
 
 class CourierRoute(Base):
@@ -81,6 +102,7 @@ class CourierRoute(Base):
     # Route preferences
     max_deviation_km = Column(Integer, default=5)
     departure_time = Column(DateTime(timezone=True))
+    trip_date = Column(DateTime(timezone=True), nullable=True)  # Date of the trip
 
     # Status
     is_active = Column(Boolean, default=True)

@@ -1,20 +1,52 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
+from typing import Optional
 from app.database import get_db
 from app.models.user import User
 from app.utils.auth import verify_token
 
-# Security scheme for JWT bearer token
-security = HTTPBearer()
+# Security scheme for JWT bearer token (kept for backward compatibility)
+security = HTTPBearer(auto_error=False)
+
+# Cookie name must match auth.py
+COOKIE_NAME = "access_token"
+
+
+def get_token_from_request(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+) -> str:
+    """
+    Extract JWT token from httpOnly cookie or Authorization header.
+
+    Priority: Cookie > Authorization header
+    """
+    # First, try to get token from httpOnly cookie
+    token = request.cookies.get(COOKIE_NAME)
+    if token:
+        return token
+
+    # Fallback to Authorization header for backward compatibility
+    if credentials and credentials.credentials:
+        return credentials.credentials
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Not authenticated",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db)
 ) -> User:
     """
     Dependency to get the current authenticated user from JWT token.
+
+    Reads token from httpOnly cookie or Authorization header.
 
     Raises:
         HTTPException: If token is invalid or user not found
@@ -28,8 +60,8 @@ def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    # Extract token from credentials
-    token = credentials.credentials
+    # Extract token from cookie or header
+    token = get_token_from_request(request, credentials)
 
     # Verify and decode token
     payload = verify_token(token)
@@ -63,4 +95,28 @@ def get_current_active_user(
     Dependency to get the current active user.
     This is an alias for get_current_user since we already check is_active.
     """
+    return current_user
+
+
+def get_current_admin_user(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """
+    Dependency to get the current admin user.
+    Ensures the user has ADMIN role.
+
+    Raises:
+        HTTPException: If user is not an admin
+
+    Returns:
+        User: The authenticated admin user
+    """
+    from app.models.user import UserRole
+
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required"
+        )
+
     return current_user
