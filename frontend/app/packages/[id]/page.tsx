@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
-import { authAPI, adminAPI, packagesAPI, ratingsAPI, RatingResponse, messagesAPI, MessageResponse, matchingAPI, bidsAPI } from '@/lib/api'
+import { authAPI, adminAPI, packagesAPI, ratingsAPI, RatingResponse, messagesAPI, MessageResponse, matchingAPI, bidsAPI, notesAPI, PackageNoteResponse } from '@/lib/api'
 import StarRating from '@/components/StarRating'
 import RatingModal from '@/components/RatingModal'
 import ChatWindow from '@/components/ChatWindow'
@@ -81,6 +81,10 @@ export default function PackageDetailPage() {
   const [otherUserName, setOtherUserName] = useState<string>('')
   const [acceptingPackage, setAcceptingPackage] = useState(false)
   const [showBidOptionsModal, setShowBidOptionsModal] = useState(false)
+  const [notes, setNotes] = useState<PackageNoteResponse[]>([])
+  const [showNotes, setShowNotes] = useState(false)
+  const [newNoteContent, setNewNoteContent] = useState('')
+  const [submittingNote, setSubmittingNote] = useState(false)
 
   // Handle incoming WebSocket messages
   const handleMessageReceived = useCallback((message: MessageResponse) => {
@@ -146,6 +150,20 @@ export default function PackageDetailPage() {
       } catch (err) {
         // Not critical, messages might not be accessible
         console.error('Error loading messages:', err)
+      }
+
+      // Load notes - sender/admin can view anytime, courier only when assigned
+      const isSender = packageData.sender_id === userResponse.data.id
+      const isCourier = packageData.courier_id === userResponse.data.id
+      const isAdmin = userResponse.data.role === 'admin' || userResponse.data.role === 'ADMIN'
+
+      if (isSender || isAdmin || isCourier) {
+        try {
+          const notesResponse = await notesAPI.getPackageNotes(parseInt(packageId))
+          setNotes(notesResponse.data)
+        } catch (err) {
+          console.error('Error loading notes:', err)
+        }
       }
 
       // Load package ratings if delivered
@@ -315,6 +333,45 @@ export default function PackageDetailPage() {
       setPackageRatings(ratingsResponse.data)
     } catch (err) {
       console.error('Error reloading ratings:', err)
+    }
+  }
+
+  const handleAddNote = async () => {
+    if (!newNoteContent.trim() || !pkg) return
+
+    setSubmittingNote(true)
+    try {
+      const response = await notesAPI.addNote(pkg.id, newNoteContent.trim())
+      setNotes([...notes, response.data])
+      setNewNoteContent('')
+    } catch (err: any) {
+      console.error('Error adding note:', err)
+      const errorMessage = err.response?.data?.detail || 'Failed to add note'
+      alert(errorMessage)
+    } finally {
+      setSubmittingNote(false)
+    }
+  }
+
+  const getAuthorTypeLabel = (authorType: string) => {
+    const labels: { [key: string]: string } = {
+      SENDER: 'Sender',
+      COURIER: 'Courier',
+      SYSTEM: 'System'
+    }
+    return labels[authorType] || authorType
+  }
+
+  const getAuthorTypeBadgeVariant = (authorType: string): 'primary' | 'success' | 'secondary' => {
+    switch (authorType) {
+      case 'SENDER':
+        return 'primary'
+      case 'COURIER':
+        return 'success'
+      case 'SYSTEM':
+        return 'secondary'
+      default:
+        return 'secondary'
     }
   }
 
@@ -800,6 +857,112 @@ export default function PackageDetailPage() {
                     otherUserName={otherUserName || (currentUser.id === pkg.sender_id ? 'Courier' : 'Sender')}
                     className="rounded-none border-0"
                   />
+                </div>
+              )}
+            </Card>
+          </SlideIn>
+        )}
+
+        {/* Notes Section - Show for sender/admin anytime, courier only when assigned */}
+        {currentUser && pkg && (
+          currentUser.id === pkg.sender_id ||
+          currentUser.role === 'admin' || currentUser.role === 'ADMIN' ||
+          (pkg.courier_id && currentUser.id === pkg.courier_id)
+        ) && (
+          <SlideIn direction="up" delay={375}>
+            <Card className="mt-6 overflow-hidden">
+              <button
+                onClick={() => setShowNotes(!showNotes)}
+                className="w-full p-4 flex items-center justify-between hover:bg-surface-50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <svg className="w-6 h-6 text-warning-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span className="text-lg font-bold text-surface-900">
+                    Package Notes
+                  </span>
+                  {notes.length > 0 && (
+                    <Badge variant="secondary" size="sm">
+                      {notes.length}
+                    </Badge>
+                  )}
+                </div>
+                <svg
+                  className={`w-5 h-5 text-surface-400 transition-transform ${showNotes ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {showNotes && (
+                <div className="border-t border-surface-200 p-4">
+                  {/* Notes List */}
+                  {notes.length === 0 ? (
+                    <p className="text-surface-500 text-center py-4">No notes yet. Add the first note below.</p>
+                  ) : (
+                    <div className="space-y-3 mb-4 max-h-64 overflow-y-auto">
+                      {notes.map((note) => (
+                        <div key={note.id} className="bg-surface-50 rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <Badge variant={getAuthorTypeBadgeVariant(note.author_type)} size="sm">
+                                {getAuthorTypeLabel(note.author_type)}
+                              </Badge>
+                              {note.author_name && (
+                                <span className="text-sm font-medium text-surface-700">
+                                  {note.author_name}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-xs text-surface-400">
+                              {new Date(note.created_at).toLocaleString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          </div>
+                          <p className="text-surface-800 text-sm whitespace-pre-wrap">{note.content}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Add Note Form - sender/admin can add anytime, courier only when assigned */}
+                  {(
+                    currentUser.id === pkg.sender_id ||
+                    currentUser.role === 'admin' || currentUser.role === 'ADMIN' ||
+                    (pkg.courier_id && currentUser.id === pkg.courier_id)
+                  ) && (
+                    <div className={notes.length > 0 ? "border-t border-surface-200 pt-4" : ""}>
+                      <div className="flex gap-2">
+                        <textarea
+                          value={newNoteContent}
+                          onChange={(e) => setNewNoteContent(e.target.value)}
+                          placeholder="Add a note..."
+                          className="flex-1 border border-surface-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+                          rows={2}
+                          maxLength={1000}
+                        />
+                        <Button
+                          variant="primary"
+                          onClick={handleAddNote}
+                          disabled={!newNoteContent.trim() || submittingNote}
+                          className="self-end"
+                        >
+                          {submittingNote ? 'Adding...' : 'Add'}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-surface-400 mt-1 text-right">
+                        {newNoteContent.length}/1000
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </Card>

@@ -30,6 +30,7 @@ class NotificationType(str, enum.Enum):
     BID_DEADLINE_WARNING = "BID_DEADLINE_WARNING"  # Sender: 6 hours left to select a bid
     BID_DEADLINE_EXTENDED = "BID_DEADLINE_EXTENDED"  # Sender: deadline extended by 12 hours
     BID_DEADLINE_EXPIRED = "BID_DEADLINE_EXPIRED"  # All parties: bidding period ended
+    NEW_NOTE_ADDED = "NEW_NOTE_ADDED"  # Sender/Courier: new note added to their package
     SYSTEM = "SYSTEM"
 
 

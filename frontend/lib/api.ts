@@ -269,6 +269,8 @@ export type NotificationType =
   | 'bid_deadline_warning'
   | 'bid_deadline_extended'
   | 'bid_deadline_expired'
+  // Package notes
+  | 'new_note_added'
   | 'system'
 
 export interface NotificationResponse {
@@ -1030,4 +1032,32 @@ export const bidsAPI = {
   // Courier confirms pickup (transitions package to PENDING_PICKUP)
   confirmPickup: (bidId: number) =>
     api.post(`/bids/${bidId}/confirm-pickup`),
+}
+
+// Package Note Types
+export type NoteAuthorType = 'SENDER' | 'COURIER' | 'SYSTEM'
+
+export interface NoteCreate {
+  content: string
+}
+
+export interface PackageNoteResponse {
+  id: number
+  package_id: number
+  author_id: number | null
+  author_type: NoteAuthorType
+  author_name: string | null
+  content: string
+  created_at: string
+}
+
+// Notes API
+export const notesAPI = {
+  // Get all notes for a package
+  getPackageNotes: (packageId: number) =>
+    api.get<PackageNoteResponse[]>(`/packages/${packageId}/notes`),
+
+  // Add a note to a package
+  addNote: (packageId: number, content: string) =>
+    api.post<PackageNoteResponse>(`/packages/${packageId}/notes`, { content }),
 }

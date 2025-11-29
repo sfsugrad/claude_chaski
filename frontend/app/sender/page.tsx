@@ -336,48 +336,99 @@ function PackageCard({ pkg, onCancel, cancelling, canCancel }: PackageCardProps)
 
   return (
     <Card className="overflow-hidden">
-      {/* Status Progress Bar */}
-      {!isCanceled && currentStep >= 0 && (
-        <div className="bg-surface-100 px-6 py-3">
-          <div className="flex items-center justify-between">
-            {STATUS_ORDER.map((status, index) => {
-              const isCompleted = index <= currentStep
-              const isCurrent = index === currentStep
-              const config = STATUS_CONFIG[status]
+      {/* Status Progress Bar - show for all packages */}
+      <div className={`px-6 py-3 ${isCanceled ? 'bg-surface-50' : 'bg-surface-100'}`}>
+        <div className="flex items-center justify-between">
+          {STATUS_ORDER.map((status, index) => {
+            // For canceled packages, determine last completed step based on package state
+            // STATUS_ORDER: 0=new, 1=open_for_bids, 2=bid_selected, 3=pending_pickup, 4=in_transit, 5=delivered
+            let lastCompletedBeforeCancel = -1
+            if (isCanceled) {
+              if (pkg.courier_id) {
+                // Courier was assigned, so at least bid_selected (index 2) was completed
+                // Check for further progress using timestamps
+                if (pkg.in_transit_at) {
+                  lastCompletedBeforeCancel = 4 // in_transit
+                } else if (pkg.picked_up_at) {
+                  lastCompletedBeforeCancel = 3 // pending_pickup (package was picked up)
+                } else {
+                  lastCompletedBeforeCancel = 2 // bid_selected
+                }
+              } else if (pkg.bid_deadline) {
+                // Package was opened for bids (has a bid deadline)
+                lastCompletedBeforeCancel = 1 // open_for_bids
+              } else {
+                // Package was canceled at 'new' status
+                lastCompletedBeforeCancel = 0 // new
+              }
+            }
 
-              return (
-                <div key={status} className="flex items-center flex-1">
-                  <div className="flex flex-col items-center">
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all duration-300 ${
-                        isCompleted
-                          ? 'bg-primary-600 text-white'
-                          : 'bg-surface-300 text-surface-500'
-                      } ${isCurrent ? 'ring-2 ring-primary-300 ring-offset-2' : ''}`}
-                    >
-                      {isCompleted ? '✓' : index + 1}
-                    </div>
-                    <span
-                      className={`text-xs mt-1 ${
-                        isCompleted ? 'text-primary-600 font-medium' : 'text-surface-500'
-                      }`}
-                    >
-                      {config.label}
-                    </span>
+            const isCompleted = isCanceled
+              ? index <= lastCompletedBeforeCancel
+              : index <= currentStep
+            const isCurrent = !isCanceled && index === currentStep
+            const isLastBeforeCancel = isCanceled && index === lastCompletedBeforeCancel
+            const config = STATUS_CONFIG[status]
+
+            return (
+              <div key={status} className="flex items-center flex-1">
+                <div className="flex flex-col items-center">
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all duration-300 ${
+                      isCompleted
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-surface-300 text-surface-500'
+                    } ${isCurrent ? 'ring-2 ring-primary-300 ring-offset-2' : ''} ${
+                      isLastBeforeCancel ? 'ring-2 ring-primary-300 ring-offset-2' : ''
+                    }`}
+                  >
+                    {isCompleted ? '✓' : index + 1}
                   </div>
-                  {index < STATUS_ORDER.length - 1 && (
-                    <div
-                      className={`flex-1 h-1 mx-2 transition-all duration-300 ${
-                        index < currentStep ? 'bg-primary-600' : 'bg-surface-300'
-                      }`}
-                    />
-                  )}
+                  <span
+                    className={`text-xs mt-1 ${
+                      isCompleted ? 'text-primary-600 font-medium' : 'text-surface-500'
+                    }`}
+                  >
+                    {config.label}
+                  </span>
                 </div>
-              )
-            })}
-          </div>
+                {index < STATUS_ORDER.length - 1 && (
+                  <div
+                    className={`flex-1 h-1 mx-2 transition-all duration-300 ${
+                      isCompleted && index < (isCanceled ? lastCompletedBeforeCancel : currentStep)
+                        ? 'bg-primary-600'
+                        : 'bg-surface-300'
+                    }`}
+                  />
+                )}
+              </div>
+            )
+          })}
+
+          {/* Canceled/Failed indicator at the end of progress bar */}
+          {isCanceled && (
+            <>
+              <div className={`flex-1 h-1 mx-2 ${
+                normalizedStatus === 'canceled' ? 'bg-red-300' : 'bg-orange-300'
+              }`} />
+              <div className="flex flex-col items-center">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${
+                  normalizedStatus === 'canceled'
+                    ? 'bg-red-500 text-white ring-2 ring-red-300 ring-offset-1'
+                    : 'bg-orange-500 text-white ring-2 ring-orange-300 ring-offset-1'
+                }`}>
+                  {normalizedStatus === 'canceled' ? '✕' : '!'}
+                </div>
+                <span className={`text-xs mt-1 font-medium ${
+                  normalizedStatus === 'canceled' ? 'text-red-600' : 'text-orange-600'
+                }`}>
+                  {statusConfig.label}
+                </span>
+              </div>
+            </>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Package Content */}
       <div className="p-6">
