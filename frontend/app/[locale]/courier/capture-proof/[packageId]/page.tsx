@@ -9,6 +9,7 @@ import { Select } from '@/components/ui/Select'
 import { Alert } from '@/components/ui/Alert'
 import { PhotoCapture, SignaturePad } from '@/components/proof'
 import { packagesAPI, proofAPI, DeliveryProofCreate, PackageResponse } from '@/lib/api'
+import CourierVerificationGuard from '@/components/CourierVerificationGuard'
 
 type ProofStep = 'photo' | 'signature' | 'details' | 'confirm'
 
@@ -21,7 +22,7 @@ const RECIPIENT_RELATIONSHIPS = [
   { value: 'other', label: 'Other' },
 ]
 
-export default function CaptureProofPage() {
+function CaptureProofContent() {
   const params = useParams()
   const router = useRouter()
   const packageId = parseInt(params.packageId as string, 10)
@@ -457,5 +458,13 @@ export default function CaptureProofPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function CaptureProofPage() {
+  return (
+    <CourierVerificationGuard>
+      <CaptureProofContent />
+    </CourierVerificationGuard>
   )
 }

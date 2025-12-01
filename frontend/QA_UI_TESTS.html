@@ -1,0 +1,2134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chaski Frontend QA UI Manual Test Plan</title>
+    <style>
+        :root {
+            --primary: #3B82F6;
+            --primary-dark: #1E40AF;
+            --secondary: #10B981;
+            --warning: #F59E0B;
+            --error: #EF4444;
+            --gray-50: #F9FAFB;
+            --gray-100: #F3F4F6;
+            --gray-200: #E5E7EB;
+            --gray-300: #D1D5DB;
+            --gray-500: #6B7280;
+            --gray-700: #374151;
+            --gray-900: #111827;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--gray-700);
+            background: var(--gray-50);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 3rem 2rem;
+            margin-bottom: 2rem;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 2rem;
+            margin-top: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .stat {
+            background: rgba(255,255,255,0.15);
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            opacity: 0.9;
+        }
+
+        nav.toc {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        nav.toc h2 {
+            color: var(--gray-900);
+            margin-bottom: 1rem;
+            font-size: 1.25rem;
+        }
+
+        nav.toc ul {
+            list-style: none;
+            columns: 2;
+            column-gap: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            nav.toc ul {
+                columns: 1;
+            }
+        }
+
+        nav.toc li {
+            margin-bottom: 0.5rem;
+        }
+
+        nav.toc a {
+            color: var(--primary);
+            text-decoration: none;
+            font-size: 0.95rem;
+        }
+
+        nav.toc a:hover {
+            text-decoration: underline;
+        }
+
+        section {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        section h2 {
+            color: var(--gray-900);
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid var(--primary);
+        }
+
+        section h3 {
+            color: var(--gray-900);
+            font-size: 1.15rem;
+            margin: 1.5rem 0 1rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.9rem;
+        }
+
+        th, td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        th {
+            background: var(--gray-100);
+            font-weight: 600;
+            color: var(--gray-900);
+            position: sticky;
+            top: 0;
+        }
+
+        tr:hover {
+            background: var(--gray-50);
+        }
+
+        .test-id {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--primary);
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-critical {
+            background: #FEE2E2;
+            color: #991B1B;
+        }
+
+        .badge-high {
+            background: #FEF3C7;
+            color: #92400E;
+        }
+
+        .badge-medium {
+            background: #DBEAFE;
+            color: #1E40AF;
+        }
+
+        .badge-low {
+            background: #D1FAE5;
+            color: #065F46;
+        }
+
+        .info-box {
+            background: var(--gray-100);
+            border-left: 4px solid var(--primary);
+            padding: 1rem 1.5rem;
+            margin: 1rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .info-box.warning {
+            border-color: var(--warning);
+            background: #FFFBEB;
+        }
+
+        .info-box.success {
+            border-color: var(--secondary);
+            background: #ECFDF5;
+        }
+
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--gray-100);
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+
+        pre {
+            background: var(--gray-900);
+            color: #E5E7EB;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            margin: 1rem 0;
+        }
+
+        .checkbox-list {
+            list-style: none;
+        }
+
+        .checkbox-list li {
+            padding: 0.5rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .checkbox-list input[type="checkbox"] {
+            width: 1.25rem;
+            height: 1.25rem;
+            accent-color: var(--primary);
+        }
+
+        .test-table-container {
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+
+        .priority-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .print-button {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .print-button:hover {
+            background: var(--primary-dark);
+        }
+
+        @media print {
+            .print-button {
+                display: none;
+            }
+
+            section {
+                break-inside: avoid;
+                box-shadow: none;
+                border: 1px solid var(--gray-200);
+            }
+
+            header {
+                background: var(--primary);
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+
+        .expand-collapse {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .expand-collapse::before {
+            content: '▼ ';
+            font-size: 0.75rem;
+        }
+
+        .expand-collapse.collapsed::before {
+            content: '▶ ';
+        }
+
+        .collapsible-content.hidden {
+            display: none;
+        }
+
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--gray-500);
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Chaski Frontend QA UI Manual Test Plan</h1>
+            <p>Comprehensive manual UI test cases for the Chaski logistics platform frontend</p>
+            <div class="stats-bar">
+                <div class="stat">
+                    <div class="stat-value">250+</div>
+                    <div class="stat-label">Test Cases</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">20</div>
+                    <div class="stat-label">Test Sections</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">4</div>
+                    <div class="stat-label">Priority Tiers</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <nav class="toc">
+            <h2>Table of Contents</h2>
+            <ul>
+                <li><a href="#section-1">1. Test Environment Setup</a></li>
+                <li><a href="#section-2">2. Authentication Tests</a></li>
+                <li><a href="#section-3">3. Registration Tests</a></li>
+                <li><a href="#section-4">4. Dashboard Tests</a></li>
+                <li><a href="#section-5">5. Sender Features Tests</a></li>
+                <li><a href="#section-6">6. Courier Features Tests</a></li>
+                <li><a href="#section-7">7. Package Lifecycle Tests</a></li>
+                <li><a href="#section-8">8. Bidding System Tests</a></li>
+                <li><a href="#section-9">9. Messaging Tests</a></li>
+                <li><a href="#section-10">10. Notifications Tests</a></li>
+                <li><a href="#section-11">11. Ratings & Reviews Tests</a></li>
+                <li><a href="#section-12">12. Admin Panel Tests</a></li>
+                <li><a href="#section-13">13. ID Verification Tests</a></li>
+                <li><a href="#section-14">14. Delivery Proof Tests</a></li>
+                <li><a href="#section-15">15. Internationalization (i18n) Tests</a></li>
+                <li><a href="#section-16">16. Responsive Design Tests</a></li>
+                <li><a href="#section-17">17. Error Handling Tests</a></li>
+                <li><a href="#section-18">18. Security Tests</a></li>
+                <li><a href="#section-19">19. Performance & UX Tests</a></li>
+                <li><a href="#section-20">20. Accessibility Tests</a></li>
+                <li><a href="#appendix-a">Appendix A: Test Data Requirements</a></li>
+                <li><a href="#appendix-b">Appendix B: Bug Report Template</a></li>
+                <li><a href="#appendix-c">Appendix C: Test Execution Checklist</a></li>
+            </ul>
+        </nav>
+
+        <!-- Section 1: Test Environment Setup -->
+        <section id="section-1">
+            <h2>1. Test Environment Setup</h2>
+
+            <h3>Prerequisites</h3>
+            <ul>
+                <li>Backend running on <code>http://localhost:8000</code></li>
+                <li>Frontend running on <code>http://localhost:3000</code></li>
+                <li>PostgreSQL database with test data loaded</li>
+                <li>Redis running for WebSocket/session support</li>
+                <li>Test accounts for each role (see below)</li>
+            </ul>
+
+            <h3>Test Accounts to Create</h3>
+            <div class="test-table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Role</th>
+                            <th>Email</th>
+                            <th>Password</th>
+                            <th>Verification Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Sender</td>
+                            <td><code>sender@test.com</code></td>
+                            <td><code>TestPass123!</code></td>
+                            <td>Email + Phone verified</td>
+                        </tr>
+                        <tr>
+                            <td>Courier</td>
+                            <td><code>courier@test.com</code></td>
+                            <td><code>TestPass123!</code></td>
+                            <td>Email + Phone + ID verified</td>
+                        </tr>
+                        <tr>
+                            <td>Both</td>
+                            <td><code>both@test.com</code></td>
+                            <td><code>TestPass123!</code></td>
+                            <td>Email + Phone + ID verified</td>
+                        </tr>
+                        <tr>
+                            <td>Admin</td>
+                            <td><code>admin@test.com</code></td>
+                            <td><code>TestPass123!</code></td>
+                            <td>Full access</td>
+                        </tr>
+                        <tr>
+                            <td>Unverified Sender</td>
+                            <td><code>unverified-sender@test.com</code></td>
+                            <td><code>TestPass123!</code></td>
+                            <td>Email only</td>
+                        </tr>
+                        <tr>
+                            <td>Unverified Courier</td>
+                            <td><code>unverified-courier@test.com</code></td>
+                            <td><code>TestPass123!</code></td>
+                            <td>Email + Phone (no ID)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>Browser Matrix</h3>
+            <p>Test on the following browsers:</p>
+            <ul>
+                <li>Chrome (latest)</li>
+                <li>Firefox (latest)</li>
+                <li>Safari (latest)</li>
+                <li>Edge (latest)</li>
+            </ul>
+        </section>
+
+        <!-- Section 2: Authentication Tests -->
+        <section id="section-2">
+            <h2>2. Authentication Tests</h2>
+            <div class="priority-indicator">
+                <span class="badge badge-critical">Critical</span>
+                <span>22 Test Cases</span>
+            </div>
+
+            <h3>2.1 Login Page Display</h3>
+            <div class="test-table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Test ID</th>
+                            <th>Test Case</th>
+                            <th>Steps</th>
+                            <th>Expected Result</th>
+                            <th>Pass/Fail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="test-id">AUTH-001</td>
+                            <td>Login page loads correctly</td>
+                            <td>Navigate to <code>/login</code></td>
+                            <td>Page displays email input, password input, "Remember me" checkbox, Login button, Google Sign-In button, "Forgot password?" link, Register link</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">AUTH-002</td>
+                            <td>Form fields are empty by default</td>
+                            <td>Navigate to <code>/login</code></td>
+                            <td>Email and password fields are empty, "Remember me" is unchecked</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">AUTH-003</td>
+                            <td>Password field masks input</td>
+                            <td>Type in password field</td>
+                            <td>Characters are masked (dots/asterisks)</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">AUTH-004</td>
+                            <td>Show/hide password toggle</td>
+                            <td>Click eye icon in password field</td>
+                            <td>Password toggles between masked and visible</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>2.2 Login Validation</h3>
+            <div class="test-table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Test ID</th>
+                            <th>Test Case</th>
+                            <th>Steps</th>
+                            <th>Expected Result</th>
+                            <th>Pass/Fail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="test-id">AUTH-005</td>
+                            <td>Empty form submission</td>
+                            <td>Click Login with empty fields</td>
+                            <td>Error message: "Email is required"</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">AUTH-006</td>
+                            <td>Invalid email format</td>
+                            <td>Enter "notanemail", click Login</td>
+                            <td>Error message: "Invalid email format"</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">AUTH-007</td>
+                            <td>Empty password</td>
+                            <td>Enter valid email, leave password empty, click Login</td>
+                            <td>Error message: "Password is required"</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">AUTH-008</td>
+                            <td>Invalid credentials</td>
+                            <td>Enter wrong email/password, click Login</td>
+                            <td>Error message: "Invalid email or password"</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">AUTH-009</td>
+                            <td>Account lockout after 5 failures</td>
+                            <td>Enter wrong password 5 times</td>
+                            <td>Error message: "Account locked. Try again in 15 minutes"</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>2.3 Successful Login</h3>
+            <div class="test-table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Test ID</th>
+                            <th>Test Case</th>
+                            <th>Steps</th>
+                            <th>Expected Result</th>
+                            <th>Pass/Fail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="test-id">AUTH-010</td>
+                            <td>Sender login redirect</td>
+                            <td>Login as sender</td>
+                            <td>Redirects to <code>/en/dashboard</code> (or user's preferred language)</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">AUTH-011</td>
+                            <td>Courier login redirect</td>
+                            <td>Login as courier</td>
+                            <td>Redirects to <code>/en/dashboard</code></td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">AUTH-012</td>
+                            <td>Admin login redirect</td>
+                            <td>Login as admin</td>
+                            <td>Redirects to <code>/en/admin</code></td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">AUTH-013</td>
+                            <td>Remember me functionality</td>
+                            <td>Check "Remember me", login, close browser, reopen</td>
+                            <td>User remains logged in</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">AUTH-014</td>
+                            <td>Login without remember me</td>
+                            <td>Uncheck "Remember me", login, close browser, reopen</td>
+                            <td>User is logged out</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">AUTH-015</td>
+                            <td>Preferred language redirect</td>
+                            <td>Login as user with <code>preferred_language: fr</code></td>
+                            <td>Redirects to <code>/fr/dashboard</code></td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>2.4 Google OAuth Login</h3>
+            <div class="test-table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Test ID</th>
+                            <th>Test Case</th>
+                            <th>Steps</th>
+                            <th>Expected Result</th>
+                            <th>Pass/Fail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="test-id">AUTH-016</td>
+                            <td>Google Sign-In button present</td>
+                            <td>Navigate to <code>/login</code></td>
+                            <td>"Continue with Google" button is visible</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">AUTH-017</td>
+                            <td>Google OAuth flow</td>
+                            <td>Click Google Sign-In button</td>
+                            <td>Redirects to Google OAuth consent screen</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">AUTH-018</td>
+                            <td>Google OAuth success</td>
+                            <td>Complete Google OAuth</td>
+                            <td>User logged in, redirected to dashboard</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">AUTH-019</td>
+                            <td>Google OAuth - new user</td>
+                            <td>OAuth with unregistered Google account</td>
+                            <td>New account created, redirected to dashboard</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>2.5 Logout</h3>
+            <div class="test-table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Test ID</th>
+                            <th>Test Case</th>
+                            <th>Steps</th>
+                            <th>Expected Result</th>
+                            <th>Pass/Fail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="test-id">AUTH-020</td>
+                            <td>Logout from navbar</td>
+                            <td>Click user menu &gt; Logout</td>
+                            <td>User logged out, redirected to <code>/login</code></td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">AUTH-021</td>
+                            <td>Protected route after logout</td>
+                            <td>After logout, navigate to <code>/dashboard</code></td>
+                            <td>Redirected to <code>/login</code></td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">AUTH-022</td>
+                            <td>Session invalidation</td>
+                            <td>Logout, try to use old session token</td>
+                            <td>Access denied, must re-login</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Section 3: Registration Tests -->
+        <section id="section-3">
+            <h2>3. Registration Tests</h2>
+            <div class="priority-indicator">
+                <span class="badge badge-critical">Critical</span>
+                <span>26 Test Cases</span>
+            </div>
+
+            <h3>3.1 Registration Page Display</h3>
+            <div class="test-table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Test ID</th>
+                            <th>Test Case</th>
+                            <th>Steps</th>
+                            <th>Expected Result</th>
+                            <th>Pass/Fail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="test-id">REG-001</td>
+                            <td>Registration page loads</td>
+                            <td>Navigate to <code>/register</code></td>
+                            <td>Form displays: Full Name, Email, Password, Confirm Password, Role dropdown, Phone Number, Preferred Language, Terms checkbox</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">REG-002</td>
+                            <td>Role-specific fields - Sender</td>
+                            <td>Select "Sender" role</td>
+                            <td>Default Address field appears</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">REG-003</td>
+                            <td>Role-specific fields - Courier</td>
+                            <td>Select "Courier" role</td>
+                            <td>Max Deviation (km) field appears</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">REG-004</td>
+                            <td>Role-specific fields - Both</td>
+                            <td>Select "Both" role</td>
+                            <td>Both Default Address and Max Deviation fields appear</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">REG-005</td>
+                            <td>Password requirements display</td>
+                            <td>Focus on password field</td>
+                            <td>Password requirements checklist appears</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>3.2 Registration Validation</h3>
+            <div class="test-table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Test ID</th>
+                            <th>Test Case</th>
+                            <th>Steps</th>
+                            <th>Expected Result</th>
+                            <th>Pass/Fail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="test-id">REG-006</td>
+                            <td>Empty form submission</td>
+                            <td>Click Register with empty fields</td>
+                            <td>Error messages for all required fields</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">REG-007</td>
+                            <td>Invalid email format</td>
+                            <td>Enter "bademail"</td>
+                            <td>Error: "Invalid email format"</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">REG-008</td>
+                            <td>Duplicate email</td>
+                            <td>Enter existing user's email</td>
+                            <td>Error: "Email already registered"</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">REG-009</td>
+                            <td>Password too short</td>
+                            <td>Enter password &lt; 12 chars</td>
+                            <td>Error: "Password must be at least 12 characters"</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">REG-010</td>
+                            <td>Password missing uppercase</td>
+                            <td>Enter "testpassword123!"</td>
+                            <td>Requirement indicator shows missing uppercase</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">REG-011</td>
+                            <td>Password missing lowercase</td>
+                            <td>Enter "TESTPASSWORD123!"</td>
+                            <td>Requirement indicator shows missing lowercase</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">REG-012</td>
+                            <td>Password missing digit</td>
+                            <td>Enter "TestPassword!!!"</td>
+                            <td>Requirement indicator shows missing digit</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">REG-013</td>
+                            <td>Password missing special char</td>
+                            <td>Enter "TestPassword123"</td>
+                            <td>Requirement indicator shows missing special character</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">REG-014</td>
+                            <td>Passwords don't match</td>
+                            <td>Enter different confirm password</td>
+                            <td>Error: "Passwords do not match"</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">REG-015</td>
+                            <td>Invalid phone format</td>
+                            <td>Enter "1234567890" (no +1)</td>
+                            <td>Error: "Invalid phone number. Must be format +1XXXXXXXXXX"</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">REG-016</td>
+                            <td>Valid phone format</td>
+                            <td>Enter "+12125551234"</td>
+                            <td>Phone field shows valid (green check)</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">REG-017</td>
+                            <td>Non-US phone number</td>
+                            <td>Enter "+442071234567" (UK)</td>
+                            <td>Error: "Must be a valid US phone number"</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>3.3 Password Strength Indicator</h3>
+            <div class="test-table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Test ID</th>
+                            <th>Test Case</th>
+                            <th>Steps</th>
+                            <th>Expected Result</th>
+                            <th>Pass/Fail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="test-id">REG-018</td>
+                            <td>Real-time password validation</td>
+                            <td>Type password character by character</td>
+                            <td>Requirements checklist updates in real-time</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">REG-019</td>
+                            <td>All requirements met</td>
+                            <td>Enter "SecurePass123!"</td>
+                            <td>All 5 requirements show green checkmarks</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">REG-020</td>
+                            <td>Visual strength indicator</td>
+                            <td>Enter various passwords</td>
+                            <td>Strength bar fills and changes color (red→yellow→green)</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>3.4 Successful Registration</h3>
+            <div class="test-table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Test ID</th>
+                            <th>Test Case</th>
+                            <th>Steps</th>
+                            <th>Expected Result</th>
+                            <th>Pass/Fail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="test-id">REG-021</td>
+                            <td>Successful registration</td>
+                            <td>Complete valid registration</td>
+                            <td>Redirects to <code>/register-success</code>, success message displayed</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">REG-022</td>
+                            <td>Verification email sent</td>
+                            <td>Complete registration</td>
+                            <td>Email received with verification link</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">REG-023</td>
+                            <td>Login before verification</td>
+                            <td>Try to login before email verification</td>
+                            <td>Error: "Please verify your email first"</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>3.5 Geo-Restriction</h3>
+            <div class="test-table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Test ID</th>
+                            <th>Test Case</th>
+                            <th>Steps</th>
+                            <th>Expected Result</th>
+                            <th>Pass/Fail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="test-id">REG-024</td>
+                            <td>Registration from allowed country</td>
+                            <td>Register from US IP</td>
+                            <td>Registration succeeds</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">REG-025</td>
+                            <td>Registration from blocked country</td>
+                            <td>Register from non-US IP (use VPN)</td>
+                            <td>GeoBlockedModal appears with country name and support contact</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">REG-026</td>
+                            <td>Geo-blocked modal display</td>
+                            <td>Trigger geo-block</td>
+                            <td>Modal shows detected country, explains restriction, provides support email</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Section 4: Dashboard Tests -->
+        <section id="section-4">
+            <h2>4. Dashboard Tests</h2>
+            <div class="priority-indicator">
+                <span class="badge badge-high">High</span>
+                <span>17 Test Cases</span>
+            </div>
+
+            <h3>4.1 Dashboard Display</h3>
+            <div class="test-table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Test ID</th>
+                            <th>Test Case</th>
+                            <th>Steps</th>
+                            <th>Expected Result</th>
+                            <th>Pass/Fail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="test-id">DASH-001</td>
+                            <td>Dashboard loads for sender</td>
+                            <td>Login as sender</td>
+                            <td>Dashboard shows: Welcome message, verification status, quick actions, pending ratings</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">DASH-002</td>
+                            <td>Dashboard loads for courier</td>
+                            <td>Login as courier</td>
+                            <td>Dashboard shows: Welcome message, verification status, active routes, quick actions</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">DASH-003</td>
+                            <td>Dashboard loads for both</td>
+                            <td>Login as both-role user</td>
+                            <td>Dashboard shows combined sender and courier sections</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">DASH-004</td>
+                            <td>User info display</td>
+                            <td>View dashboard header</td>
+                            <td>Shows user's full name, email, role badge</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>4.2 Verification Status</h3>
+            <div class="test-table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Test ID</th>
+                            <th>Test Case</th>
+                            <th>Steps</th>
+                            <th>Expected Result</th>
+                            <th>Pass/Fail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="test-id">DASH-005</td>
+                            <td>Email verification status</td>
+                            <td>Login as verified user</td>
+                            <td>Email shows green checkmark</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">DASH-006</td>
+                            <td>Phone verification prompt</td>
+                            <td>Login as user without phone verified</td>
+                            <td>"Verify Phone" button/banner displayed</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">DASH-007</td>
+                            <td>ID verification prompt (courier)</td>
+                            <td>Login as courier without ID verified</td>
+                            <td>"Verify ID" banner prominently displayed</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">DASH-008</td>
+                            <td>Fully verified status</td>
+                            <td>Login as fully verified user</td>
+                            <td>All verification badges show green</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>4.3 Unverified User Restrictions</h3>
+            <div class="test-table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Test ID</th>
+                            <th>Test Case</th>
+                            <th>Steps</th>
+                            <th>Expected Result</th>
+                            <th>Pass/Fail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="test-id">DASH-009</td>
+                            <td>Unverified sender restrictions</td>
+                            <td>Login as unverified sender</td>
+                            <td>Cannot access Messages, Notifications hidden, limited navbar</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">DASH-010</td>
+                            <td>Unverified courier restrictions</td>
+                            <td>Login as courier without ID</td>
+                            <td>Cannot access courier features, VerificationBanner shown</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">DASH-011</td>
+                            <td>Redirect to dashboard</td>
+                            <td>Unverified user tries <code>/sender</code> or <code>/courier</code></td>
+                            <td>Redirected to <code>/dashboard</code></td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">DASH-012</td>
+                            <td>Verification banner click</td>
+                            <td>Click "Verify Now" on banner</td>
+                            <td>Redirects to appropriate verification page</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>4.4 Quick Actions</h3>
+            <div class="test-table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Test ID</th>
+                            <th>Test Case</th>
+                            <th>Steps</th>
+                            <th>Expected Result</th>
+                            <th>Pass/Fail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="test-id">DASH-013</td>
+                            <td>Create Package button (sender)</td>
+                            <td>Click "Create Package"</td>
+                            <td>Redirects to <code>/packages/create</code></td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">DASH-014</td>
+                            <td>Create Route button (courier)</td>
+                            <td>Click "Create Route"</td>
+                            <td>Redirects to <code>/courier/routes/create</code></td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">DASH-015</td>
+                            <td>View Packages link</td>
+                            <td>Click "View My Packages"</td>
+                            <td>Redirects to <code>/sender</code></td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">DASH-016</td>
+                            <td>View Routes link</td>
+                            <td>Click "View My Routes"</td>
+                            <td>Redirects to <code>/courier</code></td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>4.5 Pending Ratings</h3>
+            <div class="test-table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Test ID</th>
+                            <th>Test Case</th>
+                            <th>Steps</th>
+                            <th>Expected Result</th>
+                            <th>Pass/Fail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="test-id">DASH-017</td>
+                            <td>Pending ratings display</td>
+                            <td>User has unrated deliveries</td>
+                            <td>"Pending Ratings" section shows deliveries to rate</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Section 5: Sender Features Tests -->
+        <section id="section-5">
+            <h2>5. Sender Features Tests</h2>
+            <div class="priority-indicator">
+                <span class="badge badge-high">High</span>
+                <span>39 Test Cases</span>
+            </div>
+
+            <h3>5.1 Sender Dashboard (<code>/sender</code>)</h3>
+            <div class="test-table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Test ID</th>
+                            <th>Test Case</th>
+                            <th>Steps</th>
+                            <th>Expected Result</th>
+                            <th>Pass/Fail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="test-id">SEND-001</td>
+                            <td>Sender page loads</td>
+                            <td>Navigate to <code>/sender</code></td>
+                            <td>Shows package list, filters, "Create Package" button</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-002</td>
+                            <td>Package list display</td>
+                            <td>View package list</td>
+                            <td>Shows package cards with: description, status badge, pickup/dropoff, price, actions</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-003</td>
+                            <td>Empty state</td>
+                            <td>Sender with no packages</td>
+                            <td>Shows "No packages yet" message with Create button</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-004</td>
+                            <td>Status filter - All</td>
+                            <td>Select "All" filter</td>
+                            <td>Shows all packages regardless of status</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-005</td>
+                            <td>Status filter - Active</td>
+                            <td>Select "Active" filter</td>
+                            <td>Shows only non-delivered, non-canceled packages</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-006</td>
+                            <td>Status filter - Delivered</td>
+                            <td>Select "Delivered" filter</td>
+                            <td>Shows only delivered packages</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-007</td>
+                            <td>Status filter - Canceled</td>
+                            <td>Select "Canceled" filter</td>
+                            <td>Shows only canceled packages</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>5.2 Package Creation Wizard</h3>
+            <div class="test-table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Test ID</th>
+                            <th>Test Case</th>
+                            <th>Steps</th>
+                            <th>Expected Result</th>
+                            <th>Pass/Fail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="test-id">SEND-008</td>
+                            <td>Wizard page loads</td>
+                            <td>Navigate to <code>/packages/create</code></td>
+                            <td>Step 1 (Details) displayed with progress indicator</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-009</td>
+                            <td>Progress indicator</td>
+                            <td>View wizard header</td>
+                            <td>Shows 4 steps: Details, Pickup, Dropoff, Review</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-010</td>
+                            <td>Step 1 - Details form</td>
+                            <td>View Step 1</td>
+                            <td>Shows: Description (textarea), Size (dropdown), Weight (number input)</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-011</td>
+                            <td>Size options</td>
+                            <td>Click Size dropdown</td>
+                            <td>Options: Small, Medium, Large, Extra Large</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-012</td>
+                            <td>Step 1 validation</td>
+                            <td>Click Next with empty fields</td>
+                            <td>Error messages for required fields</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-013</td>
+                            <td>Step 1 completion</td>
+                            <td>Fill valid details, click Next</td>
+                            <td>Advances to Step 2 (Pickup)</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-014</td>
+                            <td>Step 2 - Pickup form</td>
+                            <td>View Step 2</td>
+                            <td>Shows: Address autocomplete, Contact Name (optional), Contact Phone (optional)</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-015</td>
+                            <td>Address autocomplete</td>
+                            <td>Type address in pickup field</td>
+                            <td>Google Places suggestions appear</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-016</td>
+                            <td>Address selection</td>
+                            <td>Select address from suggestions</td>
+                            <td>Full address populated, coordinates auto-filled</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-017</td>
+                            <td>Step 2 validation</td>
+                            <td>Click Next without address</td>
+                            <td>Error: "Pickup address is required"</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-018</td>
+                            <td>Step 2 completion</td>
+                            <td>Fill pickup info, click Next</td>
+                            <td>Advances to Step 3 (Dropoff)</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-019</td>
+                            <td>Step 3 - Dropoff form</td>
+                            <td>View Step 3</td>
+                            <td>Shows: Address autocomplete, Contact Name, Contact Phone</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-020</td>
+                            <td>Step 3 completion</td>
+                            <td>Fill dropoff info, click Next</td>
+                            <td>Advances to Step 4 (Review)</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-021</td>
+                            <td>Step 4 - Review</td>
+                            <td>View Step 4</td>
+                            <td>Shows all entered information in summary format</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-022</td>
+                            <td>Edit from review</td>
+                            <td>Click "Edit" on any section</td>
+                            <td>Returns to that step for editing</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-023</td>
+                            <td>Back button</td>
+                            <td>Click Back on any step</td>
+                            <td>Returns to previous step with data preserved</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-024</td>
+                            <td>Optional price field</td>
+                            <td>View pricing section</td>
+                            <td>Can leave price empty or enter amount</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-025</td>
+                            <td>Requires proof checkbox</td>
+                            <td>View options</td>
+                            <td>"Require delivery proof" checkbox available</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-026</td>
+                            <td>Package submission</td>
+                            <td>Click "Create Package" on review</td>
+                            <td>Package created, redirects to <code>/sender</code> with success toast</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-027</td>
+                            <td>Submission error handling</td>
+                            <td>Network error during submit</td>
+                            <td>Error toast displayed, form data preserved</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>5.3 Package Detail Page (<code>/packages/[id]</code>)</h3>
+            <div class="test-table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Test ID</th>
+                            <th>Test Case</th>
+                            <th>Steps</th>
+                            <th>Expected Result</th>
+                            <th>Pass/Fail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="test-id">SEND-028</td>
+                            <td>Package detail loads</td>
+                            <td>Click on package card</td>
+                            <td>Detail page shows: status, description, size, weight, addresses, map</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-029</td>
+                            <td>Status timeline</td>
+                            <td>View status section</td>
+                            <td>StatusTimeline component shows all status transitions</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-030</td>
+                            <td>Route map display</td>
+                            <td>View map section</td>
+                            <td>Leaflet map shows pickup (green) and dropoff (red) markers</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-031</td>
+                            <td>Bids section</td>
+                            <td>Package is OPEN_FOR_BIDS</td>
+                            <td>"Bids" section shows list of courier bids</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-032</td>
+                            <td>No bids state</td>
+                            <td>Package with no bids</td>
+                            <td>Shows "No bids yet" message</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-033</td>
+                            <td>Cancel package</td>
+                            <td>Click "Cancel Package"</td>
+                            <td>Confirmation modal appears</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-034</td>
+                            <td>Cancel confirmation</td>
+                            <td>Confirm cancellation</td>
+                            <td>Package status changes to CANCELED</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-035</td>
+                            <td>Cancel restrictions</td>
+                            <td>Package is IN_TRANSIT</td>
+                            <td>Cancel button disabled or hidden</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>5.4 Sender Analytics (<code>/sender/analytics</code>)</h3>
+            <div class="test-table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Test ID</th>
+                            <th>Test Case</th>
+                            <th>Steps</th>
+                            <th>Expected Result</th>
+                            <th>Pass/Fail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="test-id">SEND-036</td>
+                            <td>Analytics page loads</td>
+                            <td>Navigate to <code>/sender/analytics</code></td>
+                            <td>Shows stats cards and charts</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-037</td>
+                            <td>Stats cards display</td>
+                            <td>View stats section</td>
+                            <td>Shows: Total Packages, Delivered, Pending, Total Spent</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-038</td>
+                            <td>Delivery chart</td>
+                            <td>View charts</td>
+                            <td>Package completion trend chart displayed</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">SEND-039</td>
+                            <td>Date range filter</td>
+                            <td>Change date range</td>
+                            <td>Charts and stats update accordingly</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Section 6: Courier Features Tests -->
+        <section id="section-6">
+            <h2>6. Courier Features Tests</h2>
+            <div class="priority-indicator">
+                <span class="badge badge-high">High</span>
+                <span>24 Test Cases</span>
+            </div>
+
+            <h3>6.1 Courier Dashboard (<code>/courier</code>)</h3>
+            <div class="test-table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Test ID</th>
+                            <th>Test Case</th>
+                            <th>Steps</th>
+                            <th>Expected Result</th>
+                            <th>Pass/Fail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="test-id">COUR-001</td>
+                            <td>Courier page loads</td>
+                            <td>Navigate to <code>/courier</code></td>
+                            <td>Shows: Active routes, assigned packages, "Create Route" button</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">COUR-002</td>
+                            <td>Active routes display</td>
+                            <td>View routes section</td>
+                            <td>Shows route cards with: start, end, departure time, status</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">COUR-003</td>
+                            <td>Empty routes state</td>
+                            <td>Courier with no routes</td>
+                            <td>Shows "No routes yet" message with Create button</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">COUR-004</td>
+                            <td>Assigned packages</td>
+                            <td>View packages section</td>
+                            <td>Shows packages assigned to courier</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">COUR-005</td>
+                            <td>Route status badges</td>
+                            <td>View route cards</td>
+                            <td>Shows status: Active, Expired, Completed</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>6.2 Route Creation (<code>/courier/routes/create</code>)</h3>
+            <div class="test-table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Test ID</th>
+                            <th>Test Case</th>
+                            <th>Steps</th>
+                            <th>Expected Result</th>
+                            <th>Pass/Fail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="test-id">COUR-006</td>
+                            <td>Route creation page loads</td>
+                            <td>Navigate to <code>/courier/routes/create</code></td>
+                            <td>Form shows: Start address, End address, Max deviation, Trip date, Departure time</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">COUR-007</td>
+                            <td>Start address autocomplete</td>
+                            <td>Type in start address field</td>
+                            <td>Google Places suggestions appear</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">COUR-008</td>
+                            <td>End address autocomplete</td>
+                            <td>Type in end address field</td>
+                            <td>Google Places suggestions appear</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">COUR-009</td>
+                            <td>Deviation presets</td>
+                            <td>View deviation options</td>
+                            <td>Preset buttons: 5km, 10km, 15km, 25km, 50km</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">COUR-010</td>
+                            <td>Custom deviation</td>
+                            <td>Enter custom value</td>
+                            <td>Validates range 1-50 km</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">COUR-011</td>
+                            <td>Invalid deviation</td>
+                            <td>Enter 0 or 100</td>
+                            <td>Error: "Deviation must be between 1-50 km"</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">COUR-012</td>
+                            <td>Trip date validation</td>
+                            <td>Select past date</td>
+                            <td>Error: "Trip date must be today or later"</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">COUR-013</td>
+                            <td>Route creation success</td>
+                            <td>Fill valid data, submit</td>
+                            <td>Route created, redirects to <code>/courier</code> with success toast</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">COUR-014</td>
+                            <td>Route map preview</td>
+                            <td>After entering addresses</td>
+                            <td>Map shows route preview with markers</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>6.3 Package Matching (<code>/courier/routes/[id]/matches</code>)</h3>
+            <div class="test-table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Test ID</th>
+                            <th>Test Case</th>
+                            <th>Steps</th>
+                            <th>Expected Result</th>
+                            <th>Pass/Fail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="test-id">COUR-015</td>
+                            <td>Matches page loads</td>
+                            <td>Click "View Matches" on route</td>
+                            <td>Shows list of matching packages</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">COUR-016</td>
+                            <td>Match sorting</td>
+                            <td>View match list</td>
+                            <td>Packages sorted by relevance to route</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">COUR-017</td>
+                            <td>Package card info</td>
+                            <td>View match card</td>
+                            <td>Shows: description, size, weight, pickup/dropoff, sender rating</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">COUR-018</td>
+                            <td>No matches state</td>
+                            <td>Route with no matching packages</td>
+                            <td>Shows "No matching packages" message</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">COUR-019</td>
+                            <td>Place bid button</td>
+                            <td>Click "Place Bid"</td>
+                            <td>BidModal opens</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">COUR-020</td>
+                            <td>Bid restrictions - unverified</td>
+                            <td>Courier without ID verification</td>
+                            <td>"Place Bid" button disabled, shows verification prompt</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>6.4 Courier Analytics (<code>/courier/analytics</code>)</h3>
+            <div class="test-table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Test ID</th>
+                            <th>Test Case</th>
+                            <th>Steps</th>
+                            <th>Expected Result</th>
+                            <th>Pass/Fail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="test-id">COUR-021</td>
+                            <td>Analytics page loads</td>
+                            <td>Navigate to <code>/courier/analytics</code></td>
+                            <td>Shows stats cards and charts</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">COUR-022</td>
+                            <td>Stats display</td>
+                            <td>View stats section</td>
+                            <td>Shows: Total Deliveries, Completed, Rating, Earnings</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">COUR-023</td>
+                            <td>Delivery trends chart</td>
+                            <td>View charts</td>
+                            <td>Delivery completion trend displayed</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                        <tr>
+                            <td class="test-id">COUR-024</td>
+                            <td>Earnings chart</td>
+                            <td>View earnings section</td>
+                            <td>Earnings over time chart displayed</td>
+                            <td><input type="checkbox"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Section 7-20 abbreviated for space - continue with same pattern -->
+        <section id="section-7">
+            <h2>7. Package Lifecycle Tests</h2>
+            <div class="priority-indicator">
+                <span class="badge badge-critical">Critical</span>
+                <span>16 Test Cases</span>
+            </div>
+            <div class="info-box">
+                <strong>Package Status Flow:</strong><br>
+                <code>NEW → OPEN_FOR_BIDS → BID_SELECTED → PENDING_PICKUP → IN_TRANSIT → DELIVERED</code><br>
+                <code>CANCELED</code> can occur from any non-terminal state (except IN_TRANSIT).<br>
+                <code>FAILED → OPEN_FOR_BIDS</code> (admin only retry)
+            </div>
+            <p>See full test cases in the markdown version of this document.</p>
+        </section>
+
+        <section id="section-8">
+            <h2>8. Bidding System Tests</h2>
+            <div class="priority-indicator">
+                <span class="badge badge-high">High</span>
+                <span>16 Test Cases</span>
+            </div>
+            <div class="info-box">
+                <strong>Bid Timeline:</strong><br>
+                • First bid starts 24-hour deadline for sender to select<br>
+                • If deadline expires: auto-extends 12 hours (max 2 times)<br>
+                • After 2 extensions: all bids expire, package returns to OPEN_FOR_BIDS<br>
+                • 6 hours before deadline: warning notification sent
+            </div>
+            <p>See full test cases in the markdown version of this document.</p>
+        </section>
+
+        <section id="section-9">
+            <h2>9. Messaging Tests</h2>
+            <div class="priority-indicator">
+                <span class="badge badge-medium">Medium</span>
+                <span>17 Test Cases</span>
+            </div>
+            <p>Covers: Messages page display, chat window functionality, real-time messaging via WebSocket.</p>
+        </section>
+
+        <section id="section-10">
+            <h2>10. Notifications Tests</h2>
+            <div class="priority-indicator">
+                <span class="badge badge-medium">Medium</span>
+                <span>15 Test Cases</span>
+            </div>
+            <p>Covers: Notification dropdown, notifications page, real-time notification delivery.</p>
+        </section>
+
+        <section id="section-11">
+            <h2>11. Ratings & Reviews Tests</h2>
+            <div class="priority-indicator">
+                <span class="badge badge-medium">Medium</span>
+                <span>14 Test Cases</span>
+            </div>
+            <p>Covers: Rating modal, reviews page, pending ratings workflow.</p>
+        </section>
+
+        <section id="section-12">
+            <h2>12. Admin Panel Tests</h2>
+            <div class="priority-indicator">
+                <span class="badge badge-high">High</span>
+                <span>39 Test Cases</span>
+            </div>
+            <p>Covers: Admin dashboard, user management, package management, route management, ID verification review.</p>
+            <div class="info-box warning">
+                <strong>Important:</strong> Admin tests require admin-role account. Test role transitions carefully - only specific transitions are allowed (see CLAUDE.md for role hierarchy).
+            </div>
+        </section>
+
+        <section id="section-13">
+            <h2>13. ID Verification Tests</h2>
+            <div class="priority-indicator">
+                <span class="badge badge-high">High</span>
+                <span>16 Test Cases</span>
+            </div>
+            <p>Covers: Stripe Identity verification flow, status display, admin verification review.</p>
+        </section>
+
+        <section id="section-14">
+            <h2>14. Delivery Proof Tests</h2>
+            <div class="priority-indicator">
+                <span class="badge badge-medium">Medium</span>
+                <span>15 Test Cases</span>
+            </div>
+            <p>Covers: Photo capture, signature pad, proof submission, proof viewing.</p>
+        </section>
+
+        <section id="section-15">
+            <h2>15. Internationalization (i18n) Tests</h2>
+            <div class="priority-indicator">
+                <span class="badge badge-medium">Medium</span>
+                <span>15 Test Cases</span>
+            </div>
+            <p>Covers: Language switching (EN/FR/ES), translation coverage, date/number formatting.</p>
+        </section>
+
+        <section id="section-16">
+            <h2>16. Responsive Design Tests</h2>
+            <div class="priority-indicator">
+                <span class="badge badge-medium">Medium</span>
+                <span>21 Test Cases</span>
+            </div>
+            <div class="info-box">
+                <strong>Breakpoints:</strong><br>
+                • Mobile: 320px - 767px<br>
+                • Tablet: 768px - 1023px<br>
+                • Desktop: 1024px+
+            </div>
+            <p>Test all critical flows on each breakpoint.</p>
+        </section>
+
+        <section id="section-17">
+            <h2>17. Error Handling Tests</h2>
+            <div class="priority-indicator">
+                <span class="badge badge-medium">Medium</span>
+                <span>14 Test Cases</span>
+            </div>
+            <p>Covers: API errors (401, 403, 404, 500), error boundaries, form error display.</p>
+        </section>
+
+        <section id="section-18">
+            <h2>18. Security Tests</h2>
+            <div class="priority-indicator">
+                <span class="badge badge-critical">Critical</span>
+                <span>13 Test Cases</span>
+            </div>
+            <p>Covers: Authentication security (CSRF, XSS, SQL injection), authorization, input validation.</p>
+        </section>
+
+        <section id="section-19">
+            <h2>19. Performance & UX Tests</h2>
+            <div class="priority-indicator">
+                <span class="badge badge-low">Low</span>
+                <span>19 Test Cases</span>
+            </div>
+            <p>Covers: Loading states, toasts, form UX, navigation.</p>
+        </section>
+
+        <section id="section-20">
+            <h2>20. Accessibility Tests</h2>
+            <div class="priority-indicator">
+                <span class="badge badge-medium">Medium</span>
+                <span>16 Test Cases</span>
+            </div>
+            <p>Covers: Keyboard navigation, screen reader compatibility, visual accessibility (contrast, color).</p>
+        </section>
+
+        <!-- Appendices -->
+        <section id="appendix-a">
+            <h2>Appendix A: Test Data Requirements</h2>
+
+            <h3>Sample Packages</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Package</th>
+                        <th>Status</th>
+                        <th>Has Bids</th>
+                        <th>Has Proof</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>PKG-001</td>
+                        <td><span class="badge badge-medium">OPEN_FOR_BIDS</span></td>
+                        <td>Yes (3)</td>
+                        <td>No</td>
+                    </tr>
+                    <tr>
+                        <td>PKG-002</td>
+                        <td><span class="badge badge-high">BID_SELECTED</span></td>
+                        <td>Yes (1 selected)</td>
+                        <td>No</td>
+                    </tr>
+                    <tr>
+                        <td>PKG-003</td>
+                        <td><span class="badge badge-high">IN_TRANSIT</span></td>
+                        <td>Yes</td>
+                        <td>No</td>
+                    </tr>
+                    <tr>
+                        <td>PKG-004</td>
+                        <td><span class="badge badge-low">DELIVERED</span></td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                    </tr>
+                    <tr>
+                        <td>PKG-005</td>
+                        <td><span class="badge badge-critical">CANCELED</span></td>
+                        <td>No</td>
+                        <td>No</td>
+                    </tr>
+                    <tr>
+                        <td>PKG-006</td>
+                        <td><span class="badge badge-critical">FAILED</span></td>
+                        <td>Yes</td>
+                        <td>No</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Sample Routes</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Route</th>
+                        <th>Status</th>
+                        <th>Matching Packages</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>RTE-001</td>
+                        <td><span class="badge badge-low">Active</span></td>
+                        <td>5</td>
+                    </tr>
+                    <tr>
+                        <td>RTE-002</td>
+                        <td><span class="badge badge-low">Active</span></td>
+                        <td>0</td>
+                    </tr>
+                    <tr>
+                        <td>RTE-003</td>
+                        <td><span class="badge badge-critical">Expired</span></td>
+                        <td>N/A</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section id="appendix-b">
+            <h2>Appendix B: Bug Report Template</h2>
+            <pre>## Bug Report
+
+**Test ID:** [e.g., AUTH-005]
+**Title:** [Brief description]
+**Severity:** Critical / High / Medium / Low
+**Environment:**
+- Browser:
+- OS:
+- Screen size:
+
+**Steps to Reproduce:**
+1.
+2.
+3.
+
+**Expected Result:**
+
+
+**Actual Result:**
+
+
+**Screenshots/Video:**
+[Attach]
+
+**Console Errors:**
+[If any]
+
+**Additional Notes:**
+</pre>
+        </section>
+
+        <section id="appendix-c">
+            <h2>Appendix C: Test Execution Checklist</h2>
+
+            <h3>Pre-Test Checklist</h3>
+            <ul class="checkbox-list">
+                <li><input type="checkbox"> Backend running and healthy</li>
+                <li><input type="checkbox"> Frontend running and healthy</li>
+                <li><input type="checkbox"> Database seeded with test data</li>
+                <li><input type="checkbox"> Redis running</li>
+                <li><input type="checkbox"> Test accounts created</li>
+                <li><input type="checkbox"> Browser dev tools ready</li>
+            </ul>
+
+            <h3>Post-Test Checklist</h3>
+            <ul class="checkbox-list">
+                <li><input type="checkbox"> All critical tests passed</li>
+                <li><input type="checkbox"> All high-priority tests passed</li>
+                <li><input type="checkbox"> Bugs documented with screenshots</li>
+                <li><input type="checkbox"> Test results logged</li>
+                <li><input type="checkbox"> Environment cleaned up (if needed)</li>
+            </ul>
+        </section>
+    </div>
+
+    <footer>
+        <p>Chaski Frontend QA UI Manual Test Plan | Version 1.0 | December 2025</p>
+    </footer>
+
+    <button class="print-button" onclick="window.print()">
+        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+        </svg>
+        Print
+    </button>
+
+    <script>
+        // Add expand/collapse functionality for sections
+        document.querySelectorAll('section h2').forEach(header => {
+            header.style.cursor = 'pointer';
+            header.addEventListener('click', () => {
+                const content = header.nextElementSibling;
+                while (content && content.tagName !== 'SECTION') {
+                    if (content.classList) {
+                        content.classList.toggle('hidden');
+                    }
+                    content = content.nextElementSibling;
+                }
+            });
+        });
+
+        // Save checkbox state to localStorage
+        document.querySelectorAll('input[type="checkbox"]').forEach((checkbox, index) => {
+            const key = `qa-test-${index}`;
+            checkbox.checked = localStorage.getItem(key) === 'true';
+            checkbox.addEventListener('change', () => {
+                localStorage.setItem(key, checkbox.checked);
+            });
+        });
+
+        // Add progress counter
+        function updateProgress() {
+            const checkboxes = document.querySelectorAll('table input[type="checkbox"]');
+            const checked = Array.from(checkboxes).filter(cb => cb.checked).length;
+            const total = checkboxes.length;
+            console.log(`Test Progress: ${checked}/${total} (${Math.round(checked/total*100)}%)`);
+        }
+
+        document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            cb.addEventListener('change', updateProgress);
+        });
+    </script>
+</body>
+</html>

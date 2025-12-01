@@ -13,6 +13,7 @@ import {
   SlideIn
 } from '@/components/ui'
 import { BarChart, DonutChart } from '@/components/charts'
+import CourierVerificationGuard from '@/components/CourierVerificationGuard'
 
 // Status colors matching the design system
 const STATUS_COLORS: Record<string, string> = {
@@ -33,7 +34,7 @@ const STATUS_LABELS: Record<string, string> = {
   failed: 'Failed',
 }
 
-export default function CourierAnalyticsPage() {
+function CourierAnalyticsContent() {
   const router = useRouter()
   const [user, setUser] = useState<UserResponse | null>(null)
   const [stats, setStats] = useState<CourierStatsResponse | null>(null)
@@ -350,5 +351,13 @@ export default function CourierAnalyticsPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function CourierAnalyticsPage() {
+  return (
+    <CourierVerificationGuard>
+      <CourierAnalyticsContent />
+    </CourierVerificationGuard>
   )
 }

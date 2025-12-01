@@ -237,6 +237,33 @@ In your Google Cloud Console:
 heroku config:set STRIPE_WEBHOOK_SECRET="whsec_xxx" -a chaski-backend
 ```
 
+### Configure Stripe Identity (ID Verification)
+
+Chaski uses Stripe Identity for courier ID verification (document + selfie). To set this up:
+
+1. **Run the ID verification migration**:
+   ```bash
+   heroku run bash -a chaski-backend
+   PYTHONPATH=. python migrations/add_id_verification.py
+   exit
+   ```
+
+2. **Set up Stripe Identity webhook endpoint**:
+   - Go to Stripe Dashboard > Developers > Webhooks
+   - Add endpoint: `https://chaski-backend.herokuapp.com/api/id-verification/webhook`
+   - Select events: `identity.verification_session.verified`, `identity.verification_session.requires_input`, `identity.verification_session.canceled`
+   - Copy the webhook signing secret
+
+3. **Configure the webhook secret**:
+   ```bash
+   heroku config:set STRIPE_IDENTITY_WEBHOOK_SECRET="whsec_xxx" -a chaski-backend
+   ```
+
+4. **Verify Stripe Identity is enabled**:
+   - Go to Stripe Dashboard > Identity
+   - Ensure Identity is enabled for your account
+   - Note: Stripe Identity may require additional activation for some accounts
+
 ### Load Initial Data (Optional)
 
 ```bash
@@ -354,12 +381,14 @@ Before going live:
 - [ ] CORS configured with production URLs
 - [ ] Google OAuth redirect URIs updated
 - [ ] Stripe webhook endpoint configured
+- [ ] Stripe Identity webhook endpoint configured (for ID verification)
 - [ ] AWS S3 bucket permissions set
 - [ ] Email sending tested
 - [ ] WebSocket connections tested
 - [ ] SSL/HTTPS working (Heroku provides this automatically)
 - [ ] Admin user created in database
 - [ ] Test data loaded (if desired)
+- [ ] ID verification migration run (`migrations/add_id_verification.py`)
 
 ## Alternative: Single App Deployment
 

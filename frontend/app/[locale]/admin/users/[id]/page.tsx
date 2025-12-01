@@ -97,7 +97,9 @@ export default function UserDetailPage() {
         role: user.role,
         max_deviation_km: user.max_deviation_km,
         is_active: user.is_active,
-        is_verified: user.is_verified
+        is_verified: user.is_verified,
+        phone_verified: user.phone_verified,
+        id_verified: user.id_verified
       })
       setIsEditing(true)
     }
@@ -143,16 +145,30 @@ export default function UserDetailPage() {
         await adminAPI.toggleUserVerified(parseInt(userId), editedUser.is_verified)
       }
 
-      // Update profile (full_name, phone_number, and max_deviation_km) if changed
+      // Update phone verified status if changed
+      if (editedUser.phone_verified !== undefined && editedUser.phone_verified !== user.phone_verified) {
+        await adminAPI.toggleUserPhoneVerified(parseInt(userId), editedUser.phone_verified)
+      }
+
+      // Update ID verified status if changed
+      if (editedUser.id_verified !== undefined && editedUser.id_verified !== user.id_verified) {
+        await adminAPI.toggleUserIdVerified(parseInt(userId), editedUser.id_verified)
+      }
+
+      // Update profile (full_name, email, phone_number, and max_deviation_km) if changed
       const profileChanged =
         (editedUser.full_name !== undefined && editedUser.full_name !== user.full_name) ||
+        (editedUser.email !== undefined && editedUser.email !== user.email) ||
         (editedUser.phone_number !== undefined && editedUser.phone_number !== user.phone_number) ||
         (editedUser.max_deviation_km !== undefined && editedUser.max_deviation_km !== user.max_deviation_km)
 
       if (profileChanged) {
-        const profileData: { full_name?: string; phone_number?: string | null; max_deviation_km?: number } = {}
+        const profileData: { full_name?: string; email?: string; phone_number?: string | null; max_deviation_km?: number } = {}
         if (editedUser.full_name !== undefined && editedUser.full_name !== user.full_name) {
           profileData.full_name = editedUser.full_name
+        }
+        if (editedUser.email !== undefined && editedUser.email !== user.email) {
+          profileData.email = editedUser.email
         }
         if (editedUser.phone_number !== undefined && editedUser.phone_number !== user.phone_number) {
           profileData.phone_number = editedUser.phone_number
@@ -374,19 +390,21 @@ export default function UserDetailPage() {
               <div>
                 <label className="text-sm font-medium text-gray-500">Email Address</label>
                 {isEditing ? (
-                  <input
-                    type="email"
-                    value={editedUser.email || ''}
-                    onChange={(e) => setEditedUser({ ...editedUser, email: e.target.value })}
-                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    disabled
-                    title="Email cannot be changed"
-                  />
+                  <>
+                    <input
+                      type="email"
+                      value={editedUser.email || ''}
+                      onChange={(e) => setEditedUser({ ...editedUser, email: e.target.value })}
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      placeholder="Enter email address"
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Changing email will reset email verification status
+                    </p>
+                  </>
                 ) : (
                   <p className="text-gray-900 mt-1">{user.email}</p>
-                )}
-                {isEditing && (
-                  <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
                 )}
               </div>
               <div>
@@ -409,7 +427,8 @@ export default function UserDetailPage() {
                 {isEditing ? (
                   <PhoneInput
                     international
-                    defaultCountry={getDefaultCountry(locale) as any}
+                    defaultCountry="US"
+                    countries={['US']}
                     value={editedUser.phone_number || ''}
                     onChange={(value) => setEditedUser({ ...editedUser, phone_number: value || '' })}
                     className="mt-1 phone-input"
@@ -516,7 +535,7 @@ export default function UserDetailPage() {
                 )}
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-500">Verification Status</label>
+                <label className="text-sm font-medium text-gray-500">Email Verification</label>
                 {isEditing ? (
                   <>
                     <div className="mt-1 flex items-center gap-3">
@@ -552,6 +571,100 @@ export default function UserDetailPage() {
                       user.is_verified ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
                     }`}>
                       {user.is_verified ? 'Verified' : 'Unverified'}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500">Phone Verification</label>
+                {isEditing ? (
+                  <>
+                    <div className="mt-1 flex items-center gap-3">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="phone_verified"
+                          checked={editedUser.phone_verified === true}
+                          onChange={() => setEditedUser({ ...editedUser, phone_verified: true })}
+                          className="focus:ring-purple-500"
+                        />
+                        <span className="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                          Verified
+                        </span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="phone_verified"
+                          checked={editedUser.phone_verified === false}
+                          onChange={() => setEditedUser({ ...editedUser, phone_verified: false })}
+                          className="focus:ring-purple-500"
+                        />
+                        <span className="px-3 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                          Unverified
+                        </span>
+                      </label>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Phone: {user.phone_number || 'Not provided'}
+                    </p>
+                  </>
+                ) : (
+                  <div className="mt-1">
+                    <span className={`px-3 py-1 text-sm font-semibold rounded-full ${
+                      user.phone_verified ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {user.phone_verified ? 'Verified' : 'Unverified'}
+                    </span>
+                    <span className="ml-2 text-sm text-gray-500">
+                      ({user.phone_number || 'No phone'})
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500">ID Verification</label>
+                {isEditing ? (
+                  <>
+                    <div className="mt-1 flex items-center gap-3">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="id_verified"
+                          checked={editedUser.id_verified === true}
+                          onChange={() => setEditedUser({ ...editedUser, id_verified: true })}
+                          className="focus:ring-purple-500"
+                        />
+                        <span className="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                          Verified
+                        </span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="id_verified"
+                          checked={editedUser.id_verified === false}
+                          onChange={() => setEditedUser({ ...editedUser, id_verified: false })}
+                          className="focus:ring-purple-500"
+                        />
+                        <span className="px-3 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                          Unverified
+                        </span>
+                      </label>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Required for couriers to place bids and access full features
+                    </p>
+                  </>
+                ) : (
+                  <div className="mt-1">
+                    <span className={`px-3 py-1 text-sm font-semibold rounded-full ${
+                      user.id_verified ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {user.id_verified ? 'Verified' : 'Unverified'}
+                    </span>
+                    <span className="ml-2 text-sm text-gray-500">
+                      (Stripe Identity)
                     </span>
                   </div>
                 )}

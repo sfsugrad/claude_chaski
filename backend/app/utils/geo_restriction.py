@@ -34,6 +34,22 @@ def get_redis_client() -> redis.Redis:
     return _redis_client
 
 
+def is_private_ip(ip_address: str) -> bool:
+    """Check if IP is localhost or private (non-routable)."""
+    private_prefixes = (
+        '127.',       # Localhost
+        '10.',        # Private Class A
+        '172.16.', '172.17.', '172.18.', '172.19.',  # Private Class B
+        '172.20.', '172.21.', '172.22.', '172.23.',
+        '172.24.', '172.25.', '172.26.', '172.27.',
+        '172.28.', '172.29.', '172.30.', '172.31.',
+        '192.168.',   # Private Class C
+        '::1',        # IPv6 localhost
+        'fe80:',      # IPv6 link-local
+    )
+    return ip_address.startswith(private_prefixes) or ip_address == 'localhost'
+
+
 async def get_country_from_ip(ip_address: str) -> Optional[str]:
     """
     Get country code from IP address using ip-api.com.
@@ -44,6 +60,11 @@ async def get_country_from_ip(ip_address: str) -> Optional[str]:
     Returns:
         Two-letter country code (e.g., "US", "CA", "GB") or None if lookup fails
     """
+    # Skip geo lookup for localhost/private IPs (development environment)
+    if is_private_ip(ip_address):
+        logger.info(f"Private/localhost IP {ip_address} - allowing registration (dev mode)")
+        return "US"  # Default to allowed country for local development
+
     # Check Redis cache first
     redis_client = get_redis_client()
     cache_key = f"geo:ip:{ip_address}"

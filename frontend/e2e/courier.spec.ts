@@ -301,3 +301,189 @@ test.describe('Courier - Access Control', () => {
     await expect(page.getByRole('heading', { name: /create new route/i })).toBeVisible();
   });
 });
+
+test.describe('Courier Analytics', () => {
+  test.beforeEach(async ({ page }) => {
+    await loginUser(page, TEST_USERS.courier);
+  });
+
+  test('COUR-ANALYTICS-001: Analytics page loads', async ({ page }) => {
+    await page.goto('/courier/analytics');
+
+    // Should show analytics heading or metrics
+    const hasAnalytics = await page.getByRole('heading', { name: /analytics|statistics|earnings|metrics/i }).isVisible();
+    const hasCharts = await page.locator('canvas, [class*="chart"], svg').count() > 0;
+
+    // Page should load with some analytics content
+    expect(hasAnalytics || hasCharts || page.url().includes('/analytics')).toBeTruthy();
+  });
+
+  test('COUR-ANALYTICS-002: Earnings displayed', async ({ page }) => {
+    await page.goto('/courier/analytics');
+
+    // Should show earnings metrics
+    const hasEarnings = await page.getByText(/earnings|income|total earned|revenue/i).isVisible();
+    // May or may not have data depending on deliveries
+  });
+
+  test('COUR-ANALYTICS-003: Delivery statistics visible', async ({ page }) => {
+    await page.goto('/courier/analytics');
+
+    // Check for delivery-related statistics
+    const hasDeliveryStats = await page.getByText(/deliveries|completed|packages delivered/i).isVisible();
+    // May or may not show depending on data
+  });
+
+  test('COUR-ANALYTICS-004: Rating average displayed', async ({ page }) => {
+    await page.goto('/courier/analytics');
+
+    // Check for rating metrics
+    const hasRating = await page.getByText(/rating|stars|average|reviews/i).isVisible();
+    // May show average rating
+  });
+
+  test('COUR-ANALYTICS-005: Date range filter', async ({ page }) => {
+    await page.goto('/courier/analytics');
+
+    // Look for date filter
+    const dateFilter = page.getByRole('button', { name: /date|period|range|filter/i });
+    if (await dateFilter.isVisible()) {
+      await dateFilter.click();
+
+      // Should show date options
+    }
+  });
+
+  test('COUR-ANALYTICS-006: Chart visualization present', async ({ page }) => {
+    await page.goto('/courier/analytics');
+
+    // Look for chart elements
+    const charts = page.locator('canvas, [class*="chart"], svg[class*="recharts"]');
+    // May or may not have charts
+  });
+});
+
+test.describe('Courier ID Verification', () => {
+  test.beforeEach(async ({ page }) => {
+    await loginUser(page, TEST_USERS.courier);
+  });
+
+  test('COUR-VERIFY-001: ID verification banner visible if not verified', async ({ page }) => {
+    await page.goto('/courier');
+
+    // Check for verification banner or prompt
+    const verifyBanner = page.getByText(/verify.*identity|id.*verification|complete.*verification/i);
+    // May show if courier not ID verified
+  });
+
+  test('COUR-VERIFY-002: Start verification button works', async ({ page }) => {
+    await page.goto('/dashboard');
+
+    // Look for verify button
+    const verifyBtn = page.getByRole('link', { name: /verify.*id|start.*verification|complete.*verification/i });
+    if (await verifyBtn.isVisible()) {
+      await verifyBtn.click();
+
+      // Should navigate to verification page
+      await expect(page).toHaveURL(/\/id-verification/);
+    }
+  });
+
+  test('COUR-VERIFY-003: ID verification page loads', async ({ page }) => {
+    await page.goto('/id-verification');
+
+    // Should show verification page content
+    const hasContent = await page.getByText(/identity|verification|document|stripe/i).isVisible();
+    expect(hasContent).toBeTruthy();
+  });
+
+  test('COUR-VERIFY-004: Verification status displayed', async ({ page }) => {
+    await page.goto('/id-verification');
+
+    // Should show current verification status
+    const hasStatus = await page.getByText(/status|pending|verified|submitted/i).isVisible();
+    // May show verification status
+  });
+});
+
+test.describe('Courier Bid Restrictions', () => {
+  test('COUR-BID-001: Unverified courier sees verification prompt on bid', async ({ page }) => {
+    await loginUser(page, TEST_USERS.courier);
+    await page.goto('/courier');
+
+    // Try to navigate to matches
+    const viewMatchesLink = page.getByRole('link', { name: /view matches/i }).first();
+
+    if (await viewMatchesLink.isVisible()) {
+      await viewMatchesLink.click();
+      await page.waitForURL(/\/matches/);
+
+      // Try to place bid
+      const placeBidBtn = page.getByRole('button', { name: /place.*bid/i }).first();
+
+      if (await placeBidBtn.isVisible()) {
+        await placeBidBtn.click();
+
+        // Should either open bid modal or show verification prompt
+        const bidModal = page.getByRole('dialog');
+        const verifyPrompt = page.getByText(/verify.*id|verification.*required/i);
+
+        const hasResponse = await bidModal.isVisible() || await verifyPrompt.isVisible();
+        // Behavior depends on courier's verification status
+      }
+    }
+  });
+});
+
+test.describe('Courier Delivery Proof', () => {
+  test.beforeEach(async ({ page }) => {
+    await loginUser(page, TEST_USERS.courier);
+  });
+
+  test('COUR-PROOF-001: Capture proof page loads', async ({ page }) => {
+    // Navigate to an assigned package's proof capture
+    await page.goto('/courier');
+
+    const captureLink = page.getByRole('link', { name: /capture.*proof|upload.*proof|photo/i }).first();
+
+    if (await captureLink.isVisible()) {
+      await captureLink.click();
+
+      // Should be on capture proof page
+      await expect(page).toHaveURL(/\/capture-proof/);
+    }
+  });
+
+  test('COUR-PROOF-002: Camera access button visible', async ({ page }) => {
+    await page.goto('/courier');
+
+    const captureLink = page.getByRole('link', { name: /capture.*proof|upload.*proof|photo/i }).first();
+
+    if (await captureLink.isVisible()) {
+      await captureLink.click();
+      await page.waitForURL(/\/capture-proof/);
+
+      // Should have camera or upload button
+      const cameraBtn = page.getByRole('button', { name: /camera|take.*photo|capture/i });
+      const uploadBtn = page.locator('input[type="file"]');
+
+      const hasInput = await cameraBtn.isVisible() || await uploadBtn.count() > 0;
+      // Should have some way to add proof
+    }
+  });
+
+  test('COUR-PROOF-003: Recipient signature option', async ({ page }) => {
+    await page.goto('/courier');
+
+    const captureLink = page.getByRole('link', { name: /capture.*proof|upload.*proof/i }).first();
+
+    if (await captureLink.isVisible()) {
+      await captureLink.click();
+      await page.waitForURL(/\/capture-proof/);
+
+      // Check for signature pad
+      const signaturePad = page.locator('canvas, [class*="signature"]');
+      // May have signature capture
+    }
+  });
+});

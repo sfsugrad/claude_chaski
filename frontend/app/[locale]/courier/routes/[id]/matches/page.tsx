@@ -5,8 +5,9 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { matchingAPI, MatchedPackage, bidsAPI, BidResponse } from '@/lib/api'
 import BidOptionsModal from '@/components/BidOptionsModal'
+import CourierVerificationGuard from '@/components/CourierVerificationGuard'
 
-export default function RouteMatchesPage() {
+function RouteMatchesContent() {
   const params = useParams()
   const routeId = parseInt(params.id as string)
 
@@ -271,5 +272,13 @@ export default function RouteMatchesPage() {
         />
       )}
     </div>
+  )
+}
+
+export default function RouteMatchesPage() {
+  return (
+    <CourierVerificationGuard>
+      <RouteMatchesContent />
+    </CourierVerificationGuard>
   )
 }

@@ -124,6 +124,21 @@ export default function DashboardPage() {
 
   const isSender = user.role === 'sender' || user.role === 'both'
   const isCourier = user.role === 'courier' || user.role === 'both'
+  const isPureSender = user.role === 'sender'
+  const isBothRole = user.role === 'both'
+  // Senders need email and phone verified
+  const isSenderVerified = user.is_verified && user.phone_verified
+  // Couriers need email, phone, AND ID verified
+  const isCourierFullyVerified = user.is_verified && user.phone_verified && user.id_verified
+  // For 'both' role users, require courier-level verification for ALL features
+  // Pure senders only need email + phone
+  const canAccessSenderFeatures = (user.role === 'sender' && isSenderVerified) ||
+    (user.role === 'both' && isCourierFullyVerified)
+  // Courier features require full courier verification (including ID)
+  const canAccessCourierFeatures = isCourier && isCourierFullyVerified
+  // Show verification banner for unverified users (pure senders or 'both' role)
+  const showSenderVerificationBanner = isPureSender && !isSenderVerified
+  const showBothRoleVerificationBanner = isBothRole && !isCourierFullyVerified
 
   return (
     <div className="min-h-screen bg-surface-50">
@@ -140,6 +155,71 @@ export default function DashboardPage() {
       )}
 
       <div className="page-container py-8">
+        {/* Sender Verification Banner */}
+        {showSenderVerificationBanner && (
+          <Alert variant="warning" className="mb-6">
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-3">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+                <div>
+                  <p className="font-medium">
+                    Complete your verification to access all features
+                  </p>
+                  <p className="text-sm opacity-80">
+                    {!user.is_verified && 'Verify your email address. '}
+                    {!user.phone_verified && 'Verify your phone number.'}
+                  </p>
+                </div>
+              </div>
+              {!user.is_verified && (
+                <Link href="/resend-verification">
+                  <Button variant="primary" size="sm">
+                    Verify Email
+                  </Button>
+                </Link>
+              )}
+            </div>
+          </Alert>
+        )}
+
+        {/* Both Role Verification Banner */}
+        {showBothRoleVerificationBanner && (
+          <Alert variant="warning" className="mb-6">
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-3">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+                <div>
+                  <p className="font-medium">
+                    Complete your verification to access all features
+                  </p>
+                  <p className="text-sm opacity-80">
+                    {!user.is_verified && 'Verify your email address. '}
+                    {!user.phone_verified && 'Verify your phone number. '}
+                    {!user.id_verified && 'Verify your ID.'}
+                  </p>
+                </div>
+              </div>
+              {!user.is_verified ? (
+                <Link href="/resend-verification">
+                  <Button variant="primary" size="sm">
+                    Verify Email
+                  </Button>
+                </Link>
+              ) : !user.id_verified && user.phone_verified ? (
+                <Link href="/id-verification">
+                  <Button variant="primary" size="sm">
+                    Verify ID
+                  </Button>
+                </Link>
+              ) : null}
+            </div>
+          </Alert>
+        )}
+
         {/* Pending Ratings Banner */}
         {pendingRatings.length > 0 && !showRatingModal && (
           <Alert variant="warning" className="mb-6">
@@ -207,15 +287,36 @@ export default function DashboardPage() {
                     {user.phone_number || <span className="text-surface-400">Not provided</span>}
                   </dd>
                 </div>
+                {user.phone_number && (
+                  <Badge variant={user.phone_verified ? 'success' : 'warning'} size="sm">
+                    {user.phone_verified ? 'Verified' : 'Not Verified'}
+                  </Badge>
+                )}
               </div>
               {isCourier && (
-                <div className="flex items-center gap-4 px-6 py-4">
-                  <MapIcon />
-                  <div className="flex-1">
-                    <dt className="text-sm font-medium text-surface-500">Max Route Deviation</dt>
-                    <dd className="text-sm text-surface-900">{user.max_deviation_km} km</dd>
+                <>
+                  <div className="flex items-center gap-4 px-6 py-4">
+                    <MapIcon />
+                    <div className="flex-1">
+                      <dt className="text-sm font-medium text-surface-500">Max Route Deviation</dt>
+                      <dd className="text-sm text-surface-900">{user.max_deviation_km} km</dd>
+                    </div>
                   </div>
-                </div>
+                  <div className="flex items-center gap-4 px-6 py-4">
+                    <svg className="w-5 h-5 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
+                    </svg>
+                    <div className="flex-1">
+                      <dt className="text-sm font-medium text-surface-500">ID Verification</dt>
+                      <dd className="text-sm text-surface-900">
+                        {user.id_verified ? 'Identity verified' : 'Required for courier features'}
+                      </dd>
+                    </div>
+                    <Badge variant={user.id_verified ? 'success' : 'warning'} size="sm">
+                      {user.id_verified ? 'Verified' : 'Not Verified'}
+                    </Badge>
+                  </div>
+                </>
               )}
               <div className="flex items-center gap-4 px-6 py-4">
                 <UserIcon />
@@ -233,82 +334,86 @@ export default function DashboardPage() {
           </Card>
         </SlideIn>
 
-        {/* Quick Actions */}
-        <SlideIn direction="up" delay={200} duration={400}>
-          <h2 className="text-lg font-semibold text-surface-900 mb-4">Quick Actions</h2>
-        </SlideIn>
-        <FadeIn delay={300} duration={500}>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {isSender && (
-              <>
+        {/* Quick Actions - Show for verified senders or fully verified couriers */}
+        {(canAccessSenderFeatures || canAccessCourierFeatures) && (
+          <>
+            <SlideIn direction="up" delay={200} duration={400}>
+              <h2 className="text-lg font-semibold text-surface-900 mb-4">Quick Actions</h2>
+            </SlideIn>
+            <FadeIn delay={300} duration={500}>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {canAccessSenderFeatures && (
+                  <>
+                    <Card hoverable className="group">
+                    <CardBody>
+                      <div className="flex items-start gap-4">
+                        <div className="flex-shrink-0 w-14 h-14 bg-primary-50 text-primary-600 rounded-xl flex items-center justify-center group-hover:bg-primary-100 transition-colors">
+                          <PackageIcon />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-lg font-semibold text-surface-900 mb-1">My Packages</h3>
+                          <p className="text-sm text-surface-500 mb-4">
+                            Track and manage your deliveries
+                          </p>
+                          <Link href="/sender">
+                            <Button variant="primary" size="sm">
+                              View Packages
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
+                    </CardBody>
+                  </Card>
+
+                  <Card hoverable className="group">
+                    <CardBody>
+                      <div className="flex items-start gap-4">
+                        <div className="flex-shrink-0 w-14 h-14 bg-secondary-50 text-secondary-600 rounded-xl flex items-center justify-center group-hover:bg-secondary-100 transition-colors">
+                          <SendIcon />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-lg font-semibold text-surface-900 mb-1">Send a Package</h3>
+                          <p className="text-sm text-surface-500 mb-4">
+                            Create a new delivery request
+                          </p>
+                          <Link href="/packages/create">
+                            <Button variant="secondary" size="sm">
+                              Create Package
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
+                    </CardBody>
+                  </Card>
+                </>
+              )}
+
+              {canAccessCourierFeatures && (
                 <Card hoverable className="group">
-                <CardBody>
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-14 h-14 bg-primary-50 text-primary-600 rounded-xl flex items-center justify-center group-hover:bg-primary-100 transition-colors">
-                      <PackageIcon />
+                  <CardBody>
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0 w-14 h-14 bg-success-50 text-success-600 rounded-xl flex items-center justify-center group-hover:bg-success-100 transition-colors">
+                        <CarIcon />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-lg font-semibold text-surface-900 mb-1">Find Packages</h3>
+                        <p className="text-sm text-surface-500 mb-4">
+                          Browse packages along your route
+                        </p>
+                        <Link href="/courier">
+                          <Button variant="outline" size="sm" className="border-success-600 text-success-600 hover:bg-success-50">
+                            Browse Packages
+                          </Button>
+                        </Link>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-semibold text-surface-900 mb-1">My Packages</h3>
-                      <p className="text-sm text-surface-500 mb-4">
-                        Track and manage your deliveries
-                      </p>
-                      <Link href="/sender">
-                        <Button variant="primary" size="sm">
-                          View Packages
-                        </Button>
-                      </Link>
-                    </div>
-                  </div>
-                </CardBody>
-              </Card>
-
-              <Card hoverable className="group">
-                <CardBody>
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-14 h-14 bg-secondary-50 text-secondary-600 rounded-xl flex items-center justify-center group-hover:bg-secondary-100 transition-colors">
-                      <SendIcon />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-semibold text-surface-900 mb-1">Send a Package</h3>
-                      <p className="text-sm text-surface-500 mb-4">
-                        Create a new delivery request
-                      </p>
-                      <Link href="/packages/create">
-                        <Button variant="secondary" size="sm">
-                          Create Package
-                        </Button>
-                      </Link>
-                    </div>
-                  </div>
-                </CardBody>
-              </Card>
-            </>
-          )}
-
-          {isCourier && (
-            <Card hoverable className="group">
-              <CardBody>
-                <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0 w-14 h-14 bg-success-50 text-success-600 rounded-xl flex items-center justify-center group-hover:bg-success-100 transition-colors">
-                    <CarIcon />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-semibold text-surface-900 mb-1">Find Packages</h3>
-                    <p className="text-sm text-surface-500 mb-4">
-                      Browse packages along your route
-                    </p>
-                    <Link href="/courier">
-                      <Button variant="outline" size="sm" className="border-success-600 text-success-600 hover:bg-success-50">
-                        Browse Packages
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              </CardBody>
-            </Card>
-            )}
-          </div>
-        </FadeIn>
+                  </CardBody>
+                </Card>
+                )}
+              </div>
+            </FadeIn>
+          </>
+        )}
       </div>
     </div>
   )

@@ -1,16 +1,20 @@
+import logging
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
+
+logger = logging.getLogger(__name__)
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_, desc
 from app.database import get_db
 from app.models.user import User, UserRole
-from app.models.package import Package, PackageStatus
+from app.models.package import Package, PackageStatus, CourierRoute
 from app.models.message import Message
 from app.models.package_note import PackageNote, NoteAuthorType
 from app.models.audit_log import AuditLog, AuditAction
 from app.utils.dependencies import get_current_admin_user
 from app.utils.encryption import get_encryption_service
 from app.utils.password_validator import validate_password
+from app.utils.phone_validator import validate_us_phone_number
 from app.services.audit_service import (
     log_user_create,
     log_user_update,
@@ -43,6 +47,8 @@ class UserAdminResponse(BaseModel):
     phone_number: str | None
     is_active: bool
     is_verified: bool
+    phone_verified: bool
+    id_verified: bool
     max_deviation_km: int
     created_at: datetime
     updated_at: datetime | None
@@ -123,6 +129,27 @@ class AuditLogListResponse(BaseModel):
     logs: List[AuditLogResponse]
 
 
+class CourierRouteAdminResponse(BaseModel):
+    id: int
+    courier_id: int
+    courier_name: str
+    courier_email: str
+    start_address: str
+    start_lat: float
+    start_lng: float
+    end_address: str
+    end_lat: float
+    end_lng: float
+    max_deviation_km: int
+    departure_time: datetime | None
+    trip_date: datetime | None
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 # Admin User Management Endpoints
 @router.get("/users", response_model=List[UserAdminResponse])
 async def get_all_users(
@@ -179,6 +206,10 @@ async def create_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
         )
+
+    # Validate US phone number format if provided
+    if user_data.phone_number:
+        validate_us_phone_number(user_data.phone_number)
 
     # Validate role
     role_upper = user_data.role.upper()
@@ -388,8 +419,17 @@ class ToggleUserVerified(BaseModel):
     is_verified: bool
 
 
+class TogglePhoneVerified(BaseModel):
+    phone_verified: bool
+
+
+class ToggleIdVerified(BaseModel):
+    id_verified: bool
+
+
 class UpdateUserProfile(BaseModel):
     full_name: str | None = None
+    email: str | None = None
     phone_number: str | None = None
     max_deviation_km: int | None = None
 
@@ -438,7 +478,26 @@ async def update_user_profile(
         user.full_name = profile_update.full_name
         user.full_name_encrypted = encryption_service.encrypt(profile_update.full_name) if encryption_service else None
 
+    if profile_update.email is not None and profile_update.email != user.email:
+        # Check if email is already taken by another user
+        existing_user = db.query(User).filter(
+            User.email == profile_update.email,
+            User.id != user_id
+        ).first()
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email address is already registered to another account"
+            )
+        changes["email"] = {"old": user.email, "new": profile_update.email}
+        user.email = profile_update.email
+        # Reset email verification since email changed
+        user.is_verified = False
+        user.verification_token = None
+
     if profile_update.phone_number is not None:
+        # Validate US phone number format
+        validate_us_phone_number(profile_update.phone_number)
         changes["phone_number"] = {"old": user.phone_number, "new": profile_update.phone_number}
         user.phone_number = profile_update.phone_number
         user.phone_number_encrypted = encryption_service.encrypt(profile_update.phone_number) if encryption_service else None
@@ -582,6 +641,122 @@ async def toggle_user_verified(
     return user
 
 
+@router.put("/users/{user_id}/toggle-phone-verified", response_model=UserAdminResponse)
+async def toggle_user_phone_verified(
+    request: Request,
+    user_id: int,
+    toggle_data: TogglePhoneVerified,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Toggle user phone verified status (admin only).
+
+    Allows admin to manually verify or unverify a user's phone number.
+
+    Args:
+        user_id: User ID
+        toggle_data: New phone verified status
+        db: Database session
+        admin: Current admin user
+
+    Returns:
+        Updated user details
+
+    Raises:
+        HTTPException: If user not found or user has no phone number
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    if not user.phone_number:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User does not have a phone number to verify"
+        )
+
+    user.phone_verified = toggle_data.phone_verified
+    # Clear any pending verification code when admin changes status
+    user.phone_verification_code = None
+    user.phone_verification_code_expires_at = None
+    user.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(user)
+
+    # Audit log phone verification/unverification
+    action = "phone_verified" if toggle_data.phone_verified else "phone_unverified"
+    logger.info(f"Admin {admin.id} set phone_verified={toggle_data.phone_verified} for user {user.id}")
+
+    return user
+
+
+@router.put("/users/{user_id}/toggle-id-verified", response_model=UserAdminResponse)
+async def toggle_user_id_verified(
+    request: Request,
+    user_id: int,
+    toggle_data: ToggleIdVerified,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Toggle user ID verified status (admin only).
+
+    Allows admin to manually verify or unverify a user's ID.
+    This is useful for manual approval of ID verification when the
+    automated Stripe Identity verification fails or requires review.
+
+    Args:
+        user_id: User ID
+        toggle_data: New ID verified status
+        db: Database session
+        admin: Current admin user
+
+    Returns:
+        Updated user details
+
+    Raises:
+        HTTPException: If user not found
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    old_value = user.id_verified
+    user.id_verified = toggle_data.id_verified
+    user.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(user)
+
+    # Audit log ID verification/unverification
+    log_audit(
+        db=db,
+        user=admin,
+        action=AuditAction.USER_UPDATE,
+        resource_type="user",
+        resource_id=user.id,
+        details={
+            "field": "id_verified",
+            "old_value": old_value,
+            "new_value": toggle_data.id_verified,
+            "admin_action": "manual_id_verification"
+        },
+        success=True,
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent")
+    )
+
+    logger.info(f"Admin {admin.id} set id_verified={toggle_data.id_verified} for user {user.id}")
+
+    return user
+
+
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(
     request: Request,
@@ -654,6 +829,60 @@ async def get_all_packages(
     """
     packages = db.query(Package).offset(skip).limit(limit).all()
     return packages
+
+
+# Admin Route Management Endpoints
+@router.get("/routes", response_model=List[CourierRouteAdminResponse])
+async def get_all_routes(
+    active_only: bool = False,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Get all courier routes with courier information (admin only).
+
+    Args:
+        active_only: If True, only return active routes
+        skip: Number of records to skip (pagination)
+        limit: Maximum number of records to return
+        db: Database session
+        admin: Current admin user
+
+    Returns:
+        List of all courier routes with courier details
+    """
+    query = db.query(CourierRoute).join(User, CourierRoute.courier_id == User.id)
+
+    if active_only:
+        query = query.filter(CourierRoute.is_active == True)
+
+    routes = query.order_by(desc(CourierRoute.created_at)).offset(skip).limit(limit).all()
+
+    # Build response with courier info
+    result = []
+    for route in routes:
+        courier = db.query(User).filter(User.id == route.courier_id).first()
+        result.append(CourierRouteAdminResponse(
+            id=route.id,
+            courier_id=route.courier_id,
+            courier_name=courier.full_name if courier else "Unknown",
+            courier_email=courier.email if courier else "Unknown",
+            start_address=route.start_address,
+            start_lat=route.start_lat,
+            start_lng=route.start_lng,
+            end_address=route.end_address,
+            end_lat=route.end_lat,
+            end_lng=route.end_lng,
+            max_deviation_km=route.max_deviation_km,
+            departure_time=route.departure_time,
+            trip_date=route.trip_date,
+            is_active=route.is_active,
+            created_at=route.created_at
+        ))
+
+    return result
 
 
 @router.get("/packages/{package_id}", response_model=PackageAdminResponse)

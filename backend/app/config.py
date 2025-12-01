@@ -112,6 +112,7 @@ class Settings(BaseSettings):
     STRIPE_PUBLISHABLE_KEY: Optional[str] = None
     STRIPE_WEBHOOK_SECRET: Optional[str] = None
     STRIPE_CONNECT_CLIENT_ID: Optional[str] = None
+    STRIPE_IDENTITY_WEBHOOK_SECRET: Optional[str] = None  # For Stripe Identity verification webhooks
     PLATFORM_FEE_PERCENT: float = 15.0  # 15% platform fee
 
     # Twilio Configuration

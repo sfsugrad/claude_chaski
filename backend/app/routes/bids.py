@@ -132,6 +132,13 @@ async def create_bid(
             detail="Only couriers can place bids"
         )
 
+    # Verify ID verification status
+    if not current_user.id_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="ID verification required before placing bids. Please complete ID verification in your profile settings."
+        )
+
     # Get package
     package = get_package_by_tracking_id(db, bid_data.tracking_id)
 

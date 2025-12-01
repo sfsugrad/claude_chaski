@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { couriersAPI, authAPI, ratingsAPI, packagesAPI, bidsAPI, RouteResponse, UserResponse, PendingRating, PackageResponse } from '@/lib/api'
 import Navbar from '@/components/Navbar'
 import RatingModal from '@/components/RatingModal'
+import CourierVerificationGuard from '@/components/CourierVerificationGuard'
 import {
   CourierDashboardSkeleton,
   Card,
@@ -19,7 +20,7 @@ import {
   SlideIn
 } from '@/components/ui'
 
-export default function CourierDashboard() {
+function CourierDashboardContent() {
   const [routes, setRoutes] = useState<RouteResponse[]>([])
   const [activeRoute, setActiveRoute] = useState<RouteResponse | null>(null)
   const [user, setUser] = useState<UserResponse | null>(null)
@@ -506,5 +507,13 @@ export default function CourierDashboard() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function CourierDashboard() {
+  return (
+    <CourierVerificationGuard>
+      <CourierDashboardContent />
+    </CourierVerificationGuard>
   )
 }

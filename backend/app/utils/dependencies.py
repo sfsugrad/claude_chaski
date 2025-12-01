@@ -102,12 +102,15 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Check if user is active
+    # Check if user is active (admin-controlled deactivation)
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Inactive user"
+            detail="Your account has been deactivated. Please contact support."
         )
+
+    # Note: Email and phone verification status is checked by frontend to show banners
+    # Users can still login and access dashboard even if not fully verified
 
     # Update session last activity (if session tracking is enabled)
     session_id = payload.get("session_id")

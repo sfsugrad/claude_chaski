@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -47,6 +48,7 @@ from app.services.jwt_blacklist import JWTBlacklistService
 from app.services.session_tracker import SessionTracker
 from app.utils.input_sanitizer import sanitize_plain_text, sanitize_email, sanitize_phone
 from app.utils.geo_restriction import get_country_from_ip, is_country_allowed
+from app.utils.phone_validator import validate_us_phone_number
 from app.models.audit_log import AuditLog, AuditAction
 from pydantic import BaseModel, EmailStr, Field
 
@@ -89,7 +91,7 @@ class UserRegister(BaseModel):
     password: str = Field(..., description="Password with enhanced security requirements")
     full_name: str = Field(..., min_length=1)
     role: str = Field(..., pattern="^(sender|courier|both)$")
-    phone_number: str | None = None
+    phone_number: str = Field(..., min_length=10, description="Phone number in E.164 format (required)")
     max_deviation_km: int | None = Field(default=5, ge=1, le=50)
     default_address: str | None = None
     default_address_lat: float | None = None
@@ -117,6 +119,7 @@ class UserResponse(BaseModel):
     phone_number: str | None
     is_active: bool
     is_verified: bool
+    phone_verified: bool
     max_deviation_km: int
     default_address: str | None = None
     default_address_lat: float | None = None
@@ -161,13 +164,27 @@ async def register(request: Request, user_data: UserRegister, db: Session = Depe
     - **phone_number**: Optional phone number
     - **max_deviation_km**: Maximum deviation distance for couriers (1-50 km)
     """
-    # Check if user already exists
+    # Check if email already exists
     existing_user = db.query(User).filter(User.email == user_data.email).first()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
         )
+
+    # Validate and check phone number (required, must be US format)
+    if user_data.phone_number:
+        # Validate US phone number format
+        validate_us_phone_number(user_data.phone_number)
+
+        # Check if phone number already exists
+        phone_hash = hash_pii(user_data.phone_number)
+        existing_phone = db.query(User).filter(User.phone_number_hash == phone_hash).first()
+        if existing_phone:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Phone number already registered to another account"
+            )
 
     # GEO-RESTRICTION CHECK: Block registrations from outside allowed countries
     client_ip = request.client.host if request.client else None
@@ -281,8 +298,32 @@ async def register(request: Request, user_data: UserRegister, db: Session = Depe
     )
 
     db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+
+    try:
+        db.commit()
+        db.refresh(new_user)
+    except IntegrityError as e:
+        db.rollback()
+        error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
+
+        # Check for specific constraint violations
+        if 'email' in error_msg.lower() or 'idx_users_email' in error_msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered"
+            )
+        elif 'phone' in error_msg.lower() or 'idx_users_phone' in error_msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Phone number already registered to another account"
+            )
+        else:
+            # Log the unexpected error for debugging
+            logger.error(f"Registration IntegrityError: {error_msg}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Registration failed due to a data conflict. Please check your information and try again."
+            )
 
     # Audit log registration
     log_registration(db, new_user, request)
@@ -383,7 +424,7 @@ async def login(request: Request, response: Response, credentials: UserLogin, db
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Check if user is active
+    # Check if user is active (admin-controlled deactivation)
     if not user.is_active:
         record_login_attempt(
             db, credentials.email, ip_address, user_agent,
@@ -394,8 +435,11 @@ async def login(request: Request, response: Response, credentials: UserLogin, db
 
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is inactive"
+            detail="Your account has been deactivated. Please contact support."
         )
+
+    # Note: Email and phone verification status is returned in the response
+    # Frontend will show appropriate banners for unverified users
 
     # Successful login - record attempt
     record_login_attempt(
@@ -470,6 +514,7 @@ async def get_current_user_info(
         phone_number=current_user.phone_number,
         is_active=current_user.is_active,
         is_verified=current_user.is_verified,
+        phone_verified=current_user.phone_verified,
         max_deviation_km=current_user.max_deviation_km,
         default_address=current_user.default_address,
         default_address_lat=current_user.default_address_lat,
@@ -551,6 +596,7 @@ async def update_current_user(
         phone_number=current_user.phone_number,
         is_active=current_user.is_active,
         is_verified=current_user.is_verified,
+        phone_verified=current_user.phone_verified,
         max_deviation_km=current_user.max_deviation_km,
         default_address=current_user.default_address,
         default_address_lat=current_user.default_address_lat,
@@ -786,6 +832,8 @@ async def google_callback(request: Request, state: str = 'en', db: Session = Dep
         return response
 
     except Exception as e:
+        # Log the actual error for debugging
+        logger.error(f"Google OAuth callback failed: {type(e).__name__}: {str(e)}", exc_info=True)
         # Redirect to frontend with error
         error_url = f"{settings.FRONTEND_URL}/login?error=oauth_failed"
         return RedirectResponse(url=error_url)
@@ -980,8 +1028,8 @@ async def send_phone_verification_code(
     # Generate 6-digit code
     code = ''.join([str(secrets.randbelow(10)) for _ in range(6)])
 
-    # Set expiration time (10 minutes)
-    expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+    # Set expiration time (2 hours)
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=2)
 
     # Update user with hashed verification code (for security)
     current_user.phone_verification_code = hash_token(code)
@@ -995,7 +1043,7 @@ async def send_phone_verification_code(
 
     return {
         "message": "Verification code sent to your phone number",
-        "expires_in_minutes": 10
+        "expires_in_hours": 2
     }
 
 
@@ -1076,8 +1124,8 @@ async def resend_phone_verification_code(
     # Generate new 6-digit code
     code = ''.join([str(secrets.randbelow(10)) for _ in range(6)])
 
-    # Set expiration time (10 minutes)
-    expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+    # Set expiration time (2 hours)
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=2)
 
     # Update user with hashed verification code (for security)
     current_user.phone_verification_code = hash_token(code)
@@ -1091,7 +1139,7 @@ async def resend_phone_verification_code(
 
     return {
         "message": "Verification code resent to your phone number",
-        "expires_in_minutes": 10
+        "expires_in_hours": 2
     }
 
 

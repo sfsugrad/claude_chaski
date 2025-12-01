@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { authAPI, adminAPI, AdminUser, AdminPackage, AdminStats, MatchingJobResult, UserResponse } from '@/lib/api'
+import { authAPI, adminAPI, AdminUser, AdminPackage, AdminStats, MatchingJobResult, UserResponse, AdminRoute } from '@/lib/api'
 import {
   StatsCard,
   StatsGrid,
@@ -40,7 +40,8 @@ export default function AdminPage() {
     pending_packages: 0,
     total_revenue: 0,
   })
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'packages'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'packages' | 'routes'>('overview')
+  const [routes, setRoutes] = useState<AdminRoute[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -152,6 +153,15 @@ export default function AdminPage() {
       errors.push(`Failed to load packages: ${err.response?.data?.detail || err.message}`)
     }
 
+    // Load routes
+    try {
+      const routesResponse = await adminAPI.getRoutes()
+      setRoutes(routesResponse.data)
+    } catch (err: any) {
+      console.error('Error loading routes:', err)
+      errors.push(`Failed to load routes: ${err.response?.data?.detail || err.message}`)
+    }
+
     // Load stats from backend
     try {
       const statsResponse = await adminAPI.getStats()
@@ -229,17 +239,51 @@ export default function AdminPage() {
 
   const handleToggleUserVerified = async (userId: number, currentStatus: boolean) => {
     const action = currentStatus ? 'unverify' : 'verify'
-    if (!confirm(`Are you sure you want to ${action} this user?`)) {
+    if (!confirm(`Are you sure you want to ${action} this user's email?`)) {
       return
     }
 
     try {
       await adminAPI.toggleUserVerified(userId, !currentStatus)
       await loadData()
-      alert(`User ${action === 'verify' ? 'verified' : 'unverified'} successfully`)
+      alert(`User email ${action === 'verify' ? 'verified' : 'unverified'} successfully`)
     } catch (err: any) {
       console.error('Error toggling user verification:', err)
       const errorMessage = err.response?.data?.detail || `Failed to ${action} user`
+      alert(errorMessage)
+    }
+  }
+
+  const handleTogglePhoneVerified = async (userId: number, currentStatus: boolean) => {
+    const action = currentStatus ? 'unverify' : 'verify'
+    if (!confirm(`Are you sure you want to ${action} this user's phone number?`)) {
+      return
+    }
+
+    try {
+      await adminAPI.toggleUserPhoneVerified(userId, !currentStatus)
+      await loadData()
+      alert(`User phone ${action === 'verify' ? 'verified' : 'unverified'} successfully`)
+    } catch (err: any) {
+      console.error('Error toggling phone verification:', err)
+      const errorMessage = err.response?.data?.detail || `Failed to ${action} phone`
+      alert(errorMessage)
+    }
+  }
+
+  const handleToggleIdVerified = async (userId: number, currentStatus: boolean) => {
+    const action = currentStatus ? 'unverify' : 'verify'
+    if (!confirm(`Are you sure you want to ${action} this user's ID?`)) {
+      return
+    }
+
+    try {
+      await adminAPI.toggleUserIdVerified(userId, !currentStatus)
+      await loadData()
+      alert(`User ID ${action === 'verify' ? 'verified' : 'unverified'} successfully`)
+    } catch (err: any) {
+      console.error('Error toggling ID verification:', err)
+      const errorMessage = err.response?.data?.detail || `Failed to ${action} ID`
       alert(errorMessage)
     }
   }
@@ -451,6 +495,16 @@ export default function AdminPage() {
               }`}
             >
               Packages
+            </button>
+            <button
+              onClick={() => setActiveTab('routes')}
+              className={`py-4 px-2 border-b-2 transition ${
+                activeTab === 'routes'
+                  ? 'border-primary-600 text-primary-600 font-semibold'
+                  : 'border-transparent text-surface-600 hover:text-primary-600'
+              }`}
+            >
+              Routes ({routes.filter(r => r.is_active).length} active)
             </button>
           </div>
         </div>
@@ -860,7 +914,13 @@ export default function AdminPage() {
                         Role
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Verification
+                        Email
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Phone
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        ID
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                         Active
@@ -911,9 +971,41 @@ export default function AdminPage() {
                                 ? 'bg-green-100 text-green-800 hover:bg-green-200'
                                 : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
                             } ${!u.is_active ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            title={u.is_active ? `Click to ${u.is_verified ? 'unverify' : 'verify'} user` : 'Cannot modify inactive user'}
+                            title={u.is_active ? `Click to ${u.is_verified ? 'unverify' : 'verify'} email` : 'Cannot modify inactive user'}
                           >
                             {u.is_verified ? 'Verified' : 'Unverified'}
+                          </button>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {u.phone_number ? (
+                            <button
+                              onClick={() => handleTogglePhoneVerified(u.id, u.phone_verified)}
+                              disabled={!u.is_active}
+                              className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full cursor-pointer transition-colors ${
+                                u.phone_verified
+                                  ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                                  : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
+                              } ${!u.is_active ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              title={u.is_active ? `Click to ${u.phone_verified ? 'unverify' : 'verify'} phone` : 'Cannot modify inactive user'}
+                            >
+                              {u.phone_verified ? 'Verified' : 'Unverified'}
+                            </button>
+                          ) : (
+                            <span className="px-2 py-1 text-xs text-gray-400">No phone</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <button
+                            onClick={() => handleToggleIdVerified(u.id, u.id_verified)}
+                            disabled={!u.is_active}
+                            className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full cursor-pointer transition-colors ${
+                              u.id_verified
+                                ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                                : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
+                            } ${!u.is_active ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            title={u.is_active ? `Click to ${u.id_verified ? 'unverify' : 'verify'} ID` : 'Cannot modify inactive user'}
+                          >
+                            {u.id_verified ? 'Verified' : 'Unverified'}
                           </button>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -1140,6 +1232,105 @@ export default function AdminPage() {
                         </tr>
                       )
                     })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'routes' && (
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold">Courier Routes</h2>
+              <div className="text-gray-600">
+                Total Routes: {routes.length} ({routes.filter(r => r.is_active).length} active)
+              </div>
+            </div>
+
+            {routes.length === 0 ? (
+              <div className="bg-white rounded-lg shadow p-8 text-center">
+                <div className="text-gray-600">No courier routes found</div>
+              </div>
+            ) : (
+              <div className="bg-white rounded-lg shadow overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
+                        ID
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
+                        Courier
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
+                        From
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
+                        To
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
+                        Trip Date
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
+                        Deviation
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
+                        Created
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {routes.map((route) => (
+                      <tr key={route.id} className={!route.is_active ? 'bg-gray-50' : ''}>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="text-sm font-medium text-gray-900">#{route.id}</span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">
+                            <Link href={`/admin/users/${route.courier_id}`} className="text-purple-600 hover:text-purple-900">
+                              {route.courier_name}
+                            </Link>
+                          </div>
+                          <div className="text-xs text-gray-500">{route.courier_email}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="text-sm text-gray-900 max-w-[200px] truncate" title={route.start_address}>
+                            {route.start_address}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="text-sm text-gray-900 max-w-[200px] truncate" title={route.end_address}>
+                            {route.end_address}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                          {route.trip_date
+                            ? new Date(route.trip_date).toLocaleDateString()
+                            : route.departure_time
+                              ? new Date(route.departure_time).toLocaleDateString()
+                              : 'Not set'}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                          {route.max_deviation_km} km
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            route.is_active
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {route.is_active ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                          {new Date(route.created_at).toLocaleDateString()}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>

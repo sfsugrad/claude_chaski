@@ -8,6 +8,7 @@ import { couriersAPI, RouteCreate } from '@/lib/api';
 import { Button, Card, CardBody, Alert, Input } from '@/components/ui';
 import AddressAutocomplete from '@/components/AddressAutocomplete';
 import { RouteMap } from '@/components/map';
+import CourierVerificationGuard from '@/components/CourierVerificationGuard';
 
 const deviationPresets = [
   { value: 2, label: '2 km', description: 'Very close to route' },
@@ -16,7 +17,7 @@ const deviationPresets = [
   { value: 20, label: '20 km', description: 'Significant detour' },
 ];
 
-export default function CreateRoutePage() {
+function CreateRouteContent() {
   const router = useRouter();
   const [formData, setFormData] = useState<RouteCreate>({
     start_address: '',
@@ -360,5 +361,13 @@ export default function CreateRoutePage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function CreateRoutePage() {
+  return (
+    <CourierVerificationGuard>
+      <CreateRouteContent />
+    </CourierVerificationGuard>
   );
 }

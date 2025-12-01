@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum as SQLEnum, Float
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.models.base import Base
 import enum
@@ -66,9 +67,20 @@ class User(Base):
     # Stripe customer ID (for senders to save payment methods)
     stripe_customer_id = Column(String(255), nullable=True, unique=True)
 
+    # ID verification for couriers (Stripe Identity)
+    id_verified = Column(Boolean, default=False)  # True when ID verification approved
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    id_verifications = relationship(
+        "IDVerification",
+        back_populates="user",
+        foreign_keys="IDVerification.user_id",
+        cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<User {self.email}>"

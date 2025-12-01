@@ -68,6 +68,25 @@ export default function Navbar({ user }: NavbarProps) {
   const isSender = user?.role === 'sender' || user?.role === 'both' || user?.role === 'admin'
   const isCourier = user?.role === 'courier' || user?.role === 'both'
   const isAdmin = user?.role === 'admin'
+  // Sender features require email and phone verification
+  const isSenderVerified = user?.is_verified && user?.phone_verified
+  // Courier features require email, phone, AND ID verification
+  const isCourierFullyVerified = user?.is_verified && user?.phone_verified && user?.id_verified
+  // For 'both' role users, require courier-level verification for ALL features
+  // Pure senders only need email + phone
+  const canAccessSenderFeatures = isAdmin ||
+    (user?.role === 'sender' && isSenderVerified) ||
+    (user?.role === 'both' && isCourierFullyVerified)
+  const canAccessCourierFeatures = isCourier && isCourierFullyVerified
+  // Check if user can access general features (messages, notifications, reviews)
+  // - Admins: always allowed
+  // - Senders: need email + phone verification
+  // - Couriers: need email + phone + ID verification
+  // - Both: need courier-level verification (all three)
+  const canAccessGeneralFeatures = isAdmin ||
+    (user?.role === 'sender' && isSenderVerified) ||
+    (user?.role === 'courier' && isCourierFullyVerified) ||
+    (user?.role === 'both' && isCourierFullyVerified)
 
   const isActiveLink = (path: string) => pathname === path
 
@@ -93,7 +112,7 @@ export default function Navbar({ user }: NavbarProps) {
                   </svg>
                   Dashboard
                 </Link>
-                {isSender && (
+                {canAccessSenderFeatures && (
                   <>
                     <Link
                       href="/sender"
@@ -124,7 +143,7 @@ export default function Navbar({ user }: NavbarProps) {
                     </Link>
                   </>
                 )}
-                {isCourier && (
+                {canAccessCourierFeatures && (
                   <Link
                     href="/courier"
                     className={`nav-link ${isActiveLink('/courier') ? 'nav-link-active' : ''}`}
@@ -166,37 +185,39 @@ export default function Navbar({ user }: NavbarProps) {
                   data-testid="connection-status"
                 />
 
-                {/* Messages Link */}
-                <Link
-                  href="/messages"
-                  className="relative p-2 text-surface-500 hover:text-surface-900 hover:bg-surface-100 rounded-lg transition-colors"
-                  aria-label={`Messages${unreadMessageCount > 0 ? ` (${unreadMessageCount} unread)` : ''}`}
-                >
-                  <svg
-                    className="h-5 w-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
+                {/* Messages Link - Hidden for unverified pure couriers */}
+                {canAccessGeneralFeatures && (
+                  <Link
+                    href="/messages"
+                    className="relative p-2 text-surface-500 hover:text-surface-900 hover:bg-surface-100 rounded-lg transition-colors"
+                    aria-label={`Messages${unreadMessageCount > 0 ? ` (${unreadMessageCount} unread)` : ''}`}
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                    />
-                  </svg>
-                  {unreadMessageCount > 0 && (
-                    <span
-                      className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-primary-600 rounded-full"
-                      data-testid="message-unread-count"
+                    <svg
+                      className="h-5 w-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
                     >
-                      {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
-                    </span>
-                  )}
-                </Link>
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                      />
+                    </svg>
+                    {unreadMessageCount > 0 && (
+                      <span
+                        className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-primary-600 rounded-full"
+                        data-testid="message-unread-count"
+                      >
+                        {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
+                      </span>
+                    )}
+                  </Link>
+                )}
 
-                {/* Notification Dropdown */}
-                <NotificationDropdown />
+                {/* Notification Dropdown - Hidden for unverified pure couriers */}
+                {canAccessGeneralFeatures && <NotificationDropdown />}
 
                 {/* User Dropdown Menu - Hidden on mobile */}
                 <div className="hidden sm:block relative" data-testid="user-menu-button">
@@ -246,46 +267,48 @@ export default function Navbar({ user }: NavbarProps) {
                           </Badge>
                         </div>
 
-                        {/* Menu Items */}
-                        <div className="py-1">
-                          <Link
-                            href="/profile/reviews"
-                            className="dropdown-item"
-                            onClick={() => setUserMenuOpen(false)}
-                          >
-                            <svg className="w-4 h-4 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                            </svg>
-                            My Reviews
-                          </Link>
-                          <Link
-                            href="/notifications"
-                            className="dropdown-item"
-                            onClick={() => setUserMenuOpen(false)}
-                          >
-                            <svg className="w-4 h-4 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                            </svg>
-                            Notifications
-                          </Link>
-                          <Link
-                            href="/messages"
-                            className="dropdown-item"
-                            onClick={() => setUserMenuOpen(false)}
-                          >
-                            <svg className="w-4 h-4 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                            </svg>
-                            Messages
-                            {unreadMessageCount > 0 && (
-                              <span className="ml-auto">
-                                <Badge variant="primary" size="sm">
-                                  {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
-                                </Badge>
-                              </span>
-                            )}
-                          </Link>
-                        </div>
+                        {/* Menu Items - Hidden for unverified pure couriers */}
+                        {canAccessGeneralFeatures && (
+                          <div className="py-1">
+                            <Link
+                              href="/profile/reviews"
+                              className="dropdown-item"
+                              onClick={() => setUserMenuOpen(false)}
+                            >
+                              <svg className="w-4 h-4 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                              </svg>
+                              My Reviews
+                            </Link>
+                            <Link
+                              href="/notifications"
+                              className="dropdown-item"
+                              onClick={() => setUserMenuOpen(false)}
+                            >
+                              <svg className="w-4 h-4 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                              </svg>
+                              Notifications
+                            </Link>
+                            <Link
+                              href="/messages"
+                              className="dropdown-item"
+                              onClick={() => setUserMenuOpen(false)}
+                            >
+                              <svg className="w-4 h-4 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                              </svg>
+                              Messages
+                              {unreadMessageCount > 0 && (
+                                <span className="ml-auto">
+                                  <Badge variant="primary" size="sm">
+                                    {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
+                                  </Badge>
+                                </span>
+                              )}
+                            </Link>
+                          </div>
+                        )}
 
                         {/* Logout */}
                         <div className="dropdown-divider" />
@@ -366,22 +389,24 @@ export default function Navbar({ user }: NavbarProps) {
               </svg>
               Dashboard
             </Link>
-            <Link
-              href="/messages"
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-base font-medium ${pathname?.startsWith('/messages') ? 'bg-primary-50 text-primary-700' : 'text-surface-600 hover:bg-surface-100'}`}
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-              Messages
-              {unreadMessageCount > 0 && (
-                <Badge variant="primary" size="sm">
-                  {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
-                </Badge>
-              )}
-            </Link>
-            {isSender && (
+            {canAccessGeneralFeatures && (
+              <Link
+                href="/messages"
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-base font-medium ${pathname?.startsWith('/messages') ? 'bg-primary-50 text-primary-700' : 'text-surface-600 hover:bg-surface-100'}`}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                Messages
+                {unreadMessageCount > 0 && (
+                  <Badge variant="primary" size="sm">
+                    {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
+                  </Badge>
+                )}
+              </Link>
+            )}
+            {canAccessSenderFeatures && (
               <>
                 <Link
                   href="/sender"
@@ -415,7 +440,7 @@ export default function Navbar({ user }: NavbarProps) {
                 </Link>
               </>
             )}
-            {isCourier && (
+            {canAccessCourierFeatures && (
               <Link
                 href="/courier"
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg text-base font-medium ${isActiveLink('/courier') ? 'bg-primary-50 text-primary-700' : 'text-surface-600 hover:bg-surface-100'}`}
@@ -445,14 +470,21 @@ export default function Navbar({ user }: NavbarProps) {
             <div className="px-4 py-2">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-medium text-surface-900">{user.full_name}</p>
-                <Link
-                  href="/profile/reviews"
-                  className="flex items-center gap-1 hover:opacity-80 transition-opacity"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <StarRating rating={user.average_rating || 0} size="sm" />
-                  <span className="text-xs text-surface-400">({user.total_ratings || 0})</span>
-                </Link>
+                {canAccessGeneralFeatures ? (
+                  <Link
+                    href="/profile/reviews"
+                    className="flex items-center gap-1 hover:opacity-80 transition-opacity"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <StarRating rating={user.average_rating || 0} size="sm" />
+                    <span className="text-xs text-surface-400">({user.total_ratings || 0})</span>
+                  </Link>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <StarRating rating={user.average_rating || 0} size="sm" />
+                    <span className="text-xs text-surface-400">({user.total_ratings || 0})</span>
+                  </div>
+                )}
               </div>
               <p className="text-sm text-surface-500">{user.email}</p>
             </div>

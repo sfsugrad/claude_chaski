@@ -37,6 +37,86 @@ const PhoneIcon = () => (
   </svg>
 )
 
+const CheckIcon = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+  </svg>
+)
+
+const XIcon = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+  </svg>
+)
+
+// Password validation helpers
+const validatePasswordRequirements = (password: string) => {
+  return {
+    minLength: password.length >= 12,
+    hasUppercase: /[A-Z]/.test(password),
+    hasLowercase: /[a-z]/.test(password),
+    hasDigit: /\d/.test(password),
+    hasSpecial: /[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\\/;`~]/.test(password),
+  }
+}
+
+// Password Requirements Component
+const PasswordRequirements = ({ password }: { password: string }) => {
+  const requirements = validatePasswordRequirements(password)
+  const hasStartedTyping = password.length > 0
+
+  const items = [
+    { key: 'minLength', label: 'At least 12 characters', met: requirements.minLength },
+    { key: 'hasUppercase', label: 'One uppercase letter (A-Z)', met: requirements.hasUppercase },
+    { key: 'hasLowercase', label: 'One lowercase letter (a-z)', met: requirements.hasLowercase },
+    { key: 'hasDigit', label: 'One digit (0-9)', met: requirements.hasDigit },
+    { key: 'hasSpecial', label: 'One special character (!@#$...)', met: requirements.hasSpecial },
+  ]
+
+  if (!hasStartedTyping) {
+    return (
+      <div className="mt-2 p-3 bg-surface-50 rounded-lg border border-surface-200">
+        <p className="text-xs font-medium text-surface-600 mb-2">Password must contain:</p>
+        <ul className="space-y-1">
+          {items.map((item) => (
+            <li key={item.key} className="flex items-center gap-2 text-xs text-surface-500">
+              <span className="w-4 h-4 rounded-full border border-surface-300 flex-shrink-0" />
+              {item.label}
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
+  }
+
+  const allMet = Object.values(requirements).every(Boolean)
+
+  return (
+    <div className={`mt-2 p-3 rounded-lg border ${allMet ? 'bg-success-50 border-success-200' : 'bg-surface-50 border-surface-200'}`}>
+      <p className="text-xs font-medium text-surface-600 mb-2">
+        {allMet ? 'Password meets all requirements!' : 'Password requirements:'}
+      </p>
+      <ul className="space-y-1">
+        {items.map((item) => (
+          <li
+            key={item.key}
+            className={`flex items-center gap-2 text-xs ${
+              item.met ? 'text-success-600' : 'text-error-600'
+            }`}
+          >
+            <span className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${
+              item.met ? 'bg-success-100 text-success-600' : 'bg-error-100 text-error-600'
+            }`}>
+              {item.met ? <CheckIcon /> : <XIcon />}
+            </span>
+            {item.label}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 export default function RegisterPage() {
   const router = useRouter()
   const locale = useLocale()
@@ -108,8 +188,10 @@ export default function RegisterPage() {
       return false
     }
 
-    if (formData.password.length < 8) {
-      setError(t('passwordMinLength'))
+    // Validate password requirements
+    const passwordReqs = validatePasswordRequirements(formData.password)
+    if (!Object.values(passwordReqs).every(Boolean)) {
+      setError('Password does not meet all requirements')
       return false
     }
 
@@ -264,33 +346,55 @@ export default function RegisterPage() {
               />
 
               {/* Password */}
-              <Input
-                label={t('password')}
-                id="password"
-                name="password"
-                type="password"
-                required
-                value={formData.password}
-                onChange={handleChange}
-                placeholder={t('passwordPlaceholder')}
-                leftIcon={<LockIcon />}
-                helperText={t('passwordHelper')}
-                autoComplete="new-password"
-              />
+              <div>
+                <Input
+                  label={t('password')}
+                  id="password"
+                  name="password"
+                  type="password"
+                  required
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder={t('passwordPlaceholder')}
+                  leftIcon={<LockIcon />}
+                  autoComplete="new-password"
+                />
+                <PasswordRequirements password={formData.password} />
+              </div>
 
               {/* Confirm Password */}
-              <Input
-                label={t('confirmPassword')}
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                required
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                placeholder={t('confirmPasswordPlaceholder')}
-                leftIcon={<LockIcon />}
-                autoComplete="new-password"
-              />
+              <div>
+                <Input
+                  label={t('confirmPassword')}
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type="password"
+                  required
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  placeholder={t('confirmPasswordPlaceholder')}
+                  leftIcon={<LockIcon />}
+                  autoComplete="new-password"
+                />
+                {formData.confirmPassword.length > 0 && (
+                  <div className={`mt-2 flex items-center gap-2 text-xs ${
+                    formData.password === formData.confirmPassword
+                      ? 'text-success-600'
+                      : 'text-error-600'
+                  }`}>
+                    <span className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      formData.password === formData.confirmPassword
+                        ? 'bg-success-100 text-success-600'
+                        : 'bg-error-100 text-error-600'
+                    }`}>
+                      {formData.password === formData.confirmPassword ? <CheckIcon /> : <XIcon />}
+                    </span>
+                    {formData.password === formData.confirmPassword
+                      ? 'Passwords match'
+                      : 'Passwords do not match'}
+                  </div>
+                )}
+              </div>
 
               {/* Role */}
               <div className="form-group">
@@ -317,14 +421,15 @@ export default function RegisterPage() {
                 </label>
                 <PhoneInput
                   international
-                  defaultCountry={getDefaultCountry(locale) as any}
+                  defaultCountry="US"
+                  countries={['US']}
                   value={formData.phone_number}
                   onChange={(value) => setFormData(prev => ({ ...prev, phone_number: value || '' }))}
                   className="phone-input"
                   placeholder={t('phonePlaceholder')}
                 />
                 <p className="helper-text">
-                  {t('phoneHelper')}
+                  US phone numbers only (+1)
                 </p>
               </div>
 

@@ -62,6 +62,8 @@ export interface UserResponse {
   phone_number: string | null
   is_active: boolean
   is_verified: boolean
+  phone_verified: boolean
+  id_verified: boolean
   max_deviation_km: number
   default_address: string | null
   default_address_lat: number | null
@@ -186,6 +188,10 @@ export const authAPI = {
   updateProfile: (data: UserUpdate) => api.put<UserResponse>('/auth/me', data),
   forgotPassword: (data: ForgotPasswordData) => api.post<MessageResponse>('/auth/forgot-password', data),
   resetPassword: (data: ResetPasswordData) => api.post<MessageResponse>('/auth/reset-password', data),
+  // Phone verification
+  sendPhoneCode: () => api.post<MessageResponse>('/auth/phone/send-code'),
+  verifyPhoneCode: (code: string) => api.post<MessageResponse>('/auth/phone/verify', { code }),
+  resendPhoneCode: () => api.post<MessageResponse>('/auth/phone/resend-code'),
 }
 
 // Packages API
@@ -449,6 +455,8 @@ export interface AdminUser {
   phone_number: string | null
   is_active: boolean
   is_verified: boolean
+  phone_verified: boolean
+  id_verified: boolean
   max_deviation_km: number
   created_at: string
   updated_at: string | null
@@ -515,6 +523,25 @@ export interface MatchingJobResult {
 }
 
 // Admin API
+// Admin Route type
+export interface AdminRoute {
+  id: number
+  courier_id: number
+  courier_name: string
+  courier_email: string
+  start_address: string
+  start_lat: number
+  start_lng: number
+  end_address: string
+  end_lat: number
+  end_lng: number
+  max_deviation_km: number
+  departure_time: string | null
+  trip_date: string | null
+  is_active: boolean
+  created_at: string
+}
+
 export const adminAPI = {
   // Users
   getUsers: () => api.get<AdminUser[]>('/admin/users'),
@@ -526,13 +553,21 @@ export const adminAPI = {
     api.put(`/admin/users/${userId}/toggle-active`, { is_active: isActive }),
   toggleUserVerified: (userId: number, isVerified: boolean) =>
     api.put(`/admin/users/${userId}/toggle-verified`, { is_verified: isVerified }),
-  updateUserProfile: (userId: number, data: { full_name?: string; phone_number?: string | null; max_deviation_km?: number }) =>
+  toggleUserPhoneVerified: (userId: number, phoneVerified: boolean) =>
+    api.put(`/admin/users/${userId}/toggle-phone-verified`, { phone_verified: phoneVerified }),
+  toggleUserIdVerified: (userId: number, idVerified: boolean) =>
+    api.put(`/admin/users/${userId}/toggle-id-verified`, { id_verified: idVerified }),
+  updateUserProfile: (userId: number, data: { full_name?: string; email?: string; phone_number?: string | null; max_deviation_km?: number }) =>
     api.put(`/admin/users/${userId}/profile`, data),
 
   // Packages
   getPackages: () => api.get<AdminPackage[]>('/admin/packages'),
   togglePackageActive: (packageId: number, isActive: boolean) =>
     api.put(`/admin/packages/${packageId}/toggle-active`, { is_active: isActive }),
+
+  // Routes
+  getRoutes: (activeOnly: boolean = false) =>
+    api.get<AdminRoute[]>(`/admin/routes?active_only=${activeOnly}`),
 
   // Stats
   getStats: () => api.get<AdminStats>('/admin/stats'),
@@ -1107,4 +1142,105 @@ export const notesAPI = {
   // Add a note to a package
   addNote: (trackingId: string, content: string) =>
     api.post<PackageNoteResponse>(`/packages/${trackingId}/notes`, { content }),
+}
+
+// ID Verification Types
+export type IDVerificationStatus =
+  | 'pending'
+  | 'processing'
+  | 'verified'
+  | 'failed'
+  | 'requires_review'
+  | 'admin_approved'
+  | 'admin_rejected'
+  | 'expired'
+
+export interface IDVerificationStatusResponse {
+  is_verified: boolean
+  status: IDVerificationStatus | null
+  can_start_verification: boolean
+  verification: {
+    id: number
+    status: IDVerificationStatus
+    created_at: string | null
+    completed_at: string | null
+    rejection_reason: string | null
+    failure_reason: string | null
+  } | null
+}
+
+export interface StartVerificationResponse {
+  session_id: string
+  url: string
+  verification_id: number
+}
+
+export interface VerificationResponse {
+  id: number
+  user_id: number
+  status: IDVerificationStatus
+  document_type: string | null
+  document_country: string | null
+  created_at: string
+  submitted_at: string | null
+  completed_at: string | null
+  rejection_reason: string | null
+  failure_reason: string | null
+  reviewed_at: string | null
+}
+
+export interface AdminVerificationResponse extends VerificationResponse {
+  user_email: string | null
+  user_full_name: string | null
+  failure_code: string | null
+  reviewed_by_admin_id: number | null
+  admin_notes: string | null
+}
+
+// ID Verification API
+export const idVerificationAPI = {
+  // Get current verification status
+  getStatus: () =>
+    api.get<IDVerificationStatusResponse>('/id-verification/status'),
+
+  // Start a new verification session
+  startVerification: (returnUrl: string) =>
+    api.post<StartVerificationResponse>('/id-verification/start', { return_url: returnUrl }),
+
+  // Get verification history
+  getHistory: () =>
+    api.get<VerificationResponse[]>('/id-verification/history'),
+
+  // Cancel pending verification
+  cancelVerification: () =>
+    api.post('/id-verification/cancel'),
+
+  // Admin endpoints
+  admin: {
+    // Get pending verifications
+    getPending: (skip: number = 0, limit: number = 50) =>
+      api.get<AdminVerificationResponse[]>(`/id-verification/admin/pending?skip=${skip}&limit=${limit}`),
+
+    // Get all verifications with optional status filter
+    getAll: (skip: number = 0, limit: number = 50, status?: IDVerificationStatus) =>
+      api.get<AdminVerificationResponse[]>(
+        `/id-verification/admin/all?skip=${skip}&limit=${limit}${status ? `&status_filter=${status}` : ''}`
+      ),
+
+    // Get single verification details
+    getVerification: (verificationId: number) =>
+      api.get<AdminVerificationResponse>(`/id-verification/admin/${verificationId}`),
+
+    // Review verification (approve/reject)
+    review: (verificationId: number, action: 'approve' | 'reject', rejectionReason?: string, notes?: string) =>
+      api.post(`/id-verification/admin/${verificationId}/review`, {
+        action,
+        rejection_reason: rejectionReason,
+        notes,
+      }),
+
+    // Get user's verifications
+    getUserVerifications: (userId: number) =>
+      api.get<AdminVerificationResponse[]>(`/id-verification/admin/user/${userId}`),
+  },
 }
