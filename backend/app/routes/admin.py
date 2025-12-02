@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 
 logger = logging.getLogger(__name__)
 from sqlalchemy.orm import Session
-from sqlalchemy import func, or_, desc
+from sqlalchemy import func, or_, desc, and_
 from app.database import get_db
 from app.models.user import User, UserRole
 from app.models.package import Package, PackageStatus, CourierRoute
@@ -29,9 +29,13 @@ from app.services.audit_service import (
     log_admin_stats_access,
     log_matching_job_run,
     log_audit,
+    log_route_create,
 )
+from app.services.route_deactivation_service import handle_route_deactivation
 from app.services.package_status import transition_package
 from app.services.user_service import can_deactivate_user
+from app.utils.matching_utils import count_matching_routes_for_package
+from app.models.bid import CourierBid
 from pydantic import BaseModel, EmailStr, Field
 from typing import List, Optional
 
@@ -75,6 +79,9 @@ class PackageAdminResponse(BaseModel):
     price: float | None
     is_active: bool
     created_at: datetime
+    bid_count: int = 0
+    matched_routes_count: int = 0
+    has_selected_bid: bool = False
 
     class Config:
         from_attributes = True
@@ -148,6 +155,20 @@ class CourierRouteAdminResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class AdminRouteCreate(BaseModel):
+    """Model for admin to create a route for a courier."""
+    courier_id: int = Field(..., description="ID of the courier to assign the route to")
+    start_address: str = Field(..., min_length=1)
+    start_lat: float = Field(..., ge=-90, le=90)
+    start_lng: float = Field(..., ge=-180, le=180)
+    end_address: str = Field(..., min_length=1)
+    end_lat: float = Field(..., ge=-90, le=90)
+    end_lng: float = Field(..., ge=-180, le=180)
+    max_deviation_km: int = Field(default=5, ge=1, le=50)
+    departure_time: datetime | None = None
+    trip_date: datetime | None = None
 
 
 # Admin User Management Endpoints
@@ -812,23 +833,105 @@ async def delete_user(
 async def get_all_packages(
     skip: int = 0,
     limit: int = 100,
+    bid_status: str | None = Query(None, description="Filter by bid status: no_bids, has_bids, has_selected_bid"),
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
 ):
     """
-    Get all packages in the system (admin only).
+    Get all packages in the system with bid and matching information (admin only).
 
     Args:
         skip: Number of records to skip (pagination)
         limit: Maximum number of records to return
+        bid_status: Filter by bid status (no_bids, has_bids, has_selected_bid)
         db: Database session
         admin: Current admin user
 
     Returns:
-        List of all packages
+        List of all packages with bid counts and matched routes counts
     """
-    packages = db.query(Package).offset(skip).limit(limit).all()
-    return packages
+    # Build base query with ordering (newest first)
+    query = db.query(Package).order_by(Package.created_at.desc())
+
+    # Apply bid_status filter at DB level using subqueries for efficiency
+    if bid_status:
+        # Subquery to count bids per package
+        bid_count_subquery = (
+            db.query(CourierBid.package_id, func.count(CourierBid.id).label('bid_count'))
+            .group_by(CourierBid.package_id)
+            .subquery()
+        )
+
+        if bid_status == "no_bids":
+            # Packages with no bids (left join where count is null or 0)
+            query = query.outerjoin(
+                bid_count_subquery,
+                Package.id == bid_count_subquery.c.package_id
+            ).filter(
+                (bid_count_subquery.c.bid_count == None) | (bid_count_subquery.c.bid_count == 0)
+            )
+        elif bid_status == "has_bids":
+            # Packages with at least one bid
+            query = query.join(
+                bid_count_subquery,
+                Package.id == bid_count_subquery.c.package_id
+            ).filter(bid_count_subquery.c.bid_count > 0)
+        elif bid_status == "has_selected_bid":
+            # Packages with a selected bid
+            query = query.filter(Package.selected_bid_id != None)
+
+    # Apply pagination at DB level BEFORE fetching
+    packages = query.offset(skip).limit(limit).all()
+
+    # Get all active routes for matching calculation (only needed for OPEN_FOR_BIDS packages)
+    active_routes = db.query(CourierRoute).filter(CourierRoute.is_active == True).all()
+
+    # Get bid counts only for the paginated packages (more efficient)
+    package_ids = [p.id for p in packages]
+    bid_counts = {}
+    if package_ids:
+        bid_counts = dict(
+            db.query(CourierBid.package_id, func.count(CourierBid.id))
+            .filter(CourierBid.package_id.in_(package_ids))
+            .group_by(CourierBid.package_id)
+            .all()
+        )
+
+    # Build response with computed fields (only for paginated results)
+    result = []
+    for package in packages:
+        bid_count = bid_counts.get(package.id, 0)
+        has_selected_bid = package.selected_bid_id is not None
+
+        # Calculate matched routes count only for OPEN_FOR_BIDS packages
+        matched_routes_count = 0
+        if package.status == PackageStatus.OPEN_FOR_BIDS and package.is_active:
+            matched_routes_count = count_matching_routes_for_package(package, active_routes)
+
+        result.append(PackageAdminResponse(
+            id=package.id,
+            tracking_id=package.tracking_id,
+            sender_id=package.sender_id,
+            courier_id=package.courier_id,
+            description=package.description,
+            size=package.size.value if hasattr(package.size, 'value') else str(package.size),
+            weight_kg=package.weight_kg,
+            pickup_address=package.pickup_address,
+            pickup_lat=package.pickup_lat,
+            pickup_lng=package.pickup_lng,
+            dropoff_address=package.dropoff_address,
+            dropoff_lat=package.dropoff_lat,
+            dropoff_lng=package.dropoff_lng,
+            status=package.status.value if hasattr(package.status, 'value') else str(package.status),
+            price=package.price,
+            is_active=package.is_active,
+            created_at=package.created_at,
+            bid_count=bid_count,
+            matched_routes_count=matched_routes_count,
+            has_selected_bid=has_selected_bid,
+        ))
+
+    return result
 
 
 # Admin Route Management Endpoints
@@ -883,6 +986,119 @@ async def get_all_routes(
         ))
 
     return result
+
+
+@router.post("/routes", status_code=status.HTTP_201_CREATED, response_model=CourierRouteAdminResponse)
+async def create_route_for_courier(
+    request: Request,
+    route_data: AdminRouteCreate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """
+    Create a new route for a courier (admin only).
+
+    Business Rules:
+    - Target user must exist and have COURIER or BOTH role
+    - Target user must be active
+    - Deactivate any existing active routes for this courier (one active route at a time)
+
+    Args:
+        route_data: Route creation data including courier_id
+        db: Database session
+        admin: Current admin user
+
+    Returns:
+        Created route with courier information
+
+    Raises:
+        HTTPException: If courier not found or has invalid role
+    """
+    # Find the target courier
+    courier = db.query(User).filter(User.id == route_data.courier_id).first()
+    if not courier:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with ID {route_data.courier_id} not found"
+        )
+
+    # Validate courier has appropriate role
+    if courier.role not in [UserRole.COURIER, UserRole.BOTH]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"User {courier.full_name} does not have courier role. Current role: {courier.role.value}"
+        )
+
+    # Validate courier is active
+    if not courier.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"User {courier.full_name} is not active"
+        )
+
+    # Find and deactivate existing active routes for this courier
+    existing_routes = db.query(CourierRoute).filter(
+        and_(
+            CourierRoute.courier_id == courier.id,
+            CourierRoute.is_active == True
+        )
+    ).all()
+
+    # Handle deactivation of existing routes (withdraw/cancel bids)
+    for existing_route in existing_routes:
+        await handle_route_deactivation(db, courier.id, existing_route.id)
+        existing_route.is_active = False
+
+    # Create new route
+    new_route = CourierRoute(
+        courier_id=courier.id,
+        start_address=route_data.start_address,
+        start_lat=route_data.start_lat,
+        start_lng=route_data.start_lng,
+        end_address=route_data.end_address,
+        end_lat=route_data.end_lat,
+        end_lng=route_data.end_lng,
+        max_deviation_km=route_data.max_deviation_km,
+        departure_time=route_data.departure_time,
+        trip_date=route_data.trip_date,
+        is_active=True
+    )
+
+    db.add(new_route)
+    db.commit()
+    db.refresh(new_route)
+
+    # Audit log route creation (created by admin on behalf of courier)
+    log_route_create(
+        db, admin, new_route.id,
+        {
+            "start": route_data.start_address,
+            "end": route_data.end_address,
+            "max_deviation_km": route_data.max_deviation_km,
+            "courier_id": courier.id,
+            "courier_name": courier.full_name,
+            "created_by_admin": True
+        },
+        request
+    )
+
+    return CourierRouteAdminResponse(
+        id=new_route.id,
+        courier_id=new_route.courier_id,
+        courier_name=courier.full_name,
+        courier_email=courier.email,
+        start_address=new_route.start_address,
+        start_lat=new_route.start_lat,
+        start_lng=new_route.start_lng,
+        end_address=new_route.end_address,
+        end_lat=new_route.end_lat,
+        end_lng=new_route.end_lng,
+        max_deviation_km=new_route.max_deviation_km,
+        departure_time=new_route.departure_time,
+        trip_date=new_route.trip_date,
+        is_active=new_route.is_active,
+        created_at=new_route.created_at
+    )
 
 
 @router.get("/packages/{package_id}", response_model=PackageAdminResponse)

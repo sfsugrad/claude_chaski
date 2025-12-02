@@ -3,7 +3,8 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { authAPI, adminAPI, AdminUser, AdminPackage, AdminStats, MatchingJobResult, UserResponse, AdminRoute } from '@/lib/api'
+import { authAPI, adminAPI, AdminUser, AdminPackage, AdminStats, MatchingJobResult, UserResponse, AdminRoute, AdminRouteCreate } from '@/lib/api'
+import AddressAutocomplete from '@/components/AddressAutocomplete'
 import {
   StatsCard,
   StatsGrid,
@@ -46,6 +47,7 @@ export default function AdminPage() {
   const [error, setError] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [activeFilter, setActiveFilter] = useState<string>('all')
+  const [bidStatusFilter, setBidStatusFilter] = useState<string>('all')
   const [userRoleFilter, setUserRoleFilter] = useState<string>('all')
   const [userVerificationFilter, setUserVerificationFilter] = useState<string>('all')
   const [userActiveFilter, setUserActiveFilter] = useState<string>('all')
@@ -60,6 +62,21 @@ export default function AdminPage() {
   })
   const [matchingJobRunning, setMatchingJobRunning] = useState(false)
   const [matchingJobResult, setMatchingJobResult] = useState<MatchingJobResult | null>(null)
+  const [showCreateRouteModal, setShowCreateRouteModal] = useState(false)
+  const [newRouteData, setNewRouteData] = useState<AdminRouteCreate & { trip_date: string; departure_time: string }>({
+    courier_id: 0,
+    start_address: '',
+    start_lat: 0,
+    start_lng: 0,
+    end_address: '',
+    end_lat: 0,
+    end_lng: 0,
+    max_deviation_km: 5,
+    trip_date: '',
+    departure_time: ''
+  })
+  const [createRouteError, setCreateRouteError] = useState('')
+  const [createRouteLoading, setCreateRouteLoading] = useState(false)
 
   // Chart data computations
   const userRoleChartData = useMemo(() => [
@@ -106,6 +123,14 @@ export default function AdminPage() {
       value,
     }))
   }, [packages])
+
+  // Get list of users who can have routes assigned (courier or both role)
+  const courierUsers = useMemo(() => {
+    return users.filter(u =>
+      u.is_active &&
+      (u.role.toLowerCase() === 'courier' || u.role.toLowerCase() === 'both')
+    ).sort((a, b) => a.full_name.localeCompare(b.full_name))
+  }, [users])
 
   useEffect(() => {
     checkAuth()
@@ -327,6 +352,64 @@ export default function AdminPage() {
     }
   }
 
+  const handleCreateRoute = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setCreateRouteError('')
+
+    // Validate form
+    if (!newRouteData.courier_id) {
+      setCreateRouteError('Please select a courier')
+      return
+    }
+    if (!newRouteData.start_address || !newRouteData.end_address) {
+      setCreateRouteError('Please enter both start and end addresses')
+      return
+    }
+    if (newRouteData.start_lat === 0 || newRouteData.end_lat === 0) {
+      setCreateRouteError('Please select addresses from the autocomplete suggestions')
+      return
+    }
+
+    setCreateRouteLoading(true)
+
+    try {
+      const submitData: AdminRouteCreate = {
+        courier_id: newRouteData.courier_id,
+        start_address: newRouteData.start_address,
+        start_lat: newRouteData.start_lat,
+        start_lng: newRouteData.start_lng,
+        end_address: newRouteData.end_address,
+        end_lat: newRouteData.end_lat,
+        end_lng: newRouteData.end_lng,
+        max_deviation_km: newRouteData.max_deviation_km,
+        trip_date: newRouteData.trip_date || null,
+        departure_time: newRouteData.departure_time || null
+      }
+
+      await adminAPI.createRoute(submitData)
+      await loadData()
+      setShowCreateRouteModal(false)
+      setNewRouteData({
+        courier_id: 0,
+        start_address: '',
+        start_lat: 0,
+        start_lng: 0,
+        end_address: '',
+        end_lat: 0,
+        end_lng: 0,
+        max_deviation_km: 5,
+        trip_date: '',
+        departure_time: ''
+      })
+      alert('Route created successfully')
+    } catch (err: any) {
+      console.error('Error creating route:', err)
+      setCreateRouteError(err.response?.data?.detail || 'Failed to create route')
+    } finally {
+      setCreateRouteLoading(false)
+    }
+  }
+
   const handleRunMatchingJob = async () => {
     if (matchingJobRunning) return
 
@@ -383,6 +466,15 @@ export default function AdminPage() {
       filtered = filtered.filter(pkg => pkg.is_active)
     } else if (activeFilter === 'inactive') {
       filtered = filtered.filter(pkg => !pkg.is_active)
+    }
+
+    // Filter by bid status
+    if (bidStatusFilter === 'no_bids') {
+      filtered = filtered.filter(pkg => pkg.bid_count === 0)
+    } else if (bidStatusFilter === 'has_bids') {
+      filtered = filtered.filter(pkg => pkg.bid_count > 0)
+    } else if (bidStatusFilter === 'has_selected_bid') {
+      filtered = filtered.filter(pkg => pkg.has_selected_bid)
     }
 
     return filtered
@@ -1107,6 +1199,20 @@ export default function AdminPage() {
                   </select>
                 </div>
 
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700">Bid Status:</label>
+                  <select
+                    value={bidStatusFilter}
+                    onChange={(e) => setBidStatusFilter(e.target.value)}
+                    className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="all">All Bids</option>
+                    <option value="no_bids">No Bids</option>
+                    <option value="has_bids">Has Bids</option>
+                    <option value="has_selected_bid">Has Selected Bid</option>
+                  </select>
+                </div>
+
                 <div className="text-sm text-gray-600 ml-auto">
                   Showing {getFilteredPackages().length} of {packages.length} packages
                 </div>
@@ -1125,6 +1231,7 @@ export default function AdminPage() {
                     onClick={() => {
                       setStatusFilter('all')
                       setActiveFilter('all')
+                      setBidStatusFilter('all')
                     }}
                     className="text-purple-600 hover:text-purple-700 text-sm underline"
                   >
@@ -1133,32 +1240,38 @@ export default function AdminPage() {
                 )}
               </div>
             ) : (
-              <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="bg-white rounded-lg shadow overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                         Package ID
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                         Sender
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                         Description
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                         Status
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
+                        Bids
+                      </th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
+                        Routes
+                      </th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                         Active
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                         Price
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                         Created
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                         Actions
                       </th>
                     </tr>
@@ -1168,7 +1281,7 @@ export default function AdminPage() {
                       const sender = users.find(u => u.id === pkg.sender_id)
                       return (
                         <tr key={pkg.id} className={!pkg.is_active ? 'bg-gray-50 opacity-60' : ''}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <td className="px-3 py-3 whitespace-nowrap text-sm font-medium">
                             <a
                               href={`/packages/${pkg.tracking_id}`}
                               className="text-purple-600 hover:text-purple-700 font-semibold"
@@ -1176,37 +1289,61 @@ export default function AdminPage() {
                               {pkg.tracking_id}
                             </a>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            <div className="font-medium">{sender?.full_name || 'Unknown'}</div>
-                            <div className="text-gray-500 text-xs">{sender?.email}</div>
+                          <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
+                            <div className="font-medium text-xs">{sender?.full_name || 'Unknown'}</div>
+                            <div className="text-gray-500 text-xs truncate max-w-[120px]">{sender?.email}</div>
                           </td>
-                          <td className="px-6 py-4 text-sm text-gray-500">
-                            <div className="max-w-xs truncate">{pkg.description}</div>
-                            <div className="text-xs text-gray-400 mt-1">
+                          <td className="px-3 py-3 text-sm text-gray-500">
+                            <div className="max-w-[150px] truncate text-xs">{pkg.description}</div>
+                            <div className="text-xs text-gray-400">
                               {pkg.size} · {pkg.weight_kg}kg
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-3 py-3 whitespace-nowrap">
                             <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                              {pkg.status}
+                              {pkg.status.replace('_', ' ')}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-3 py-3 whitespace-nowrap text-center">
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                              pkg.has_selected_bid
+                                ? 'bg-green-100 text-green-800'
+                                : pkg.bid_count > 0
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-gray-100 text-gray-600'
+                            }`}>
+                              {pkg.bid_count}{pkg.has_selected_bid && ' ✓'}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3 whitespace-nowrap text-center">
+                            {pkg.status.toLowerCase() === 'open_for_bids' ? (
+                              <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                                pkg.matched_routes_count > 0
+                                  ? 'bg-purple-100 text-purple-800'
+                                  : 'bg-gray-100 text-gray-600'
+                              }`}>
+                                {pkg.matched_routes_count}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 text-xs">-</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 whitespace-nowrap text-center">
                             <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
                               pkg.is_active
                                 ? 'bg-green-100 text-green-800'
                                 : 'bg-red-100 text-red-800'
                             }`}>
-                              {pkg.is_active ? 'Active' : 'Inactive'}
+                              {pkg.is_active ? 'Yes' : 'No'}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900 text-right">
                             ${pkg.price?.toFixed(2) || '0.00'}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-500">
                             {new Date(pkg.created_at).toLocaleDateString()}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          <td className="px-3 py-3 whitespace-nowrap text-sm">
                             {pkg.is_active ? (
                               ['new', 'open_for_bids'].includes(pkg.status.toLowerCase()) ? (
                                 <button
@@ -1242,10 +1379,21 @@ export default function AdminPage() {
         {activeTab === 'routes' && (
           <div>
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold">Courier Routes</h2>
-              <div className="text-gray-600">
-                Total Routes: {routes.length} ({routes.filter(r => r.is_active).length} active)
+              <div>
+                <h2 className="text-2xl font-bold">Courier Routes</h2>
+                <div className="text-gray-600 text-sm mt-1">
+                  Total Routes: {routes.length} ({routes.filter(r => r.is_active).length} active)
+                </div>
               </div>
+              <button
+                onClick={() => setShowCreateRouteModal(true)}
+                className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition flex items-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Create Route
+              </button>
             </div>
 
             {routes.length === 0 ? (
@@ -1453,6 +1601,177 @@ export default function AdminPage() {
                 <button
                   type="button"
                   onClick={() => setShowCreateUserModal(false)}
+                  className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400 transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Create Route Modal */}
+      {showCreateRouteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold">Create Route for Courier</h3>
+              <button
+                onClick={() => {
+                  setShowCreateRouteModal(false)
+                  setCreateRouteError('')
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {createRouteError && (
+              <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                {createRouteError}
+              </div>
+            )}
+
+            <form onSubmit={handleCreateRoute} className="space-y-4">
+              {/* Courier Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Select Courier *
+                </label>
+                <select
+                  required
+                  value={newRouteData.courier_id}
+                  onChange={(e) => setNewRouteData({ ...newRouteData, courier_id: parseInt(e.target.value) || 0 })}
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value={0}>-- Select a courier --</option>
+                  {courierUsers.map((courier) => (
+                    <option key={courier.id} value={courier.id}>
+                      {courier.full_name} ({courier.email}) - {courier.role}
+                    </option>
+                  ))}
+                </select>
+                {courierUsers.length === 0 && (
+                  <p className="text-xs text-orange-600 mt-1">
+                    No active users with courier or both role found.
+                  </p>
+                )}
+              </div>
+
+              {/* Start Address */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Start Address *
+                </label>
+                <AddressAutocomplete
+                  id="admin_route_start_address"
+                  name="start_address"
+                  value={newRouteData.start_address}
+                  onChange={(address: string, lat: number, lng: number) => {
+                    setNewRouteData({
+                      ...newRouteData,
+                      start_address: address,
+                      start_lat: lat,
+                      start_lng: lng
+                    })
+                  }}
+                  placeholder="Where is the courier leaving from?"
+                  required
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              {/* End Address */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  End Address *
+                </label>
+                <AddressAutocomplete
+                  id="admin_route_end_address"
+                  name="end_address"
+                  value={newRouteData.end_address}
+                  onChange={(address: string, lat: number, lng: number) => {
+                    setNewRouteData({
+                      ...newRouteData,
+                      end_address: address,
+                      end_lat: lat,
+                      end_lng: lng
+                    })
+                  }}
+                  placeholder="Where is the courier going?"
+                  required
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              {/* Max Deviation */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Max Deviation (km)
+                </label>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="range"
+                    min="1"
+                    max="50"
+                    value={newRouteData.max_deviation_km}
+                    onChange={(e) => setNewRouteData({ ...newRouteData, max_deviation_km: parseInt(e.target.value) || 5 })}
+                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                  />
+                  <span className="w-16 text-center text-sm font-medium text-gray-700">
+                    {newRouteData.max_deviation_km} km
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  How far from the route the courier is willing to deviate for pickups.
+                </p>
+              </div>
+
+              {/* Trip Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Trip Date
+                </label>
+                <input
+                  type="date"
+                  value={newRouteData.trip_date}
+                  onChange={(e) => setNewRouteData({ ...newRouteData, trip_date: e.target.value })}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              {/* Departure Time */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Departure Time (optional)
+                </label>
+                <input
+                  type="time"
+                  value={newRouteData.departure_time}
+                  onChange={(e) => setNewRouteData({ ...newRouteData, departure_time: e.target.value })}
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="submit"
+                  disabled={createRouteLoading}
+                  className="flex-1 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition disabled:opacity-50"
+                >
+                  {createRouteLoading ? 'Creating...' : 'Create Route'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateRouteModal(false)
+                    setCreateRouteError('')
+                  }}
                   className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400 transition"
                 >
                   Cancel

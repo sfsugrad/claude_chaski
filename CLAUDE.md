@@ -142,6 +142,11 @@ Key migrations: `add_phone_verification_fields.py`, `add_account_lockout_column.
 
 **Frontend:** Jest + React Testing Library. Tests in `__tests__/` directories.
 
+**E2E (Playwright):** Tests in `frontend/e2e/` using fixtures from `frontend/e2e/fixtures/test-fixtures.ts`:
+- Test users: `TEST_USERS.sender`, `TEST_USERS.courier`, `TEST_USERS.both`, `TEST_USERS.admin`
+- Helpers: `loginUser(page, user)`, `logoutUser(page)`, page object helpers (`NavbarHelper`, `PackageHelper`, `RouteHelper`)
+- Run single test: `npx playwright test e2e/auth.spec.ts`
+
 ## Role System
 
 Users have one of four roles:
@@ -304,6 +309,32 @@ CANCELED can occur from any non-terminal state (except IN_TRANSIT and FAILED)
 FAILED → OPEN_FOR_BIDS (admin only retry)
 ```
 
+## Route-Package Matching Algorithm
+
+The matching algorithm finds packages along a courier's route within a configurable deviation distance.
+
+**How it works:**
+1. Creates a Shapely `LineString` from route start→end coordinates
+2. For each `OPEN_FOR_BIDS` package, calculates distance from pickup/dropoff to route
+3. Matches if BOTH points are within `max_deviation_km`
+4. Returns packages sorted by estimated detour (shortest first)
+
+**Key files:** `app/routes/matching.py`, `app/utils/geo.py`
+
+**Current Limitations & Future Improvements:**
+
+| Priority | Improvement | Reason |
+|----------|-------------|--------|
+| High | Use PostGIS `ST_DWithin` for spatial filtering | Current O(n) Python filtering won't scale past ~10k packages |
+| Medium | Add date/deadline matching | Package due tomorrow shouldn't match route next week |
+| Medium | Check route direction | Ensure pickup comes before dropoff along route (avoid backtracking) |
+| Low | Use geodesic/UTM projection | Shapely uses flat-earth math; ~10-20% error at 200km+ routes |
+| Low | Support multi-point routes | Current straight-line model doesn't match curved road routes |
+
+**Note:** The algorithm uses Shapely's Cartesian distance, not the spherical `point_to_line_distance` in `geo.py`. At LA-SD scale (~180km), expect ~10-20% distance variance between the two methods.
+
+See **[backend/docs/MATCHING_FEATURE.html](backend/docs/MATCHING_FEATURE.html)** for detailed documentation.
+
 ## Bidding System
 
 **Bid States:** `PENDING` → `SELECTED` | `REJECTED` | `WITHDRAWN` | `EXPIRED`
@@ -345,3 +376,11 @@ REGISTRATION_COUNTRY_ALLOWLIST=US       # Comma-separated country codes (e.g., "
 NEXT_PUBLIC_API_URL=http://localhost:8000
 NEXT_PUBLIC_GOOGLE_PLACES_API_KEY=your-key  # For address autocomplete
 ```
+
+## Deployment
+
+See **[DEPLOYMENT.md](DEPLOYMENT.md)** for Heroku deployment guide including:
+- Separate backend/frontend apps setup
+- PostgreSQL with PostGIS and Redis add-ons
+- Stripe Identity webhook configuration
+- Environment variables and migrations

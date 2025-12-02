@@ -471,11 +471,18 @@ export interface AdminPackage {
   size: string
   weight_kg: number
   pickup_address: string
+  pickup_lat: number
+  pickup_lng: number
   dropoff_address: string
+  dropoff_lat: number
+  dropoff_lng: number
   status: string
   price: number
   is_active: boolean
   created_at: string
+  bid_count: number
+  matched_routes_count: number
+  has_selected_bid: boolean
 }
 
 export interface AdminStats {
@@ -524,6 +531,19 @@ export interface MatchingJobResult {
 
 // Admin API
 // Admin Route type
+export interface AdminRouteCreate {
+  courier_id: number
+  start_address: string
+  start_lat: number
+  start_lng: number
+  end_address: string
+  end_lat: number
+  end_lng: number
+  max_deviation_km?: number
+  departure_time?: string | null
+  trip_date?: string | null
+}
+
 export interface AdminRoute {
   id: number
   courier_id: number
@@ -561,13 +581,22 @@ export const adminAPI = {
     api.put(`/admin/users/${userId}/profile`, data),
 
   // Packages
-  getPackages: () => api.get<AdminPackage[]>('/admin/packages'),
+  getPackages: (bidStatus?: string) => {
+    const params = new URLSearchParams()
+    if (bidStatus && bidStatus !== 'all') {
+      params.append('bid_status', bidStatus)
+    }
+    const queryString = params.toString()
+    return api.get<AdminPackage[]>(`/admin/packages${queryString ? `?${queryString}` : ''}`)
+  },
   togglePackageActive: (packageId: number, isActive: boolean) =>
     api.put(`/admin/packages/${packageId}/toggle-active`, { is_active: isActive }),
 
   // Routes
   getRoutes: (activeOnly: boolean = false) =>
     api.get<AdminRoute[]>(`/admin/routes?active_only=${activeOnly}`),
+  createRoute: (data: AdminRouteCreate) =>
+    api.post<AdminRoute>('/admin/routes', data),
 
   // Stats
   getStats: () => api.get<AdminStats>('/admin/stats'),
