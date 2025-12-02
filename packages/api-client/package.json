@@ -1,0 +1,46 @@
+{
+  "name": "@chaski/api-client",
+  "version": "0.0.1",
+  "description": "Platform-agnostic API client for Chaski",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./adapters/axios": {
+      "import": "./dist/adapters/axios.mjs",
+      "require": "./dist/adapters/axios.js",
+      "types": "./dist/adapters/axios.d.ts"
+    },
+    "./adapters/fetch": {
+      "import": "./dist/adapters/fetch.mjs",
+      "require": "./dist/adapters/fetch.js",
+      "types": "./dist/adapters/fetch.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts src/adapters/axios.ts src/adapters/fetch.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts src/adapters/axios.ts src/adapters/fetch.ts --format cjs,esm --dts --watch",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@chaski/shared-types": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3"
+  },
+  "peerDependencies": {
+    "axios": "^1.6.0"
+  },
+  "peerDependenciesMeta": {
+    "axios": {
+      "optional": true
+    }
+  }
+}

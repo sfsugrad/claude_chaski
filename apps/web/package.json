@@ -1,5 +1,5 @@
 {
-  "name": "chaski-frontend",
+  "name": "@chaski/web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -17,6 +17,9 @@
     "test:e2e:report": "playwright show-report"
   },
   "dependencies": {
+    "@chaski/shared-types": "workspace:*",
+    "@chaski/shared-utils": "workspace:*",
+    "@chaski/shared-i18n": "workspace:*",
     "@react-google-maps/api": "^2.20.7",
     "axios": "^1.6.0",
     "clsx": "^2.1.1",

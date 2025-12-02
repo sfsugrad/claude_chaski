@@ -1,0 +1,37 @@
+{
+  "name": "@chaski/shared-i18n",
+  "version": "0.0.1",
+  "description": "Shared i18n translations for Chaski",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./locales/en": {
+      "import": "./dist/locales/en.mjs",
+      "require": "./dist/locales/en.js"
+    },
+    "./locales/fr": {
+      "import": "./dist/locales/fr.mjs",
+      "require": "./dist/locales/fr.js"
+    },
+    "./locales/es": {
+      "import": "./dist/locales/es.mjs",
+      "require": "./dist/locales/es.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts src/locales/en.ts src/locales/fr.ts src/locales/es.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts src/locales/en.ts src/locales/fr.ts src/locales/es.ts --format cjs,esm --dts --watch",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3"
+  }
+}
