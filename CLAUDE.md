@@ -233,6 +233,43 @@ logError('Failed to process', error, { context });
 
 View logs: `tail -f backend/logs/app.log | jq .`
 
+## Audit Logging
+
+All security-relevant actions are tracked in the `audit_logs` table via `app/services/audit_service.py`.
+
+**Usage:**
+```python
+from app.services.audit_service import log_audit_event
+from app.models.audit_log import AuditAction
+
+log_audit_event(
+    db=db,
+    action=AuditAction.PACKAGE_CREATE,
+    user_id=current_user.id,
+    resource_type="package",
+    resource_id=package.id,
+    details={"size": "medium"},
+    request=request  # Captures IP and user agent
+)
+```
+
+**Action Categories (50+ actions):**
+
+| Category | Actions |
+|----------|---------|
+| **Authentication** | `LOGIN_SUCCESS`, `LOGIN_FAILED`, `LOGOUT`, `REGISTER`, `PASSWORD_RESET_*`, `EMAIL_VERIFICATION`, `OAUTH_LOGIN` |
+| **Security** | `ACCOUNT_LOCKED`, `SESSION_*`, `PASSWORD_CHANGED`, `TOKEN_BLACKLISTED` |
+| **Access Control** | `UNAUTHORIZED_ACCESS`, `PERMISSION_DENIED` |
+| **File Upload** | `FILE_UPLOAD_SUCCESS`, `FILE_UPLOAD_FAILED`, `FILE_VALIDATION_FAILED`, `SUSPICIOUS_FILE_UPLOAD` |
+| **User Management** | `USER_CREATE`, `USER_UPDATE`, `USER_ROLE_CHANGE`, `USER_ACTIVATE`, `USER_DEACTIVATE`, `USER_DELETE` |
+| **Packages** | `PACKAGE_CREATE`, `PACKAGE_UPDATE`, `PACKAGE_STATUS_CHANGE`, `PACKAGE_CANCEL`, `PACKAGE_DELETE` |
+| **Courier** | `ROUTE_CREATE`, `ROUTE_UPDATE`, `ROUTE_DELETE`, `PACKAGE_ACCEPT`, `PACKAGE_REJECT` |
+| **Bidding** | `BID_CREATED`, `BID_WITHDRAWN`, `BID_SELECTED` |
+| **ID Verification** | `ID_VERIFICATION_STARTED`, `ID_VERIFICATION_COMPLETED`, `ID_VERIFICATION_FAILED`, `ID_VERIFICATION_ADMIN_*` |
+| **Data Privacy** | `DATA_EXPORT_REQUEST`, `DATA_EXPORT_COMPLETED` |
+
+**Admin endpoint:** `GET /api/logs/audit` - Query audit logs with filters (action, user, date range)
+
 ## Phone Verification (Twilio)
 
 See **[backend/TWILIO_SETUP.md](backend/TWILIO_SETUP.md)** for setup.
