@@ -11,6 +11,7 @@ import GoogleSignInButton from '@/components/GoogleSignInButton'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
 import { Button, Input, Card, CardBody, Alert } from '@/components/ui'
+import { kmToMiles, milesToKm } from '@/lib/distance'
 
 // Icons
 const UserIcon = () => (
@@ -478,7 +479,7 @@ export default function RegisterPage() {
               {(formData.role === 'courier' || formData.role === 'both') && (
                 <div className="form-group">
                   <label htmlFor="max_deviation_km" className="label">
-                    {t('maxDeviation')}
+                    {t('maxDeviation')} (miles)
                   </label>
                   <input
                     id="max_deviation_km"
@@ -486,8 +487,12 @@ export default function RegisterPage() {
                     type="number"
                     min="1"
                     max="50"
-                    value={formData.max_deviation_km}
-                    onChange={handleChange}
+                    step="0.5"
+                    value={kmToMiles(formData.max_deviation_km).toFixed(1)}
+                    onChange={(e) => setFormData((prev) => ({
+                      ...prev,
+                      max_deviation_km: milesToKm(parseFloat(e.target.value) || 3),
+                    }))}
                     className="input"
                   />
                   <p className="helper-text">

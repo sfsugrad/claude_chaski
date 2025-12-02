@@ -132,6 +132,21 @@ Key migrations: `add_phone_verification_fields.py`, `add_account_lockout_column.
 - TypeScript types defined in `lib/api.ts` - reuse them
 - Package status changes via `package_status.py` functions only
 
+**Distance Units (km/miles):**
+- Backend stores all distances in **kilometers** (e.g., `max_deviation_km`)
+- Frontend displays all distances in **miles** for US users
+- Use `lib/distance.ts` utilities for conversion:
+  ```typescript
+  import { kmToMiles, milesToKm } from '@/lib/distance';
+
+  // Display: convert km → miles
+  const displayValue = kmToMiles(user.max_deviation_km).toFixed(1);  // "3.1"
+
+  // Input: convert miles → km for storage
+  const storageValue = milesToKm(parseFloat(inputValue));
+  ```
+- See **[frontend/docs/DISTANCE_UNITS.md](frontend/docs/DISTANCE_UNITS.md)** for implementation details
+
 ### Testing
 
 **Backend:** Pytest fixtures in `tests/conftest.py`:

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { authAPI, adminAPI, AdminUser, AdminPackage, AdminStats, MatchingJobResult, UserResponse, AdminRoute, AdminRouteCreate } from '@/lib/api'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
+import { kmToMiles, milesToKm } from '@/lib/distance'
 import {
   StatsCard,
   StatsGrid,
@@ -1463,7 +1464,7 @@ export default function AdminPage() {
                               : 'Not set'}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                          {route.max_deviation_km} km
+                          {kmToMiles(route.max_deviation_km).toFixed(1)} mi
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -1579,14 +1580,15 @@ export default function AdminPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Max Deviation (km)
+                  Max Deviation (miles)
                 </label>
                 <input
                   type="number"
                   min="1"
                   max="50"
-                  value={newUserData.max_deviation_km}
-                  onChange={(e) => setNewUserData({ ...newUserData, max_deviation_km: parseInt(e.target.value) || 5 })}
+                  step="0.5"
+                  value={kmToMiles(newUserData.max_deviation_km).toFixed(1)}
+                  onChange={(e) => setNewUserData({ ...newUserData, max_deviation_km: milesToKm(parseFloat(e.target.value) || 3) })}
                   className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
               </div>
@@ -1711,19 +1713,20 @@ export default function AdminPage() {
               {/* Max Deviation */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Max Deviation (km)
+                  Max Deviation (miles)
                 </label>
                 <div className="flex items-center gap-4">
                   <input
                     type="range"
                     min="1"
                     max="50"
-                    value={newRouteData.max_deviation_km}
-                    onChange={(e) => setNewRouteData({ ...newRouteData, max_deviation_km: parseInt(e.target.value) || 5 })}
+                    step="0.5"
+                    value={kmToMiles(newRouteData.max_deviation_km)}
+                    onChange={(e) => setNewRouteData({ ...newRouteData, max_deviation_km: milesToKm(parseFloat(e.target.value) || 3) })}
                     className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-500"
                   />
                   <span className="w-16 text-center text-sm font-medium text-gray-700">
-                    {newRouteData.max_deviation_km} km
+                    {kmToMiles(newRouteData.max_deviation_km).toFixed(1)} mi
                   </span>
                 </div>
                 <p className="text-xs text-gray-500 mt-1">

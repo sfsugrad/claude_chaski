@@ -7,6 +7,7 @@ import { couriersAPI, authAPI, ratingsAPI, packagesAPI, bidsAPI, RouteResponse, 
 import Navbar from '@/components/Navbar'
 import RatingModal from '@/components/RatingModal'
 import CourierVerificationGuard from '@/components/CourierVerificationGuard'
+import { kmToMiles } from '@/lib/distance'
 import {
   CourierDashboardSkeleton,
   Card,
@@ -284,7 +285,7 @@ function CourierDashboardContent() {
                       {activeRoute.trip_date && (
                         <p><strong className="text-surface-900">Trip Date:</strong> {new Date(activeRoute.trip_date).toLocaleDateString()}</p>
                       )}
-                      <p><strong className="text-surface-900">Max Deviation:</strong> {activeRoute.max_deviation_km} km</p>
+                      <p><strong className="text-surface-900">Max Deviation:</strong> {kmToMiles(activeRoute.max_deviation_km).toFixed(1)} mi</p>
                       {activeRoute.departure_time && (
                         <p><strong className="text-surface-900">Departure Time:</strong> {activeRoute.departure_time}</p>
                       )}
@@ -456,7 +457,7 @@ function CourierDashboardContent() {
                               Created: {new Date(route.created_at).toLocaleDateString()}
                             </p>
                             <p className="text-sm text-surface-500">
-                              Deviation: {route.max_deviation_km} km
+                              Deviation: {kmToMiles(route.max_deviation_km).toFixed(1)} mi
                             </p>
                             <div className="flex items-center gap-2">
                               <Badge

@@ -7,6 +7,7 @@ import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import RatingModal from '@/components/RatingModal'
 import { Card, CardBody, CardHeader, Button, Badge, Alert, DashboardSkeleton, FadeIn, SlideIn } from '@/components/ui'
+import { kmToMiles } from '@/lib/distance'
 
 // Icons
 const PackageIcon = () => (
@@ -299,7 +300,7 @@ export default function DashboardPage() {
                     <MapIcon />
                     <div className="flex-1">
                       <dt className="text-sm font-medium text-surface-500">Max Route Deviation</dt>
-                      <dd className="text-sm text-surface-900">{user.max_deviation_km} km</dd>
+                      <dd className="text-sm text-surface-900">{kmToMiles(user.max_deviation_km).toFixed(1)} mi</dd>
                     </div>
                   </div>
                   <div className="flex items-center gap-4 px-6 py-4">

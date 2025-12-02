@@ -9,12 +9,15 @@ import { Button, Card, CardBody, Alert, Input } from '@/components/ui';
 import AddressAutocomplete from '@/components/AddressAutocomplete';
 import { RouteMap } from '@/components/map';
 import CourierVerificationGuard from '@/components/CourierVerificationGuard';
+import { kmToMiles, milesToKm } from '@/lib/distance';
 
+// Values stored in km, displayed in miles
 const deviationPresets = [
-  { value: 2, label: '2 km', description: 'Very close to route' },
-  { value: 5, label: '5 km', description: 'Slight detour' },
-  { value: 10, label: '10 km', description: 'Moderate detour' },
-  { value: 20, label: '20 km', description: 'Significant detour' },
+  { value: 1.6, label: '1 mi', description: 'Very close to route' },
+  { value: 4.8, label: '3 mi', description: 'Slight detour' },
+  { value: 8, label: '5 mi', description: 'Moderate detour' },
+  { value: 16, label: '10 mi', description: 'Moderate detour' },
+  { value: 32, label: '20 mi', description: 'Significant detour' },
 ];
 
 function CreateRouteContent() {
@@ -230,7 +233,7 @@ function CreateRouteContent() {
                   </div>
                 </div>
                 <p className="text-center text-sm text-surface-600 mt-3">
-                  <span className="font-semibold text-primary-600">{formData.max_deviation_km} km</span> radius
+                  <span className="font-semibold text-primary-600">{kmToMiles(formData.max_deviation_km).toFixed(1)} mi</span> radius
                   around your route
                 </p>
               </div>
@@ -279,17 +282,18 @@ function CreateRouteContent() {
                     type="range"
                     min="1"
                     max="50"
-                    value={formData.max_deviation_km}
+                    step="0.5"
+                    value={kmToMiles(formData.max_deviation_km)}
                     onChange={(e) =>
                       setFormData((prev) => ({
                         ...prev,
-                        max_deviation_km: parseInt(e.target.value) || 5,
+                        max_deviation_km: milesToKm(parseFloat(e.target.value) || 3),
                       }))
                     }
                     className="flex-1 h-2 bg-surface-200 rounded-lg appearance-none cursor-pointer accent-primary-500"
                   />
                   <span className="w-16 text-center text-sm font-medium text-surface-700">
-                    {formData.max_deviation_km} km
+                    {kmToMiles(formData.max_deviation_km).toFixed(1)} mi
                   </span>
                 </div>
               </div>
