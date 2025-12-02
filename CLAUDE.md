@@ -2,6 +2,22 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Quick Reference
+
+```bash
+# Backend (from backend/)
+source venv/bin/activate && uvicorn main:app --reload --port 8000  # Dev server
+pytest tests/test_<file>.py::test_<name> -v                        # Single test
+pytest --cov=app tests/                                            # All tests + coverage
+
+# Frontend (from frontend/)
+npm run dev                                    # Dev server (localhost:3000)
+npm test -- path/to/test                       # Single test
+npm run test:e2e                               # Playwright E2E tests
+
+# API Docs: http://localhost:8000/docs (Swagger UI)
+```
+
 ## Project Overview
 
 Chaski is a logistics platform connecting package senders with couriers traveling along the same route. FastAPI backend + Next.js frontend.

@@ -30,7 +30,9 @@ from app.services.audit_service import (
     log_matching_job_run,
     log_audit,
     log_route_create,
+    create_audit_log,
 )
+from app.models.audit_log import AuditAction
 from app.services.route_deactivation_service import handle_route_deactivation
 from app.services.package_status import transition_package
 from app.services.user_service import can_deactivate_user
@@ -756,10 +758,10 @@ async def toggle_user_id_verified(
     db.refresh(user)
 
     # Audit log ID verification/unverification
-    log_audit(
+    create_audit_log(
         db=db,
-        user=admin,
         action=AuditAction.USER_UPDATE,
+        user=admin,
         resource_type="user",
         resource_id=user.id,
         details={
@@ -768,9 +770,8 @@ async def toggle_user_id_verified(
             "new_value": toggle_data.id_verified,
             "admin_action": "manual_id_verification"
         },
-        success=True,
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent")
+        request=request,
+        success="success"
     )
 
     logger.info(f"Admin {admin.id} set id_verified={toggle_data.id_verified} for user {user.id}")

@@ -89,17 +89,27 @@ export default function VerificationBanner() {
     }
   }
 
+  const [idVerificationError, setIdVerificationError] = useState('')
+
   const handleStartIdVerification = async () => {
     if (idVerificationLoading) return
     setIdVerificationLoading(true)
+    setIdVerificationError('')
     try {
       // Get current URL as return URL (verification complete page)
       const returnUrl = `${window.location.origin}/id-verification/complete`
       const response = await idVerificationAPI.startVerification(returnUrl)
       // Redirect to Stripe Identity verification
-      window.location.href = response.data.url
+      if (response.data.url) {
+        window.location.href = response.data.url
+      } else {
+        setIdVerificationError('No verification URL returned. Please try again.')
+        setIdVerificationLoading(false)
+      }
     } catch (err: any) {
       console.error('Failed to start ID verification:', err)
+      const message = err.response?.data?.detail || 'Failed to start verification. Please try again.'
+      setIdVerificationError(typeof message === 'string' ? message : JSON.stringify(message))
       setIdVerificationLoading(false)
     }
   }
@@ -294,6 +304,9 @@ export default function VerificationBanner() {
                       >
                         {idVerificationLoading ? 'Starting...' : 'Verify now'}
                       </button>
+                      {idVerificationError && (
+                        <span className="ml-2 text-red-600 text-sm">{idVerificationError}</span>
+                      )}
                     </>
                   )}
                 </p>

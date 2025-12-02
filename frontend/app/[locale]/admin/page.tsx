@@ -298,19 +298,27 @@ export default function AdminPage() {
   }
 
   const handleToggleIdVerified = async (userId: number, currentStatus: boolean) => {
-    const action = currentStatus ? 'unverify' : 'verify'
+    const newStatus = !currentStatus
+    const action = newStatus ? 'verify' : 'unverify'
     if (!confirm(`Are you sure you want to ${action} this user's ID?`)) {
       return
     }
 
     try {
-      await adminAPI.toggleUserIdVerified(userId, !currentStatus)
+      console.log(`Toggling ID verified for user ${userId} to ${newStatus}`)
+      const response = await adminAPI.toggleUserIdVerified(userId, newStatus)
+      console.log('Toggle ID verified response:', response)
+
+      // Reload data to refresh the UI
       await loadData()
       alert(`User ID ${action === 'verify' ? 'verified' : 'unverified'} successfully`)
     } catch (err: any) {
       console.error('Error toggling ID verification:', err)
+      console.error('Error response:', err.response)
+      console.error('Error status:', err.response?.status)
+      console.error('Error data:', err.response?.data)
       const errorMessage = err.response?.data?.detail || `Failed to ${action} ID`
-      alert(errorMessage)
+      alert(typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage))
     }
   }
 
@@ -1088,18 +1096,24 @@ export default function AdminPage() {
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <button
-                            onClick={() => handleToggleIdVerified(u.id, u.id_verified)}
-                            disabled={!u.is_active}
-                            className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full cursor-pointer transition-colors ${
-                              u.id_verified
-                                ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                                : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
-                            } ${!u.is_active ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            title={u.is_active ? `Click to ${u.id_verified ? 'unverify' : 'verify'} ID` : 'Cannot modify inactive user'}
-                          >
-                            {u.id_verified ? 'Verified' : 'Unverified'}
-                          </button>
+                          {u.role.toLowerCase() === 'sender' ? (
+                            <span className="px-2 py-1 text-xs text-gray-400" title="Senders don't require ID verification">
+                              N/A
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleToggleIdVerified(u.id, u.id_verified)}
+                              disabled={!u.is_active}
+                              className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full cursor-pointer transition-colors ${
+                                u.id_verified
+                                  ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                                  : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
+                              } ${!u.is_active ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              title={u.is_active ? `Click to ${u.id_verified ? 'unverify' : 'verify'} ID` : 'Cannot modify inactive user'}
+                            >
+                              {u.id_verified ? 'Verified' : 'Unverified'}
+                            </button>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
