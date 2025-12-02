@@ -54,7 +54,7 @@ export function RouteMap({
   const [routePath, setRoutePath] = useState<google.maps.LatLng[]>([]);
 
   // Check if we have a valid API key
-  const hasApiKey = Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY);
+  const hasApiKey = Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY);
 
   // Calculate bounds to fit both markers
   const fitBounds = useCallback(() => {
@@ -261,7 +261,8 @@ export function RouteMapStatic({
   className?: string;
 }) {
   // Generate static map URL
-  const hasApiKey = Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY);
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY;
+  const hasApiKey = Boolean(apiKey);
 
   if (!hasApiKey || (!pickup && !dropoff)) {
     return (
@@ -287,7 +288,7 @@ export function RouteMapStatic({
     ? `&path=color:0x3B82F6%7Cweight:4%7C${pickup.lat},${pickup.lng}%7C${dropoff.lat},${dropoff.lng}`
     : '';
 
-  const staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=600x${height}&maptype=roadmap&${markers.join('&')}${path}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`;
+  const staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=600x${height}&maptype=roadmap&${markers.join('&')}${path}&key=${apiKey}`;
 
   return (
     <div

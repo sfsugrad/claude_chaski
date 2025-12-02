@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
-import { authAPI, adminAPI, packagesAPI, ratingsAPI, RatingResponse, messagesAPI, MessageResponse, matchingAPI, bidsAPI, notesAPI, PackageNoteResponse } from '@/lib/api'
+import { authAPI, adminAPI, packagesAPI, ratingsAPI, RatingResponse, messagesAPI, MessageResponse, matchingAPI, bidsAPI, notesAPI, PackageNoteResponse, MatchedCouriersResponse, MatchedCourier } from '@/lib/api'
 import StarRating from '@/components/StarRating'
 import RatingModal from '@/components/RatingModal'
 import ChatWindow from '@/components/ChatWindow'
@@ -86,6 +86,9 @@ export default function PackageDetailPage() {
   const [showNotes, setShowNotes] = useState(false)
   const [newNoteContent, setNewNoteContent] = useState('')
   const [submittingNote, setSubmittingNote] = useState(false)
+  const [matchedCouriers, setMatchedCouriers] = useState<MatchedCouriersResponse | null>(null)
+  const [loadingMatchedCouriers, setLoadingMatchedCouriers] = useState(false)
+  const [showMatchedCouriers, setShowMatchedCouriers] = useState(true)
 
   // Handle incoming WebSocket messages
   const handleMessageReceived = useCallback((message: MessageResponse) => {
@@ -170,6 +173,19 @@ export default function PackageDetailPage() {
           setNotes(notesResponse.data)
         } catch (err) {
           console.error('Error loading notes:', err)
+        }
+      }
+
+      // Load matched couriers for OPEN_FOR_BIDS packages (sender and admin only)
+      if (packageData.status.toLowerCase() === 'open_for_bids' && (isSender || isAdmin)) {
+        setLoadingMatchedCouriers(true)
+        try {
+          const matchedResponse = await matchingAPI.getMatchedCouriers(packageData.tracking_id)
+          setMatchedCouriers(matchedResponse.data)
+        } catch (err) {
+          console.error('Error loading matched couriers:', err)
+        } finally {
+          setLoadingMatchedCouriers(false)
         }
       }
 
@@ -743,14 +759,17 @@ export default function PackageDetailPage() {
                 )}
               </div>
 
-              {pkg.status.toLowerCase() === 'open_for_bids' && currentUser.id === pkg.sender_id ? (
+              {pkg.status.toLowerCase() === 'open_for_bids' &&
+               (currentUser.id === pkg.sender_id || currentUser.role === 'admin' || currentUser.role === 'ADMIN') ? (
                 <>
                   <p className="text-surface-600 mb-4">
-                    Review bids from couriers and select your preferred one.
+                    {currentUser.id === pkg.sender_id
+                      ? 'Review bids from couriers and select your preferred one.'
+                      : 'View all bids for this package.'}
                   </p>
                   <BidsList
                     trackingId={pkg.tracking_id}
-                    isSender={true}
+                    isSender={currentUser.id === pkg.sender_id}
                     onBidSelected={loadPackageData}
                   />
                 </>
@@ -773,6 +792,144 @@ export default function PackageDetailPage() {
                   <p className="text-surface-500">
                     Bids are being collected for this package.
                   </p>
+                </div>
+              )}
+            </Card>
+          </SlideIn>
+        )}
+
+        {/* Matched Couriers Section - Show for sender/admin on OPEN_FOR_BIDS packages */}
+        {currentUser && pkg && pkg.status.toLowerCase() === 'open_for_bids' &&
+         (currentUser.id === pkg.sender_id || currentUser.role === 'admin' || currentUser.role === 'ADMIN') && (
+          <SlideIn direction="up" delay={280}>
+            <Card className="mt-6">
+              <button
+                onClick={() => setShowMatchedCouriers(!showMatchedCouriers)}
+                className="w-full p-6 flex items-center justify-between hover:bg-surface-50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <svg className="w-6 h-6 text-info-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <span className="text-xl font-bold text-surface-900">
+                    Available Couriers
+                  </span>
+                  {matchedCouriers && (
+                    <Badge variant="info" size="sm">
+                      {matchedCouriers.total_matched_couriers}
+                    </Badge>
+                  )}
+                </div>
+                <svg
+                  className={`w-5 h-5 text-surface-400 transition-transform ${showMatchedCouriers ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {showMatchedCouriers && (
+                <div className="px-6 pb-6">
+                  {loadingMatchedCouriers ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                    </div>
+                  ) : matchedCouriers && matchedCouriers.total_matched_couriers > 0 ? (
+                    <>
+                      <p className="text-surface-600 mb-4">
+                        {matchedCouriers.total_matched_couriers} courier{matchedCouriers.total_matched_couriers !== 1 ? 's' : ''} with routes that can deliver your package.
+                        {matchedCouriers.couriers_with_bids > 0 && (
+                          <span className="text-success-600 font-medium ml-1">
+                            {matchedCouriers.couriers_with_bids} {matchedCouriers.couriers_with_bids === 1 ? 'has' : 'have'} placed a bid.
+                          </span>
+                        )}
+                      </p>
+                      <div className="space-y-3">
+                        {matchedCouriers.matched_couriers.map((courier) => (
+                          <div
+                            key={`${courier.courier_id}-${courier.route_id}`}
+                            className={`border rounded-lg p-4 ${courier.has_bid ? 'border-success-300 bg-success-50' : 'border-surface-200 bg-surface-50'}`}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="font-semibold text-surface-900">{courier.courier_name}</span>
+                                  {courier.has_bid && (
+                                    <Badge variant="success" size="sm">Has Bid</Badge>
+                                  )}
+                                  {courier.average_rating && (
+                                    <div className="flex items-center gap-1 text-sm text-yellow-600">
+                                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                      </svg>
+                                      <span>{courier.average_rating.toFixed(1)}</span>
+                                      <span className="text-surface-400">({courier.total_ratings})</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="text-sm text-surface-600 space-y-1">
+                                  <div className="flex items-center gap-1">
+                                    <svg className="w-4 h-4 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                                    </svg>
+                                    <span>{courier.route_start_address} → {courier.route_end_address}</span>
+                                  </div>
+                                  <div className="flex items-center gap-4">
+                                    <span className="flex items-center gap-1">
+                                      <svg className="w-4 h-4 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                                      </svg>
+                                      {courier.distance_from_route_km.toFixed(1)} km from route
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                      <svg className="w-4 h-4 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                      </svg>
+                                      ~{courier.estimated_detour_km.toFixed(1)} km detour
+                                    </span>
+                                    {courier.total_deliveries > 0 && (
+                                      <span className="flex items-center gap-1">
+                                        <svg className="w-4 h-4 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                                        </svg>
+                                        {courier.total_deliveries} deliveries
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              {courier.has_bid && courier.bid_proposed_price && (
+                                <div className="text-right">
+                                  <div className="text-lg font-bold text-success-600">
+                                    ${courier.bid_proposed_price.toFixed(2)}
+                                  </div>
+                                  <div className="text-xs text-surface-500">
+                                    {courier.bid_status}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center py-8">
+                      <svg className="w-12 h-12 text-surface-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <p className="text-surface-500">
+                        No couriers with matching routes yet.
+                      </p>
+                      <p className="text-surface-400 text-sm mt-1">
+                        Couriers will appear here when they create routes that pass near your pickup and dropoff locations.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </Card>

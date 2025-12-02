@@ -147,7 +147,7 @@ export default function BidsList({
       <div className="flex justify-between items-center">
         <div>
           <h3 className="font-semibold text-gray-900">
-            Bids ({bidsData.bid_count})
+            Bids ({bidsData.bids.length})
           </h3>
           {pendingBids.length > 0 && (
             <p className="text-sm text-gray-500">

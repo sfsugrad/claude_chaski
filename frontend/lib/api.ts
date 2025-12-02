@@ -269,6 +269,33 @@ export const couriersAPI = {
   activateRoute: (id: number) => api.put<RouteResponse>(`/couriers/routes/${id}/activate`),
 }
 
+// Matched Courier Types (for senders viewing who can deliver their package)
+export interface MatchedCourier {
+  courier_id: number
+  courier_name: string
+  courier_email: string
+  average_rating: number | null
+  total_ratings: number
+  total_deliveries: number
+  route_id: number
+  route_start_address: string
+  route_end_address: string
+  max_deviation_km: number
+  distance_from_route_km: number
+  estimated_detour_km: number
+  has_bid: boolean
+  bid_status: string | null
+  bid_proposed_price: number | null
+}
+
+export interface MatchedCouriersResponse {
+  package_id: number
+  tracking_id: string
+  total_matched_couriers: number
+  couriers_with_bids: number
+  matched_couriers: MatchedCourier[]
+}
+
 // Matching API
 export const matchingAPI = {
   getPackagesAlongRoute: (routeId: number) =>
@@ -279,6 +306,8 @@ export const matchingAPI = {
     api.post(`/matching/decline-package/${packageId}`),
   getOptimizedRoute: (routeId: number) =>
     api.get(`/matching/optimized-route/${routeId}`),
+  getMatchedCouriers: (trackingId: string) =>
+    api.get<MatchedCouriersResponse>(`/matching/matched-couriers/${trackingId}`),
 }
 
 // Notification Types

@@ -559,10 +559,15 @@ async def get_package_bids(
         if courier:
             bid_responses.append(get_courier_bid_response(bid, courier, db))
 
+    # Count actual bids in DB for accurate count
+    actual_bid_count = db.query(CourierBid).filter(
+        CourierBid.package_id == package.id
+    ).count()
+
     return PackageBidsResponse(
         bids=bid_responses,
         bid_deadline=package.bid_deadline,
-        bid_count=package.bid_count or 0
+        bid_count=actual_bid_count
     )
 
 
