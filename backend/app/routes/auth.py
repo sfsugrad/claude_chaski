@@ -120,6 +120,7 @@ class UserResponse(BaseModel):
     is_active: bool
     is_verified: bool
     phone_verified: bool
+    id_verified: bool
     max_deviation_km: int
     default_address: str | None = None
     default_address_lat: float | None = None
@@ -515,6 +516,7 @@ async def get_current_user_info(
         is_active=current_user.is_active,
         is_verified=current_user.is_verified,
         phone_verified=current_user.phone_verified,
+        id_verified=current_user.id_verified,
         max_deviation_km=current_user.max_deviation_km,
         default_address=current_user.default_address,
         default_address_lat=current_user.default_address_lat,
@@ -597,6 +599,7 @@ async def update_current_user(
         is_active=current_user.is_active,
         is_verified=current_user.is_verified,
         phone_verified=current_user.phone_verified,
+        id_verified=current_user.id_verified,
         max_deviation_km=current_user.max_deviation_km,
         default_address=current_user.default_address,
         default_address_lat=current_user.default_address_lat,
