@@ -38,12 +38,14 @@ CSRF_PROTECTED_METHODS = {"POST", "PUT", "DELETE", "PATCH"}
 CSRF_EXEMPT_PATHS = {
     "/api/ws",  # WebSocket endpoint
     "/api/auth/login",  # Login endpoint - no CSRF token yet
+    "/api/auth/login/mobile",  # Mobile login endpoint - uses Bearer token auth
     "/api/auth/register",  # Registration endpoint - no CSRF token yet
     "/api/auth/forgot-password",  # Password reset request
     "/api/auth/reset-password",  # Password reset confirmation
     "/api/auth/verify-email",  # Email verification
     "/api/auth/google",  # OAuth endpoints
     "/api/logs/frontend",  # Frontend error logging (may not have token)
+    "/api/id-verification/webhook",  # Stripe Identity webhook - uses signature verification
     "/docs",    # Swagger UI
     "/redoc",   # ReDoc
     "/openapi.json",  # OpenAPI spec

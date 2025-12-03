@@ -1,8 +1,33 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { Platform } from 'react-native'
 import { router } from 'expo-router'
 import * as SecureStore from 'expo-secure-store'
 import { api, setAuthToken, clearAuthToken } from '@/services/api'
 import type { UserResponse } from '@chaski/shared-types'
+
+// Platform-specific token storage
+const tokenStorage = {
+  async getItem(key: string): Promise<string | null> {
+    if (Platform.OS === 'web') {
+      return localStorage.getItem(key)
+    }
+    return SecureStore.getItemAsync(key)
+  },
+  async setItem(key: string, value: string): Promise<void> {
+    if (Platform.OS === 'web') {
+      localStorage.setItem(key, value)
+      return
+    }
+    await SecureStore.setItemAsync(key, value)
+  },
+  async deleteItem(key: string): Promise<void> {
+    if (Platform.OS === 'web') {
+      localStorage.removeItem(key)
+      return
+    }
+    await SecureStore.deleteItemAsync(key)
+  },
+}
 
 interface AuthContextType {
   user: UserResponse | null
@@ -27,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loadStoredAuth = async () => {
     try {
-      const token = await SecureStore.getItemAsync(TOKEN_KEY)
+      const token = await tokenStorage.getItem(TOKEN_KEY)
       if (token) {
         setAuthToken(token)
         await refreshUser()
@@ -40,13 +65,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const login = async (email: string, password: string) => {
-    const response = await api.authAPI.login({ email, password })
+    // Use mobile-specific login endpoint that returns token in response body
+    const response = await api.authAPI.loginMobile({ email, password })
 
-    // Backend returns token in response for mobile
-    // For web, it uses cookies - for mobile, we extract the token
-    const token = (response.data as unknown as { access_token?: string }).access_token
+    // Store the token in storage
+    const token = response.data.access_token
     if (token) {
-      await SecureStore.setItemAsync(TOKEN_KEY, token)
+      await tokenStorage.setItem(TOKEN_KEY, token)
       setAuthToken(token)
     }
 
@@ -59,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Logout API error:', error)
     } finally {
-      await SecureStore.deleteItemAsync(TOKEN_KEY)
+      await tokenStorage.deleteItem(TOKEN_KEY)
       clearAuthToken()
       setUser(null)
       router.replace('/(auth)/login')

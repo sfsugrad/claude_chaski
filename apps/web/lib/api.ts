@@ -46,6 +46,10 @@ export interface RegisterData {
   default_address?: string
   default_address_lat?: number
   default_address_lng?: number
+  // Legal agreement acceptance
+  terms_accepted: boolean
+  privacy_accepted: boolean
+  courier_agreement_accepted?: boolean
 }
 
 export interface LoginData {

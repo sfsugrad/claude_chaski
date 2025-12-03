@@ -4,6 +4,7 @@ import type {
   LoginData,
   UserResponse,
   AuthResponse,
+  MobileAuthResponse,
   MessageResponse as GenericMessageResponse,
   UserUpdate,
   ForgotPasswordData,
@@ -65,6 +66,8 @@ export function createApiClient(httpClient: HttpClient) {
       httpClient.post<UserResponse>('/auth/register', data),
     login: (data: LoginData) =>
       httpClient.post<AuthResponse>('/auth/login', data),
+    loginMobile: (data: LoginData) =>
+      httpClient.post<MobileAuthResponse>('/auth/login/mobile', data),
     logout: () =>
       httpClient.post<AuthResponse>('/auth/logout'),
     getCurrentUser: () =>

@@ -70,6 +70,14 @@ class User(Base):
     # ID verification for couriers (Stripe Identity)
     id_verified = Column(Boolean, default=False)  # True when ID verification approved
 
+    # Legal agreement acceptance tracking
+    terms_accepted_at = Column(DateTime(timezone=True), nullable=True)  # When Terms of Service was accepted
+    privacy_accepted_at = Column(DateTime(timezone=True), nullable=True)  # When Privacy Policy was accepted
+    courier_agreement_accepted_at = Column(DateTime(timezone=True), nullable=True)  # When Courier Agreement was accepted (courier/both roles)
+    terms_version = Column(String(20), nullable=True)  # Version of Terms accepted (e.g., "1.0")
+    privacy_version = Column(String(20), nullable=True)  # Version of Privacy Policy accepted
+    courier_agreement_version = Column(String(20), nullable=True)  # Version of Courier Agreement accepted
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

@@ -1,10 +1,12 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { idVerificationAPI, IDVerificationStatusResponse } from '@/lib/api'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
+
+const POLL_INTERVAL = 5000 // Poll every 5 seconds when processing
 
 export default function IDVerificationCompletePage() {
   const router = useRouter()
@@ -12,6 +14,60 @@ export default function IDVerificationCompletePage() {
   const [verificationStatus, setVerificationStatus] = useState<IDVerificationStatusResponse | null>(null)
   const [message, setMessage] = useState('')
   const hasChecked = useRef(false)
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  const processVerificationStatus = useCallback((data: IDVerificationStatusResponse) => {
+    setVerificationStatus(data)
+
+    if (data.is_verified) {
+      setStatus('success')
+      setMessage('Your ID has been successfully verified. You can now start accepting deliveries.')
+      // Clear polling and redirect
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+        pollIntervalRef.current = null
+      }
+      setTimeout(() => {
+        router.push('/dashboard')
+      }, 3000)
+      return true // Terminal state
+    } else if (data.status === 'verified' || data.status === 'admin_approved') {
+      setStatus('success')
+      setMessage('Your ID has been successfully verified. You can now start accepting deliveries.')
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+        pollIntervalRef.current = null
+      }
+      setTimeout(() => {
+        router.push('/dashboard')
+      }, 3000)
+      return true // Terminal state
+    } else if (data.status === 'failed' || data.status === 'admin_rejected') {
+      setStatus('failed')
+      setMessage(data.verification?.rejection_reason || data.verification?.failure_reason || 'Verification failed. Please try again.')
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+        pollIntervalRef.current = null
+      }
+      return true // Terminal state
+    } else if (data.status === 'processing') {
+      setStatus('processing')
+      setMessage('Your verification is being processed. This usually takes a few minutes.')
+      return false // Keep polling
+    } else if (data.status === 'requires_review') {
+      setStatus('processing')
+      setMessage('Your verification requires additional review. Our team will process it shortly.')
+      return false // Keep polling
+    } else if (data.status === 'pending') {
+      setStatus('processing')
+      setMessage('Your verification is pending. Please complete the verification process if you have not already.')
+      return false // Keep polling
+    } else {
+      setStatus('error')
+      setMessage('Unable to determine verification status.')
+      return true // Terminal state
+    }
+  }, [router])
 
   useEffect(() => {
     const checkVerificationStatus = async () => {
@@ -21,36 +77,18 @@ export default function IDVerificationCompletePage() {
 
       try {
         const response = await idVerificationAPI.getStatus()
-        setVerificationStatus(response.data)
+        const isTerminal = processVerificationStatus(response.data)
 
-        if (response.data.is_verified) {
-          setStatus('success')
-          setMessage('Your ID has been successfully verified. You can now start accepting deliveries.')
-          // Redirect to dashboard after 3 seconds
-          setTimeout(() => {
-            router.push('/dashboard')
-          }, 3000)
-        } else if (response.data.status === 'processing') {
-          setStatus('processing')
-          setMessage('Your verification is being processed. This usually takes a few minutes.')
-        } else if (response.data.status === 'verified' || response.data.status === 'admin_approved') {
-          setStatus('success')
-          setMessage('Your ID has been successfully verified. You can now start accepting deliveries.')
-          setTimeout(() => {
-            router.push('/dashboard')
-          }, 3000)
-        } else if (response.data.status === 'failed' || response.data.status === 'admin_rejected') {
-          setStatus('failed')
-          setMessage(response.data.verification?.rejection_reason || response.data.verification?.failure_reason || 'Verification failed. Please try again.')
-        } else if (response.data.status === 'requires_review') {
-          setStatus('processing')
-          setMessage('Your verification requires additional review. Our team will process it shortly.')
-        } else if (response.data.status === 'pending') {
-          setStatus('processing')
-          setMessage('Your verification is pending. Please complete the verification process if you have not already.')
-        } else {
-          setStatus('error')
-          setMessage('Unable to determine verification status.')
+        // Start polling if not in a terminal state
+        if (!isTerminal && !pollIntervalRef.current) {
+          pollIntervalRef.current = setInterval(async () => {
+            try {
+              const pollResponse = await idVerificationAPI.getStatus()
+              processVerificationStatus(pollResponse.data)
+            } catch (error) {
+              console.error('Polling error:', error)
+            }
+          }, POLL_INTERVAL)
         }
       } catch (error: any) {
         setStatus('error')
@@ -63,11 +101,22 @@ export default function IDVerificationCompletePage() {
     }
 
     checkVerificationStatus()
-  }, [router])
+
+    // Cleanup polling on unmount
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+        pollIntervalRef.current = null
+      }
+    }
+  }, [router, processVerificationStatus])
 
   const handleRetryVerification = async () => {
     try {
-      const returnUrl = `${window.location.origin}/id-verification/complete`
+      // Get current locale from pathname (e.g., /en/id-verification/complete -> en)
+      const pathParts = window.location.pathname.split('/').filter(Boolean)
+      const locale = pathParts[0] || 'en'
+      const returnUrl = `${window.location.origin}/${locale}/id-verification/complete`
       const response = await idVerificationAPI.startVerification(returnUrl)
       window.location.href = response.data.url
     } catch (error: any) {

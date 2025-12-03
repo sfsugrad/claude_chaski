@@ -16,7 +16,12 @@ config.resolver.nodeModulesPaths = [
   path.resolve(workspaceRoot, 'node_modules'),
 ];
 
-// 3. Force Metro to resolve (sub)dependencies only from the `nodeModulesPaths`
-config.resolver.disableHierarchicalLookup = true;
+// 3. Add extra node modules for the packages directory
+config.resolver.extraNodeModules = {
+  '@chaski/shared-types': path.resolve(workspaceRoot, 'packages/shared-types'),
+  '@chaski/shared-utils': path.resolve(workspaceRoot, 'packages/shared-utils'),
+  '@chaski/shared-i18n': path.resolve(workspaceRoot, 'packages/shared-i18n'),
+  '@chaski/api-client': path.resolve(workspaceRoot, 'packages/api-client'),
+};
 
 module.exports = config;

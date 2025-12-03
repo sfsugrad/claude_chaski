@@ -2,579 +2,344 @@
 
 Chaski is a logistics platform that connects package senders with couriers traveling along the same route. Named after the Inca messengers, Chaski enables efficient package delivery by matching packages with travelers going the same way.
 
-## Features
+## Monorepo Structure
 
-### Authentication & Security
-- **User Registration** with email verification
-- **Email Verification** with secure token-based validation
-- **Google Single Sign-On** (OAuth 2.0) for quick authentication
-- **JWT-based Authentication** for secure API access
-- **Password Hashing** with bcrypt
-- **Role-based Access Control** (sender, courier, or both)
-- **Geographic Registration Restrictions** - IP-based country filtering for new user registrations
-  - Default: US-only registrations (configurable via environment variables)
-  - Existing users grandfathered in
-  - Admin override option for international access
-  - Fail-secure design (blocks if geolocation fails)
-  - Audit logging for blocked attempts
-
-### For Senders
-- **Create Package Delivery Requests** with Google Places address autocomplete (coordinates auto-generated)
-- **Smart Address Input**: Type and select from Google Places suggestions for accurate addresses
-- **Specify Package Details**: size (small to extra large), weight, description, optional price
-- **Pickup & Dropoff Information**: full addresses with optional contact details
-- **Get Matched** with couriers traveling along your route
-- **Track Package Status** in real-time (pending, matched, picked_up, in_transit, delivered)
-- **View All Packages** from the dashboard
-
-### For Couriers
-- Enter your travel route (start and destination)
-- Set maximum deviation distance (how far off-route you're willing to go)
-- View packages along your route
-- Accept packages to deliver and earn money
-- Update delivery status
-
-### For Admins
-- **Admin Dashboard** with comprehensive platform statistics
-- **User Management**: View, create, update roles, and delete users
-- **Package Management**: View all packages, filter by status and active state
-- **Package Detail View**: Comprehensive view of all package information
-- **Soft Delete**: Deactivate packages (pending only) instead of hard deletion
-- **Status Filtering**: Filter packages by status (pending, delivered, etc.) and active state
-- **User Creation**: Create users with any role including admin privileges
-- **Platform Statistics**: Real-time metrics on users, packages, and revenue
-
-### System
-- **Intelligent Route Matching Algorithm** - Matches packages with couriers on similar routes
-- **Geolocation-Based Package Discovery** - Auto-geocoding from addresses (coordinates generated automatically)
-- **Configurable Deviation Distance** - Couriers set how far they'll deviate from their route
-- **Real-time Matching Updates** - Instant notifications when matches are found
-- **Beautiful, Responsive UI** - Modern design with Tailwind CSS
-- **Type-Safe API** - Full TypeScript interfaces for frontend-backend communication
-- **Admin Dashboard** - Comprehensive admin panel for platform management
-- **Soft Delete Functionality** - Package deactivation with preservation of historical data
-
-## Tech Stack
-
-### Backend
-- **FastAPI** - Modern Python web framework
-- **PostgreSQL** - Database with PostGIS for geospatial queries
-- **SQLAlchemy** - ORM for database operations
-- **JWT** - Authentication and authorization
-- **FastAPI-Mail** - Email sending with SMTP
-- **Authlib** - OAuth 2.0 implementation
-- **Bcrypt** - Password hashing
-- **Geopy/Shapely** - Geospatial calculations
-- **Pytest** - Testing framework
-
-### Frontend
-- **Next.js 14** - React framework with App Router
-- **TypeScript** - Type-safe JavaScript
-- **Tailwind CSS** - Utility-first CSS framework
-- **Axios** - HTTP client for API calls
-- **React Hooks** - Modern state management
-
-## Project Structure
+This is a Turborepo monorepo with pnpm workspaces:
 
 ```
 chaski/
-├── backend/              # FastAPI backend
-│   ├── app/
-│   │   ├── models/      # Database models (User, Package, Route)
-│   │   ├── routes/      # API endpoints
-│   │   │   ├── auth.py        # Authentication & authorization
-│   │   │   ├── packages.py    # Package management
-│   │   │   ├── couriers.py    # Courier routes
-│   │   │   ├── matching.py    # Package-courier matching
-│   │   │   └── admin.py       # Admin-only endpoints
-│   │   ├── utils/       # Utility functions
-│   │   │   ├── auth.py        # JWT & password hashing
-│   │   │   ├── email.py       # Email sending
-│   │   │   ├── oauth.py       # Google OAuth
-│   │   │   └── dependencies.py # Auth dependencies
-│   │   └── config.py    # Configuration settings
-│   ├── migrations/      # Database migrations
-│   ├── tests/           # Pytest test suite
-│   ├── main.py          # Application entry point
-│   └── requirements.txt # Python dependencies
-│
-└── frontend/            # Next.js frontend
-    ├── app/             # Next.js App Router pages
-    │   ├── register/    # Registration page
-    │   ├── login/       # Login page
-    │   ├── dashboard/   # User dashboard
-    │   ├── admin/       # Admin dashboard
-    │   ├── packages/    # Package management
-    │   │   ├── create/  # Package creation form
-    │   │   └── [id]/    # Package detail page
-    │   ├── verify-email/# Email verification page
-    │   └── auth/        # OAuth callback handler
-    ├── components/      # React components (GoogleSignInButton, etc.)
-    ├── lib/             # Utility functions and API client
-    └── public/          # Static assets
+├── apps/
+│   ├── web/                 # Next.js 14 web application
+│   └── mobile/              # React Native Expo app
+├── packages/
+│   ├── shared-types/        # TypeScript types shared across apps
+│   ├── shared-utils/        # Utility functions (distance, validation)
+│   ├── shared-i18n/         # Translation files (en, fr, es)
+│   └── api-client/          # Platform-agnostic API client
+├── backend/                 # FastAPI backend (Python)
+├── turbo.json              # Turborepo configuration
+├── pnpm-workspace.yaml     # Workspace configuration
+└── package.json            # Root package.json
 ```
+
+## Features
+
+### For Senders
+- Create package delivery requests with Google Places address autocomplete
+- Specify package details: size, weight, description, pricing
+- Receive and manage bids from couriers
+- Track package status in real-time
+- Rate and review couriers after delivery
+- Real-time messaging with couriers
+
+### For Couriers
+- Create travel routes with start/destination
+- Set maximum deviation distance from route
+- View packages matching your route
+- Submit bids on packages
+- ID verification via Stripe Identity
+- Manage deliveries and upload proof of delivery
+
+### For Admins
+- Comprehensive admin dashboard with platform statistics
+- User management with role-based access control
+- Package management with filtering and soft delete
+- ID verification review and approval
+- Audit logging for all actions
+
+### System Features
+- Intelligent route matching algorithm
+- Real-time WebSocket notifications
+- Bid deadline system with auto-extension
+- Multi-language support (English, French, Spanish)
+- Secure authentication with JWT + CSRF protection
+- Phone verification via Twilio
+- Payment processing via Stripe
+
+## Tech Stack
+
+### Backend (FastAPI)
+- **FastAPI** - Modern Python web framework
+- **PostgreSQL** - Database with PostGIS for geospatial queries
+- **Redis** - Caching and WebSocket pub/sub
+- **SQLAlchemy** - ORM for database operations
+- **JWT** - Authentication with httpOnly cookies
+- **Stripe** - Payments and ID verification
+- **Twilio** - SMS/phone verification
+
+### Web App (Next.js)
+- **Next.js 14** - React framework with App Router
+- **TypeScript** - Type-safe development
+- **Tailwind CSS** - Utility-first styling
+- **next-intl** - Internationalization
+- **Axios** - HTTP client with CSRF handling
+
+### Mobile App (Expo)
+- **Expo SDK 52** - React Native framework
+- **Expo Router** - File-based navigation
+- **TypeScript** - Type-safe development
+- **Zustand + TanStack Query** - State management
+- **react-i18next** - Internationalization
+
+### Shared Packages
+- **@chaski/shared-types** - TypeScript interfaces
+- **@chaski/shared-utils** - Distance conversion, validation
+- **@chaski/shared-i18n** - Translation files
+- **@chaski/api-client** - Platform-agnostic API client
 
 ## Getting Started
 
 ### Prerequisites
 
-**For Backend:**
-- Python 3.9+
-- PostgreSQL 14+ with PostGIS extension
-- SMTP credentials (Gmail recommended for development)
-- Google OAuth credentials (optional, for SSO)
+- **Node.js 18+** and **pnpm 8+**
+- **Python 3.9+** with virtual environment
+- **PostgreSQL 14+** with PostGIS extension
+- **Redis** for caching and WebSockets
 
-**For Frontend:**
-- Node.js 18+ (v18.17.0 or higher)
-- npm or yarn
+### Quick Start
 
-### Backend Setup
+```bash
+# Install pnpm globally (if not installed)
+npm install -g pnpm
 
-1. **Navigate to the backend directory:**
+# Install all dependencies
+pnpm install
+
+# Build shared packages
+pnpm run build --filter="@chaski/shared-*" --filter="@chaski/api-client"
+```
+
+### Run Development Servers
+
+```bash
+# Terminal 1 - Backend
+cd backend
+source venv/bin/activate
+uvicorn main:app --reload --port 8000
+
+# Terminal 2 - Web App
+pnpm dev --filter=@chaski/web
+
+# Terminal 3 - Mobile App
+pnpm dev --filter=@chaski/mobile
+```
+
+Or run from within each app directory:
+
+```bash
+# Web app
+cd apps/web && pnpm dev
+
+# Mobile app
+cd apps/mobile && pnpm start
+```
+
+### Monorepo Commands
+
+```bash
+# Install dependencies
+pnpm install
+
+# Build all packages
+pnpm run build
+
+# Build specific packages
+pnpm run build --filter=@chaski/shared-types
+pnpm run build --filter="@chaski/shared-*"
+
+# Run dev for specific app
+pnpm dev --filter=@chaski/web
+pnpm dev --filter=@chaski/mobile
+
+# Lint all packages
+pnpm run lint
+
+# Type check all packages
+pnpm run typecheck
+```
+
+## Backend Setup
+
+1. **Create virtual environment:**
    ```bash
    cd backend
-   ```
-
-2. **Create a virtual environment:**
-   ```bash
    python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   source venv/bin/activate
    ```
 
-3. **Install dependencies:**
+2. **Install dependencies:**
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **Set up PostgreSQL database:**
+3. **Set up PostgreSQL:**
    ```bash
    createdb chaski_db
    psql chaski_db -c "CREATE EXTENSION postgis;"
    ```
 
-5. **Create `.env` file from example:**
+4. **Configure environment:**
    ```bash
    cp .env.example .env
+   # Edit .env with your configuration
    ```
 
-6. **Update `.env` with your configuration:**
-
-   **Required Settings:**
-   ```env
-   # Database
-   DATABASE_URL=postgresql://user:password@localhost:5432/chaski_db
-
-   # JWT
-   SECRET_KEY=your-secret-key-here-change-in-production
-   ACCESS_TOKEN_EXPIRE_MINUTES=30
-
-   # Frontend URL
-   FRONTEND_URL=http://localhost:3000
-   ```
-
-   **Email Settings (for email verification):**
-
-   For Gmail:
-   ```env
-   MAIL_USERNAME=your-email@gmail.com
-   MAIL_PASSWORD=your-gmail-app-password
-   MAIL_FROM=noreply@chaski.com
-   MAIL_SERVER=smtp.gmail.com
-   MAIL_PORT=587
-   ```
-
-   To get Gmail App Password:
-   - Enable 2-Factor Authentication in your Google Account
-   - Go to Security → App Passwords
-   - Generate an app password for "Mail"
-   - Use that password in `MAIL_PASSWORD`
-
-   **Google OAuth (optional, for SSO):**
-   ```env
-   GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
-   GOOGLE_CLIENT_SECRET=your-client-secret
-   GOOGLE_REDIRECT_URI=http://localhost:8000/api/auth/google/callback
-   ```
-
-   To get Google OAuth credentials:
-   - Go to [Google Cloud Console](https://console.cloud.google.com/)
-   - Create a project → APIs & Services → Credentials
-   - Create OAuth client ID (Web application)
-   - Add authorized redirect URI: `http://localhost:8000/api/auth/google/callback`
-
-7. **Run database migrations:**
+5. **Run migrations:**
    ```bash
-   # Add verification_token column to users table
-   psql -d chaski_db -c "ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token VARCHAR;"
-
-   # Add is_active column to packages table (for soft delete)
-   PYTHONPATH=/path/to/chaski/backend python3 migrations/add_package_is_active.py
+   PYTHONPATH=. python migrations/<migration_name>.py
    ```
 
-8. **Run the development server:**
+6. **Start server:**
    ```bash
-   uvicorn main:app --reload --host 0.0.0.0 --port 8000
+   uvicorn main:app --reload --port 8000
    ```
 
-   Backend will be available at:
-   - API: `http://localhost:8000`
-   - Interactive docs: `http://localhost:8000/docs`
-   - Alternative docs: `http://localhost:8000/redoc`
+## Web App Setup
 
-### Frontend Setup
-
-1. **Navigate to the frontend directory:**
+1. **Navigate to web app:**
    ```bash
-   cd frontend
+   cd apps/web
    ```
 
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
-
-3. **Create `.env.local` file:**
+2. **Configure environment:**
    ```bash
    cp .env.example .env.local
+   # Edit .env.local with your configuration
    ```
 
-4. **Configure environment variables in `.env.local`:**
-
-   **Required:**
-   ```env
-   NEXT_PUBLIC_API_URL=http://localhost:8000
-   ```
-
-   **Optional (but recommended for address autocomplete):**
-   ```env
-   NEXT_PUBLIC_GOOGLE_PLACES_API_KEY=your-google-places-api-key-here
-   ```
-
-   To get a Google Places API key:
-   - Go to [Google Cloud Console](https://console.cloud.google.com/)
-   - Create or select a project
-   - Go to "APIs & Services" → "Library"
-   - Enable "Places API"
-   - Go to "APIs & Services" → "Credentials"
-   - Create an API key
-   - (Recommended) Restrict the API key to:
-     - Website restrictions: Add `http://localhost:3000` for development
-     - API restrictions: Limit to "Places API"
-
-   **Note:** The application works without the Google Places API key, but users will need to manually enter coordinates. With the API key, addresses auto-complete and coordinates are automatically populated.
-
-5. **Run the development server:**
+3. **Start development server:**
    ```bash
-   npm run dev
+   pnpm dev
    ```
 
-   Frontend will be available at `http://localhost:3000`
+   Web app available at `http://localhost:3000`
 
-### Quick Start (Both Servers)
+## Mobile App Setup
 
-From the project root:
+1. **Navigate to mobile app:**
+   ```bash
+   cd apps/mobile
+   ```
 
-```bash
-# Terminal 1 - Backend
-cd backend
-source venv/bin/activate  # or venv\Scripts\activate on Windows
-uvicorn main:app --reload
+2. **Start Expo development server:**
+   ```bash
+   pnpm start
+   ```
 
-# Terminal 2 - Frontend
-cd frontend
-npm run dev
+3. **Run on simulators:**
+   ```bash
+   pnpm ios      # iOS Simulator
+   pnpm android  # Android Emulator
+   ```
+
+4. **Run on physical device:**
+   - Install Expo Go from App Store / Play Store
+   - Scan the QR code shown in the terminal
+
+See [apps/mobile/README.md](apps/mobile/README.md) for detailed mobile setup.
+
+## Shared Packages Usage
+
+```typescript
+// Types
+import type { UserResponse, PackageResponse } from '@chaski/shared-types'
+
+// Utilities
+import { kmToMiles, milesToKm, formatMiles } from '@chaski/shared-utils'
+
+// API Client (Web - Axios adapter)
+import { createApiClient } from '@chaski/api-client'
+import { createAxiosAdapter } from '@chaski/api-client/adapters/axios'
+
+// API Client (Mobile - Fetch adapter)
+import { createApiClient } from '@chaski/api-client'
+import { createFetchAdapter } from '@chaski/api-client/adapters/fetch'
+
+// Translations
+import { translations } from '@chaski/shared-i18n'
 ```
-
-## API Endpoints
-
-### Authentication
-- `POST /api/auth/register` - Register new user with email verification
-- `POST /api/auth/login` - Login and get JWT token
-- `GET /api/auth/me` - Get current user info (requires authentication)
-- `GET /api/auth/verify-email/{token}` - Verify email address
-- `POST /api/auth/resend-verification` - Resend verification email
-- `GET /api/auth/google/login` - Initiate Google OAuth login
-- `GET /api/auth/google/callback` - Handle Google OAuth callback
-
-### Packages (Sender)
-- `POST /api/packages` - Create new package (requires sender or both role)
-  - Required: description, size, weight_kg, pickup/dropoff addresses and coordinates
-  - Optional: contact info for pickup/dropoff, price
-  - Validates: weight (0-1000kg), description length (max 500 chars), size enum
-- `GET /api/packages` - Get user's packages (sender's created packages, courier's assigned packages)
-- `GET /api/packages/{id}` - Get package details (with access control)
-- `PUT /api/packages/{id}/status` - Update package status (courier only)
-
-### Couriers
-- `POST /api/couriers/routes` - Create new route
-- `GET /api/couriers/routes` - Get courier's routes
-- `GET /api/couriers/routes/{id}` - Get route details
-- `DELETE /api/couriers/routes/{id}` - Delete route
-
-### Matching
-- `GET /api/matching/packages-along-route/{route_id}` - Find packages along route
-- `POST /api/matching/accept-package/{package_id}` - Accept package delivery
-- `POST /api/matching/decline-package/{package_id}` - Decline package
-
-### Admin (Admin Role Required)
-- `GET /api/admin/users` - Get all users with pagination
-- `POST /api/admin/users` - Create new user with any role
-- `GET /api/admin/users/{id}` - Get specific user details
-- `PUT /api/admin/users/{id}` - Update user role
-- `DELETE /api/admin/users/{id}` - Delete user (cascade to packages)
-- `GET /api/admin/packages` - Get all packages with pagination
-- `GET /api/admin/packages/{id}` - Get specific package details
-- `PUT /api/admin/packages/{id}/toggle-active` - Activate/deactivate package (pending only)
-- `DELETE /api/admin/packages/{id}` - Delete package
-- `GET /api/admin/stats` - Get platform statistics (users, packages, revenue)
-
-## User Flow
-
-### Registration & Login
-
-1. **Email Registration:**
-   - User fills registration form at `/register`
-   - Receives verification email
-   - Clicks verification link
-   - Account is activated
-
-2. **Google Sign-In:**
-   - User clicks "Continue with Google"
-   - Redirects to Google OAuth
-   - Auto-creates account (already verified)
-   - Redirects to dashboard
-
-3. **Login:**
-   - User enters credentials at `/login`
-   - Receives JWT token
-   - Redirects to dashboard
-
-### Package Creation (Senders)
-
-1. **Access Package Creation:**
-   - Login to dashboard at `/dashboard`
-   - Click "Create Package" button (sender or both roles only)
-   - Redirects to `/packages/create`
-
-2. **Fill Package Details:**
-   - **Package Information**: Enter description, select size (small/medium/large/extra_large), specify weight
-   - **Pickup Location**: Enter full pickup address, add optional contact name and phone
-   - **Dropoff Location**: Enter full dropoff address, add optional contact name and phone
-   - **Pricing**: Optionally set a price, or leave empty for courier offers
-   - Coordinates are automatically generated from addresses
-
-3. **Submit Package:**
-   - Form validates all required fields
-   - Package is created with "pending" status
-   - Redirects back to dashboard
-   - Package is now available for courier matching
-
-### Admin Dashboard (Admins Only)
-
-1. **Access Admin Dashboard:**
-   - Login with admin role credentials
-   - Automatically redirects to `/admin`
-   - View platform overview with real-time statistics
-
-2. **User Management:**
-   - **View All Users**: See complete list with roles, verification status, and join dates
-   - **Create New User**: Click "+ Create User" button
-     - Fill in email, password (min 8 chars), full name, role
-     - Optionally add phone number and max deviation
-     - Users created by admin are automatically verified
-   - **Update User Role**: Select new role from dropdown (sender, courier, both, admin)
-   - **Delete User**: Remove user account (cannot delete self)
-
-3. **Package Management:**
-   - **View All Packages**: See all packages in the system with sender information
-   - **Filter Packages**:
-     - By status: pending, matched, picked_up, in_transit, delivered, cancelled
-     - By active state: active, inactive, or all
-   - **Package Details**: Click package ID to view comprehensive information
-     - Package details (size, weight, price)
-     - Sender and courier information
-     - Pickup and dropoff locations with coordinates
-     - Contact information
-   - **Deactivate Package**: Soft delete for pending packages only (preserves data)
-   - **Activate Package**: Re-enable deactivated packages
-
-4. **Platform Statistics:**
-   - Total users breakdown by role (senders, couriers, both, admins)
-   - Package metrics (total, active, completed, pending)
-   - Total revenue from completed deliveries
-
-## Database Schema
-
-### Users
-- Email (unique), hashed password
-- Full name, phone number
-- Role (sender, courier, both)
-- Email verification status and token
-- Courier settings (max deviation distance)
-- Timestamps (created_at, updated_at)
-
-### Packages
-- Sender and courier IDs (foreign keys to Users)
-- Package details:
-  - Description (max 500 characters)
-  - Size: small, medium, large, extra_large
-  - Weight (0-1000 kg)
-- Pickup location:
-  - Full address (street, city, state, zip)
-  - Coordinates (lat/lng, auto-generated)
-  - Optional contact name and phone
-- Dropoff location:
-  - Full address (street, city, state, zip)
-  - Coordinates (lat/lng, auto-generated)
-  - Optional contact name and phone
-- Status: pending → matched → picked_up → in_transit → delivered
-- Optional pricing (or null for courier offers)
-- **is_active**: Boolean flag for soft delete (default: true)
-  - Only pending packages can be deactivated
-  - Inactive packages are hidden from regular views
-  - Data preserved for historical records
-- Timestamps (created_at, updated_at, pickup_time, delivery_time)
-
-### Courier Routes
-- Courier ID
-- Start and end locations (address, lat/lng)
-- Max deviation distance
-- Departure time
-- Active status
 
 ## Testing
 
 ### Backend Tests
-
-Run the test suite:
 ```bash
 cd backend
-pytest
+source venv/bin/activate
+pytest                              # Run all tests
+pytest tests/test_packages.py -v   # Single file
+pytest --cov=app tests/            # With coverage
 ```
 
-Run with coverage:
+### Web App Tests
 ```bash
-pytest --cov=app tests/
+cd apps/web
+pnpm test                  # Run tests
+pnpm test:watch           # Watch mode
+pnpm test:coverage        # With coverage
 ```
 
-## Development Roadmap
+### E2E Tests (Playwright)
+```bash
+cd apps/web
+pnpm test:e2e             # Run all E2E tests
+pnpm test:e2e:ui          # Interactive UI mode
+pnpm test:e2e:headed      # Headed browser
+```
 
-### Phase 1: Core Features (In Progress)
-- [x] Basic project structure
-- [x] Database models
-- [x] User authentication with JWT
-- [x] Email verification system
-- [x] Google OAuth integration
-- [x] Frontend registration & login
-- [x] User dashboard
-- [x] **Package creation** (Backend & Frontend complete)
-  - [x] Full CRUD API endpoints
-  - [x] Package creation form with validation
-  - [x] Auto-geocoding from addresses
-  - [x] Role-based access control
-  - [x] Google Places autocomplete for address input
-- [x] **Admin Dashboard** (Complete)
-  - [x] Platform statistics and metrics
-  - [x] User management (view, create, update, delete)
-  - [x] Package management with filtering
-  - [x] Package detail view
-  - [x] Soft delete for packages
-  - [x] Admin-only access control
-- [x] **Package Information Pages**
-  - [x] Comprehensive package detail page
-  - [x] Pickup and dropoff location display
-  - [x] Sender and courier information
-- [ ] Route creation for couriers
-- [ ] Package-route matching algorithm
-- [ ] Package listing and management for users
+## API Documentation
 
-### Phase 2: Enhanced Matching
-- [ ] Advanced route matching with real road distances
-- [ ] Price negotiation
-- [ ] Package categories and restrictions
-- [ ] Route optimization for multiple packages
-
-### Phase 3: Mobile App
-- [ ] React Native mobile app
-- [ ] Push notifications
-- [ ] Real-time tracking
-- [ ] In-app messaging
-
-### Phase 4: Additional Features
-- [ ] Payment integration
-- [ ] Rating and review system
-- [ ] Package insurance
-- [ ] Analytics dashboard
-
-## Security Features
-
-- **Password Hashing**: Bcrypt with salt
-- **JWT Tokens**: Secure token-based authentication with expiration
-- **Email Verification**: Prevents fake accounts with secure token validation
-- **OAuth 2.0**: Industry-standard authentication via Google
-- **Role-Based Access Control**:
-  - Package creation restricted to senders
-  - Status updates restricted to couriers
-  - Admin endpoints require admin role
-  - Users cannot escalate their own privileges
-- **Resource Access Control**:
-  - Users can only view/modify their own packages
-  - Admins have full access to all resources
-  - Self-protection: Admins cannot delete themselves or remove their own admin role
-- **CORS Protection**: Configured for frontend origin only
-- **SQL Injection Protection**: SQLAlchemy ORM parameterization
-- **Input Validation**: Pydantic models for all request/response validation
-- **Field-Level Validation**: Weight limits, description length, enum types enforced
-- **Soft Delete**: Data preservation through deactivation rather than permanent deletion
-- **Business Rule Enforcement**: Only pending packages can be deactivated
+When the backend is running, API documentation is available at:
+- Swagger UI: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
 
 ## Environment Variables
 
 ### Backend (.env)
 ```env
-DATABASE_URL=postgresql://user:password@localhost:5432/chaski_db
-SECRET_KEY=your-secret-key
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-MAIL_USERNAME=your-email@gmail.com
-MAIL_PASSWORD=your-app-password
+DATABASE_URL=postgresql://user:pass@localhost:5432/chaski_db
+SECRET_KEY=your-jwt-secret
+ENCRYPTION_KEY=fernet-key
 FRONTEND_URL=http://localhost:3000
-GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=your-client-secret
+REDIS_URL=redis://localhost:6379
+# See .env.example for full list
 ```
 
-### Frontend (.env.local)
+### Web App (.env.local)
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000
-NEXT_PUBLIC_GOOGLE_PLACES_API_KEY=your-google-places-api-key-here
+NEXT_PUBLIC_GOOGLE_PLACES_API_KEY=your-key
 ```
 
-## Troubleshooting
+### Mobile App (app.json)
+```json
+{
+  "expo": {
+    "extra": {
+      "apiUrl": "https://api.chaski.com"
+    }
+  }
+}
+```
 
-### Backend Issues
+## Deployment
 
-**Database connection error:**
-- Ensure PostgreSQL is running
-- Check DATABASE_URL in `.env`
-- Verify database exists: `psql -l`
+See [DEPLOYMENT.md](DEPLOYMENT.md) for production deployment guide including:
+- Heroku deployment for backend and web app
+- EAS Build for mobile app
+- PostgreSQL with PostGIS and Redis configuration
+- Stripe webhook setup
 
-**Email not sending:**
-- Check SMTP credentials in `.env`
-- For Gmail, use App Password, not account password
-- Verify `MAIL_PORT=587` for TLS
+## Documentation
 
-**Google OAuth not working:**
-- Check redirect URI matches in Google Console
-- Verify CLIENT_ID and CLIENT_SECRET in `.env`
-
-### Frontend Issues
-
-**Node version error:**
-- Upgrade to Node.js 18+: `nvm install 18`
-- Check version: `node --version`
-
-**API connection error:**
-- Ensure backend is running on port 8000
-- Check `NEXT_PUBLIC_API_URL` in `.env.local`
+- [CLAUDE.md](CLAUDE.md) - Developer guide and codebase overview
+- [DEPLOYMENT.md](DEPLOYMENT.md) - Production deployment guide
+- [apps/mobile/README.md](apps/mobile/README.md) - Mobile app documentation
+- [backend/docs/](backend/docs/) - Backend documentation
+  - [USER_ROLES_LIFECYCLE.md](backend/docs/USER_ROLES_LIFECYCLE.md) - User roles and states
+  - [MATCHING_FEATURE.html](backend/docs/MATCHING_FEATURE.html) - Matching algorithm details
+- [apps/web/docs/](apps/web/docs/) - Web app documentation
+  - [DISTANCE_UNITS.md](apps/web/docs/DISTANCE_UNITS.md) - Distance unit handling
+- [apps/web/I18N_PLAN.md](apps/web/I18N_PLAN.md) - Internationalization roadmap
 
 ## Contributing
 
@@ -582,18 +347,14 @@ This is a personal project, but suggestions and feedback are welcome! Please ope
 
 ## License
 
-MIT License - see LICENSE file for details
+MIT License - see LICENSE file for details.
 
 ## Acknowledgments
 
 - Named after the Inca messenger system "Chasqui"
-- Built with FastAPI and Next.js
-- Powered by PostgreSQL and PostGIS
-
-## Contact
-
-For questions or support, please open an issue on the GitHub repository.
+- Built with FastAPI, Next.js, and Expo
+- Powered by PostgreSQL, PostGIS, and Redis
 
 ---
 
-**Built with Claude Code** 🤖
+**Built with Claude Code**

@@ -85,6 +85,11 @@ def clear_auth_cookie(response: Response) -> None:
         path="/",
     )
 
+# Current legal document versions - update when documents change
+TERMS_VERSION = "1.0"
+PRIVACY_VERSION = "1.0"
+COURIER_AGREEMENT_VERSION = "1.0"
+
 # Request/Response Models
 class UserRegister(BaseModel):
     email: EmailStr
@@ -97,6 +102,10 @@ class UserRegister(BaseModel):
     default_address_lat: float | None = None
     default_address_lng: float | None = None
     preferred_language: str = Field(default='en', pattern="^(en|fr|es)$")
+    # Legal agreement acceptance (required)
+    terms_accepted: bool = Field(..., description="User must accept Terms of Service")
+    privacy_accepted: bool = Field(..., description="User must accept Privacy Policy")
+    courier_agreement_accepted: bool | None = Field(default=None, description="Courier must accept Courier Agreement (required for courier/both roles)")
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -110,6 +119,12 @@ class Token(BaseModel):
 
 class LoginResponse(BaseModel):
     message: str
+
+
+class MobileLoginResponse(BaseModel):
+    message: str
+    access_token: str
+    token_type: str = "bearer"
 
 class UserResponse(BaseModel):
     id: int
@@ -239,6 +254,24 @@ async def register(request: Request, user_data: UserRegister, db: Session = Depe
             }
         )
 
+    # Validate legal agreement acceptance
+    if not user_data.terms_accepted:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You must accept the Terms of Service to register"
+        )
+    if not user_data.privacy_accepted:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You must accept the Privacy Policy to register"
+        )
+    # Courier/both roles must accept the Courier Agreement
+    if user_data.role in ("courier", "both") and not user_data.courier_agreement_accepted:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Couriers must accept the Courier Agreement to register"
+        )
+
     # Validate role
     try:
         user_role = UserRole(user_data.role)
@@ -272,6 +305,12 @@ async def register(request: Request, user_data: UserRegister, db: Session = Depe
     email_hash_value = hash_pii(sanitized_email)
     phone_hash_value = hash_pii(sanitized_phone) if sanitized_phone else None
 
+    # Set legal agreement acceptance timestamps
+    now = datetime.now(timezone.utc)
+    terms_accepted_at = now if user_data.terms_accepted else None
+    privacy_accepted_at = now if user_data.privacy_accepted else None
+    courier_agreement_accepted_at = now if user_data.courier_agreement_accepted else None
+
     # Create new user
     new_user = User(
         # Email: hash for lookup, encrypted for storage, plaintext for transition
@@ -296,6 +335,13 @@ async def register(request: Request, user_data: UserRegister, db: Session = Depe
         verification_token_hash=verification_token_hash_value,
         verification_token_expires_at=verification_token_expires_at,
         verification_token=None,  # DEPRECATED: no longer storing plaintext
+        # Legal agreement acceptance
+        terms_accepted_at=terms_accepted_at,
+        terms_version=TERMS_VERSION if terms_accepted_at else None,
+        privacy_accepted_at=privacy_accepted_at,
+        privacy_version=PRIVACY_VERSION if privacy_accepted_at else None,
+        courier_agreement_accepted_at=courier_agreement_accepted_at,
+        courier_agreement_version=COURIER_AGREEMENT_VERSION if courier_agreement_accepted_at else None,
     )
 
     db.add(new_user)
@@ -487,6 +533,159 @@ async def login(request: Request, response: Response, credentials: UserLogin, db
     log_login_success(db, user, request, "password")
 
     return {"message": "Login successful"}
+
+
+@router.post("/login/mobile", response_model=MobileLoginResponse)
+@limiter.limit("100/minute")  # Max 100 login attempts per minute per IP
+async def login_mobile(request: Request, credentials: UserLogin, db: Session = Depends(get_db)):
+    """
+    Login for mobile apps - returns JWT token in response body.
+
+    Mobile apps cannot access httpOnly cookies, so this endpoint
+    returns the token directly for storage in secure storage (e.g., SecureStore).
+
+    - **email**: Registered email address
+    - **password**: User's password
+    - **remember_me**: If true, extends session to 7 days (default: false)
+
+    Security features:
+    - Account lockout after 5 failed login attempts
+    - Lockout duration: 15 minutes
+    - Login attempts tracked per email and IP
+    """
+    # Get request context
+    ip_address = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "unknown")
+
+    # Find user by email hash (secure lookup)
+    email_hash_value = hash_pii(credentials.email)
+    user = db.query(User).filter(User.email_hash == email_hash_value).first()
+
+    # Fallback to plaintext email for users who registered before hash migration
+    if not user:
+        user = db.query(User).filter(User.email == credentials.email).first()
+
+    # Check if account is locked (even if user doesn't exist, to prevent enumeration)
+    if user and is_account_locked(user):
+        time_until_unlock = get_time_until_unlock(user)
+        minutes_remaining = int(time_until_unlock.total_seconds() / 60) if time_until_unlock else 0
+
+        # Record failed attempt
+        record_login_attempt(
+            db, credentials.email, ip_address, user_agent,
+            successful=False, failure_reason="account_locked", user_id=user.id
+        )
+
+        log_login_failed(db, credentials.email, request, "account_locked")
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Account is locked due to too many failed login attempts. Please try again in {minutes_remaining} minutes.",
+        )
+
+    if not user:
+        # Record failed attempt for non-existent user (helps track brute force)
+        record_login_attempt(
+            db, credentials.email, ip_address, user_agent,
+            successful=False, failure_reason="user_not_found"
+        )
+
+        log_login_failed(db, credentials.email, request, "user_not_found")
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Verify password
+    if not verify_password(credentials.password, user.hashed_password):
+        # Record failed attempt
+        record_login_attempt(
+            db, credentials.email, ip_address, user_agent,
+            successful=False, failure_reason="invalid_password", user_id=user.id
+        )
+
+        log_login_failed(db, credentials.email, request, "invalid_password")
+
+        # Check if account should be locked
+        if should_lock_account(db, credentials.email):
+            lock_account(db, user)
+
+            # Audit log account lockout
+            log_account_locked(db, user, "Exceeded failed login attempts threshold", request)
+
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Too many failed login attempts. Your account has been locked for 15 minutes.",
+            )
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Check if user is active (admin-controlled deactivation)
+    if not user.is_active:
+        record_login_attempt(
+            db, credentials.email, ip_address, user_agent,
+            successful=False, failure_reason="account_inactive", user_id=user.id
+        )
+
+        log_login_failed(db, credentials.email, request, "account_inactive")
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account has been deactivated. Please contact support."
+        )
+
+    # Successful login - record attempt
+    record_login_attempt(
+        db, credentials.email, ip_address, user_agent,
+        successful=True, user_id=user.id
+    )
+
+    # Determine token expiration based on remember_me
+    if credentials.remember_me:
+        expire_minutes = settings.REMEMBER_ME_EXPIRE_MINUTES
+    else:
+        expire_minutes = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+
+    # Create session in Redis (tracks active sessions across devices)
+    ttl_seconds = expire_minutes * 60
+    session_id = await SessionTracker.create_session(
+        user_id=user.id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        ttl_seconds=ttl_seconds
+    )
+
+    # Audit log session creation
+    log_session_created(db, user, session_id, request)
+
+    # Create access token with session_id and issued-at time
+    access_token_expires = timedelta(minutes=expire_minutes)
+    now = int(datetime.now(timezone.utc).timestamp())
+    access_token = create_access_token(
+        data={
+            "sub": user.email,
+            "role": user.role.value,
+            "session_id": session_id,
+            "iat": now  # Issued-at time for token revocation
+        },
+        expires_delta=access_token_expires
+    )
+
+    # Audit log successful login
+    log_login_success(db, user, request, "password_mobile")
+
+    # Return token in response body for mobile apps
+    return {
+        "message": "Login successful",
+        "access_token": access_token,
+        "token_type": "bearer"
+    }
 
 
 @router.get("/me", response_model=UserResponse)

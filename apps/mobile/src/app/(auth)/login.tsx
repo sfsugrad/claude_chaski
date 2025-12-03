@@ -25,7 +25,8 @@ export default function LoginScreen() {
       await login(email, password)
       router.replace('/(tabs)')
     } catch (err) {
-      setError(t('errors.invalidCredentials'))
+      console.error('Login error:', err)
+      setError(err instanceof Error ? err.message : t('errors.invalidCredentials'))
     } finally {
       setLoading(false)
     }

@@ -7,19 +7,19 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.js"
     },
     "./adapters/axios": {
+      "types": "./dist/adapters/axios.d.ts",
       "import": "./dist/adapters/axios.mjs",
-      "require": "./dist/adapters/axios.js",
-      "types": "./dist/adapters/axios.d.ts"
+      "require": "./dist/adapters/axios.js"
     },
     "./adapters/fetch": {
+      "types": "./dist/adapters/fetch.d.ts",
       "import": "./dist/adapters/fetch.mjs",
-      "require": "./dist/adapters/fetch.js",
-      "types": "./dist/adapters/fetch.d.ts"
+      "require": "./dist/adapters/fetch.js"
     }
   },
   "scripts": {

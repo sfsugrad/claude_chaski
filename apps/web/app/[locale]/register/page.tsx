@@ -146,6 +146,9 @@ export default function RegisterPage() {
     default_address_lat: 0,
     default_address_lng: 0,
     preferred_language: 'en',
+    terms_accepted: false,
+    privacy_accepted: false,
+    courier_agreement_accepted: false,
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -209,6 +212,21 @@ export default function RegisterPage() {
 
     if (formData.max_deviation_km < 1 || formData.max_deviation_km > 50) {
       setError(t('deviationRange'))
+      return false
+    }
+
+    // Validate legal agreement acceptance
+    if (!formData.terms_accepted) {
+      setError('You must accept the Terms of Service to register')
+      return false
+    }
+    if (!formData.privacy_accepted) {
+      setError('You must accept the Privacy Policy to register')
+      return false
+    }
+    // Couriers must accept the Courier Agreement
+    if ((formData.role === 'courier' || formData.role === 'both') && !formData.courier_agreement_accepted) {
+      setError('Couriers must accept the Courier Agreement to register')
       return false
     }
 
@@ -500,6 +518,94 @@ export default function RegisterPage() {
                   </p>
                 </div>
               )}
+
+              {/* Legal Agreements Section */}
+              <div className="space-y-4 border-t border-surface-200 pt-5 mt-5">
+                <h3 className="text-sm font-medium text-surface-700">Legal Agreements</h3>
+
+                {/* Terms of Service */}
+                <div className="flex items-start">
+                  <div className="flex items-center h-5">
+                    <input
+                      id="terms_accepted"
+                      name="terms_accepted"
+                      type="checkbox"
+                      checked={formData.terms_accepted}
+                      onChange={(e) => setFormData(prev => ({ ...prev, terms_accepted: e.target.checked }))}
+                      className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-surface-300 rounded"
+                    />
+                  </div>
+                  <div className="ml-3 text-sm">
+                    <label htmlFor="terms_accepted" className="text-surface-700">
+                      I have read and agree to the{' '}
+                      <Link
+                        href="/legal/terms"
+                        target="_blank"
+                        className="text-primary-600 hover:text-primary-700 underline"
+                      >
+                        Terms of Service
+                      </Link>
+                      <span className="text-error-500">*</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Privacy Policy */}
+                <div className="flex items-start">
+                  <div className="flex items-center h-5">
+                    <input
+                      id="privacy_accepted"
+                      name="privacy_accepted"
+                      type="checkbox"
+                      checked={formData.privacy_accepted}
+                      onChange={(e) => setFormData(prev => ({ ...prev, privacy_accepted: e.target.checked }))}
+                      className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-surface-300 rounded"
+                    />
+                  </div>
+                  <div className="ml-3 text-sm">
+                    <label htmlFor="privacy_accepted" className="text-surface-700">
+                      I have read and agree to the{' '}
+                      <Link
+                        href="/legal/privacy"
+                        target="_blank"
+                        className="text-primary-600 hover:text-primary-700 underline"
+                      >
+                        Privacy Policy
+                      </Link>
+                      <span className="text-error-500">*</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Courier Agreement (only for couriers) */}
+                {(formData.role === 'courier' || formData.role === 'both') && (
+                  <div className="flex items-start">
+                    <div className="flex items-center h-5">
+                      <input
+                        id="courier_agreement_accepted"
+                        name="courier_agreement_accepted"
+                        type="checkbox"
+                        checked={formData.courier_agreement_accepted}
+                        onChange={(e) => setFormData(prev => ({ ...prev, courier_agreement_accepted: e.target.checked }))}
+                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-surface-300 rounded"
+                      />
+                    </div>
+                    <div className="ml-3 text-sm">
+                      <label htmlFor="courier_agreement_accepted" className="text-surface-700">
+                        I have read and agree to the{' '}
+                        <Link
+                          href="/legal/courier-agreement"
+                          target="_blank"
+                          className="text-primary-600 hover:text-primary-700 underline"
+                        >
+                          Courier Agreement
+                        </Link>
+                        <span className="text-error-500">*</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* Submit Button */}
               <Button

@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { idVerificationAPI, AdminVerificationResponse, IDVerificationStatus } from '@/lib/api'
+
+const AUTO_REFRESH_INTERVAL = 10000 // Auto-refresh every 10 seconds
 
 export default function AdminIDVerificationsPage() {
   const router = useRouter()
@@ -16,15 +18,19 @@ export default function AdminIDVerificationsPage() {
   const [rejectionReason, setRejectionReason] = useState('')
   const [adminNotes, setAdminNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [autoRefresh, setAutoRefresh] = useState(true)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  const fetchVerifications = async () => {
-    setLoading(true)
+  const fetchVerifications = async (showLoading = true) => {
+    if (showLoading) setLoading(true)
     setError('')
     try {
       const response = filter === 'pending'
         ? await idVerificationAPI.admin.getPending()
         : await idVerificationAPI.admin.getAll()
       setVerifications(response.data)
+      setLastUpdated(new Date())
     } catch (err: any) {
       if (err.response?.status === 403) {
         setError('Admin access required')
@@ -33,13 +39,29 @@ export default function AdminIDVerificationsPage() {
         setError(err.response?.data?.detail || 'Failed to load verifications')
       }
     } finally {
-      setLoading(false)
+      if (showLoading) setLoading(false)
     }
   }
 
   useEffect(() => {
     fetchVerifications()
   }, [filter])
+
+  // Auto-refresh effect
+  useEffect(() => {
+    if (autoRefresh && !selectedVerification) {
+      refreshIntervalRef.current = setInterval(() => {
+        fetchVerifications(false) // Silent refresh
+      }, AUTO_REFRESH_INTERVAL)
+    }
+
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current)
+        refreshIntervalRef.current = null
+      }
+    }
+  }, [autoRefresh, selectedVerification, filter])
 
   const handleReview = async () => {
     if (!selectedVerification || !reviewAction) return
@@ -118,9 +140,9 @@ export default function AdminIDVerificationsPage() {
             </Link>
           </div>
 
-          {/* Filter Tabs */}
+          {/* Filter Tabs and Auto-refresh */}
           <div className="mb-6">
-            <div className="border-b border-gray-200">
+            <div className="flex justify-between items-end border-b border-gray-200">
               <nav className="-mb-px flex space-x-8">
                 <button
                   onClick={() => setFilter('pending')}
@@ -143,6 +165,28 @@ export default function AdminIDVerificationsPage() {
                   All Verifications
                 </button>
               </nav>
+              <div className="flex items-center space-x-4 pb-4">
+                {lastUpdated && (
+                  <span className="text-xs text-gray-500">
+                    Updated: {lastUpdated.toLocaleTimeString()}
+                  </span>
+                )}
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoRefresh}
+                    onChange={(e) => setAutoRefresh(e.target.checked)}
+                    className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                  />
+                  <span className="text-sm text-gray-600">Auto-refresh</span>
+                </label>
+                <button
+                  onClick={() => fetchVerifications()}
+                  className="text-sm text-purple-600 hover:text-purple-500"
+                >
+                  Refresh Now
+                </button>
+              </div>
             </div>
           </div>
 

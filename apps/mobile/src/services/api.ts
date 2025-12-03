@@ -1,5 +1,4 @@
-import { createApiClient } from '@chaski/api-client'
-import { createFetchAdapter } from '@chaski/api-client/adapters/fetch'
+import { createApiClient, createFetchAdapter } from '@chaski/api-client'
 import * as SecureStore from 'expo-secure-store'
 import Constants from 'expo-constants'
 

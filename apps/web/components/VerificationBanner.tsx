@@ -96,8 +96,11 @@ export default function VerificationBanner() {
     setIdVerificationLoading(true)
     setIdVerificationError('')
     try {
-      // Get current URL as return URL (verification complete page)
-      const returnUrl = `${window.location.origin}/id-verification/complete`
+      // Get current locale from pathname (e.g., /en/dashboard -> en)
+      const pathParts = pathname?.split('/').filter(Boolean) || []
+      const locale = pathParts[0] || 'en'
+      // Get current URL as return URL (verification complete page) with locale prefix
+      const returnUrl = `${window.location.origin}/${locale}/id-verification/complete`
       const response = await idVerificationAPI.startVerification(returnUrl)
       // Redirect to Stripe Identity verification
       if (response.data.url) {
@@ -293,7 +296,23 @@ export default function VerificationBanner() {
                       {' '}Your verification is being processed. This usually takes a few minutes.
                     </>
                   )}
-                  {needsIdVerification && !idVerificationFailed && !idVerificationProcessing && !idVerificationRequiresReview && (
+                  {idVerificationPending && !idVerificationProcessing && (
+                    <>
+                      <span className="font-medium">ID verification pending.</span>
+                      {' '}Please complete the verification process to start accepting deliveries.
+                      <button
+                        onClick={handleStartIdVerification}
+                        disabled={idVerificationLoading}
+                        className="ml-2 font-medium underline text-purple-700 hover:text-purple-600 disabled:opacity-50"
+                      >
+                        {idVerificationLoading ? 'Starting...' : 'Continue verification'}
+                      </button>
+                      {idVerificationError && (
+                        <span className="ml-2 text-red-600 text-sm">{idVerificationError}</span>
+                      )}
+                    </>
+                  )}
+                  {needsIdVerification && !idVerificationFailed && !idVerificationProcessing && !idVerificationRequiresReview && !idVerificationPending && (
                     <>
                       <span className="font-medium">ID verification required.</span>
                       {' '}Verify your identity to start accepting deliveries.
@@ -303,6 +322,23 @@ export default function VerificationBanner() {
                         className="ml-2 font-medium underline text-purple-700 hover:text-purple-600 disabled:opacity-50"
                       >
                         {idVerificationLoading ? 'Starting...' : 'Verify now'}
+                      </button>
+                      {idVerificationError && (
+                        <span className="ml-2 text-red-600 text-sm">{idVerificationError}</span>
+                      )}
+                    </>
+                  )}
+                  {/* Fallback for when no specific status matches but user still needs ID verification */}
+                  {!needsIdVerification && !idVerificationFailed && !idVerificationProcessing && !idVerificationRequiresReview && !idVerificationPending && !user.id_verified && (
+                    <>
+                      <span className="font-medium">ID verification required.</span>
+                      {' '}Verify your identity to start accepting deliveries.
+                      <button
+                        onClick={handleStartIdVerification}
+                        disabled={idVerificationLoading}
+                        className="ml-2 font-medium underline text-purple-700 hover:text-purple-600 disabled:opacity-50"
+                      >
+                        {idVerificationLoading ? 'Starting...' : 'Start verification'}
                       </button>
                       {idVerificationError && (
                         <span className="ml-2 text-red-600 text-sm">{idVerificationError}</span>

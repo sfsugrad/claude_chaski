@@ -5,22 +5,96 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Quick Reference
 
 ```bash
+# Monorepo Commands (from root)
+pnpm install                              # Install all dependencies
+pnpm dev                                  # Start all apps in dev mode
+pnpm build                                # Build all packages and apps
+pnpm dev --filter=@chaski/web             # Start web app only
+pnpm dev --filter=@chaski/mobile          # Start mobile app only
+
 # Backend (from backend/)
 source venv/bin/activate && uvicorn main:app --reload --port 8000  # Dev server
 pytest tests/test_<file>.py::test_<name> -v                        # Single test
 pytest --cov=app tests/                                            # All tests + coverage
 
-# Frontend (from frontend/)
-npm run dev                                    # Dev server (localhost:3000)
-npm test -- path/to/test                       # Single test
-npm run test:e2e                               # Playwright E2E tests
+# Web Frontend (from apps/web/)
+pnpm dev                                   # Dev server (localhost:3000)
+pnpm test -- path/to/test                  # Single test
+pnpm test:e2e                              # Playwright E2E tests
+
+# Mobile (from apps/mobile/)
+pnpm start                                 # Start Expo dev server
+pnpm ios                                   # Run on iOS simulator
+pnpm android                               # Run on Android emulator
 
 # API Docs: http://localhost:8000/docs (Swagger UI)
 ```
 
 ## Project Overview
 
-Chaski is a logistics platform connecting package senders with couriers traveling along the same route. FastAPI backend + Next.js frontend.
+Chaski is a logistics platform connecting package senders with couriers traveling along the same route. The project uses a **Turborepo monorepo** with:
+- **Backend**: FastAPI (Python)
+- **Web**: Next.js 14 (TypeScript)
+- **Mobile**: Expo/React Native (TypeScript)
+- **Shared Packages**: Types, utilities, API client, i18n
+
+## Monorepo Structure
+
+```
+chaski/
+├── apps/
+│   ├── web/                    # Next.js web application
+│   │   ├── app/[locale]/       # Pages with i18n
+│   │   ├── components/         # React components
+│   │   ├── lib/                # Utilities (re-exports from shared packages)
+│   │   └── e2e/                # Playwright tests
+│   └── mobile/                 # Expo React Native app
+│       ├── src/app/            # Expo Router file-based routing
+│       ├── src/components/     # React Native components
+│       ├── src/contexts/       # Auth, etc.
+│       └── src/services/       # API client setup
+├── packages/
+│   ├── shared-types/           # TypeScript interfaces (UserResponse, PackageResponse, etc.)
+│   ├── shared-utils/           # Distance, validation, phone, package-status utilities
+│   ├── shared-i18n/            # Translation files (en, fr, es)
+│   └── api-client/             # Platform-agnostic API client with adapters
+├── backend/                    # FastAPI backend (not in pnpm workspace)
+├── turbo.json                  # Turborepo pipeline config
+├── pnpm-workspace.yaml         # Workspace definition
+└── package.json                # Root package.json with turbo scripts
+```
+
+## Shared Packages
+
+### @chaski/shared-types
+All TypeScript interfaces extracted from the API:
+```typescript
+import type { UserResponse, PackageResponse, BidResponse } from '@chaski/shared-types'
+```
+
+### @chaski/shared-utils
+Utility functions shared between web and mobile:
+```typescript
+import { kmToMiles, formatMiles, isValidUSPhone, getStatusLabel } from '@chaski/shared-utils'
+```
+
+### @chaski/shared-i18n
+Translation files and locale utilities:
+```typescript
+import { translations, SUPPORTED_LOCALES, isValidLocale } from '@chaski/shared-i18n'
+```
+
+### @chaski/api-client
+Platform-agnostic API client with adapters:
+```typescript
+// Web (with cookies/CSRF)
+import { createApiClient } from '@chaski/api-client'
+import { createAxiosAdapter } from '@chaski/api-client/adapters/axios'
+
+// Mobile (with Bearer token)
+import { createApiClient } from '@chaski/api-client'
+import { createFetchAdapter } from '@chaski/api-client/adapters/fetch'
+```
 
 ## Development Commands
 
@@ -37,25 +111,35 @@ pytest --cov=app tests/                    # With coverage
 python -m test_data.load_test_data         # Load test fixtures
 ```
 
-### Frontend (Next.js)
+### Web App (Next.js)
 ```bash
-cd frontend
-npm run dev                # Dev server
-npm test                   # Run tests
-npm test -- path/to/test   # Single test
-npm run test:watch         # Watch mode
-npm run test:coverage      # With coverage
-npm run build              # Production build
-npm run lint               # Lint
+cd apps/web
+pnpm dev                # Dev server
+pnpm test               # Run tests
+pnpm test -- path/to/test   # Single test
+pnpm test:watch         # Watch mode
+pnpm test:coverage      # With coverage
+pnpm build              # Production build
+pnpm lint               # Lint
+```
+
+### Mobile App (Expo)
+```bash
+cd apps/mobile
+pnpm start              # Start Expo dev server
+pnpm ios                # Run on iOS simulator
+pnpm android            # Run on Android emulator
+pnpm build:dev          # Build development client (EAS)
+pnpm build:preview      # Build preview APK/IPA
 ```
 
 ### E2E Testing (Playwright)
 ```bash
-cd frontend
-npm run test:e2e           # Run all E2E tests
-npm run test:e2e:ui        # Interactive UI
-npm run test:e2e:headed    # Headed browser
-npm run test:e2e:debug     # Debug mode
+cd apps/web
+pnpm test:e2e           # Run all E2E tests
+pnpm test:e2e:ui        # Interactive UI
+pnpm test:e2e:headed    # Headed browser
+pnpm test:e2e:debug     # Debug mode
 ```
 
 ### Database Migrations
@@ -103,27 +187,40 @@ Key migrations: `add_phone_verification_fields.py`, `add_account_lockout_column.
 - `app/middleware/` - CSRF protection, request logging, performance monitoring, user activity tracking
 - `test_data/` - JSON fixtures and loader script
 
-### Frontend Structure
+### Web App Structure (apps/web/)
 - `app/[locale]/` - Next.js 14 App Router pages with i18n locale prefix
 - `lib/api.ts` - Centralized API client (all API calls must go through this, no direct axios in components)
   - Axios with `withCredentials: true`, auto CSRF token handling
   - API modules: `authAPI`, `packagesAPI`, `couriersAPI`, `matchingAPI`, `adminAPI`, `bidsAPI`, `paymentsAPI`, etc.
+- `lib/distance.ts` - Re-exports from `@chaski/shared-utils`
 - `lib/logger.ts` - Frontend error tracking (sends to `/api/logs/frontend` in production)
 - `hooks/useWebSocket.ts` - WebSocket with auto-reconnect
 - `contexts/WebSocketContext.tsx` - App-wide real-time updates
 - `components/` - Reusable components (ErrorBoundary, LanguageSwitcher, UnverifiedCourierGuard, CourierVerificationGuard, VerificationBanner, etc.)
-- `messages/*.json` - i18n translation files (en, fr, es)
+- `i18n/request.ts` - Uses `@chaski/shared-i18n` for translations
+
+### Mobile App Structure (apps/mobile/)
+- `src/app/` - Expo Router file-based navigation
+  - `(auth)/` - Login, register, forgot-password screens
+  - `(tabs)/` - Main tab navigation (dashboard, packages, routes, messages, profile)
+- `src/components/` - React Native components
+- `src/contexts/AuthContext.tsx` - Authentication with SecureStore token storage
+- `src/services/api.ts` - API client using `@chaski/api-client` with fetch adapter
+- `src/utils/i18n.ts` - i18next setup with `@chaski/shared-i18n`
+- `metro.config.js` - Configured for monorepo package resolution
+- `app.json` - Expo configuration with permissions
 
 ### Key Patterns
 
 **Authentication:**
-- JWT in httpOnly cookies, CSRF protection via double-submit cookie pattern
+- **Web**: JWT in httpOnly cookies, CSRF protection via double-submit cookie pattern
+- **Mobile**: JWT stored in SecureStore, Bearer token in Authorization header
 - `get_current_user` / `get_current_admin_user` FastAPI dependencies
 - Account lockout after 5 failed attempts (15 min)
 - Role-based access: sender, courier, both, admin
 
 **Security:**
-- CSRF tokens required for state-changing requests (header: `X-CSRF-Token`)
+- CSRF tokens required for state-changing requests on web (header: `X-CSRF-Token`)
 - PII fields encrypted with Fernet (phone, addresses)
 - Input sanitization for XSS prevention
 - File upload validation (type, size limits)
@@ -140,20 +237,23 @@ Key migrations: `add_phone_verification_fields.py`, `add_account_lockout_column.
 
 **Real-time Updates:**
 - WebSocket at `/api/ws` with JWT auth
+- Web: Cookie-based auth
+- Mobile: Token passed via query parameter (`?token=xxx`)
 - Events: `notification_created`, `unread_count_updated`, `message_received`
 
 **Code Rules:**
 - Backend utilities centralized in `app/utils/` - never duplicate
-- Frontend API calls ONLY through `lib/api.ts` modules
-- TypeScript types defined in `lib/api.ts` - reuse them
+- Web/Mobile API calls through shared `@chaski/api-client`
+- TypeScript types from `@chaski/shared-types` - never duplicate
+- Shared utilities from `@chaski/shared-utils` - never duplicate
 - Package status changes via `package_status.py` functions only
 
 **Distance Units (km/miles):**
 - Backend stores all distances in **kilometers** (e.g., `max_deviation_km`)
 - Frontend displays all distances in **miles** for US users
-- Use `lib/distance.ts` utilities for conversion:
+- Use `@chaski/shared-utils` for conversion:
   ```typescript
-  import { kmToMiles, milesToKm } from '@/lib/distance';
+  import { kmToMiles, milesToKm, formatMiles } from '@chaski/shared-utils'
 
   // Display: convert km → miles
   const displayValue = kmToMiles(user.max_deviation_km).toFixed(1);  // "3.1"
@@ -161,7 +261,7 @@ Key migrations: `add_phone_verification_fields.py`, `add_account_lockout_column.
   // Input: convert miles → km for storage
   const storageValue = milesToKm(parseFloat(inputValue));
   ```
-- See **[frontend/docs/DISTANCE_UNITS.md](frontend/docs/DISTANCE_UNITS.md)** for implementation details
+- See **[apps/web/docs/DISTANCE_UNITS.md](apps/web/docs/DISTANCE_UNITS.md)** for implementation details
 
 ### Testing
 
@@ -171,9 +271,9 @@ Key migrations: `add_phone_verification_fields.py`, `add_account_lockout_column.
 - `test_package_data`, `test_user_data`, `test_courier_data` - Sample data
 - `test_verified_user`, `test_admin` - User objects for direct DB operations
 
-**Frontend:** Jest + React Testing Library. Tests in `__tests__/` directories.
+**Web Frontend:** Jest + React Testing Library. Tests in `__tests__/` directories.
 
-**E2E (Playwright):** Tests in `frontend/e2e/` using fixtures from `frontend/e2e/fixtures/test-fixtures.ts`:
+**E2E (Playwright):** Tests in `apps/web/e2e/` using fixtures from `apps/web/e2e/fixtures/test-fixtures.ts`:
 - Test users: `TEST_USERS.sender`, `TEST_USERS.courier`, `TEST_USERS.both`, `TEST_USERS.admin`
 - Helpers: `loginUser(page, user)`, `logoutUser(page)`, page object helpers (`NavbarHelper`, `PackageHelper`, `RouteHelper`)
 - Run single test: `npx playwright test e2e/auth.spec.ts`
@@ -208,24 +308,30 @@ See **[backend/docs/USER_ROLES_LIFECYCLE.md](backend/docs/USER_ROLES_LIFECYCLE.m
 
 ## Internationalization (i18n)
 
-Uses `next-intl` with locale-based routing (`/en`, `/fr`, `/es`). See **[frontend/I18N_PLAN.md](frontend/I18N_PLAN.md)** for full roadmap.
+**Web:** Uses `next-intl` with locale-based routing (`/en`, `/fr`, `/es`).
 
+**Mobile:** Uses `react-i18next` with `expo-localization` for device language detection.
+
+**Shared translations:** All translations in `@chaski/shared-i18n`:
 ```typescript
-// Client components
+// Web (next-intl)
 const t = useTranslations('namespace');
 
-// Server components
-const t = await getTranslations('namespace');
+// Mobile (react-i18next)
+const { t } = useTranslation();
+t('namespace.key')
 ```
 
-Translation files: `frontend/messages/{en,fr,es}.json`
+Translation files: `packages/shared-i18n/src/locales/{en,fr,es}.json`
+
+See **[apps/web/I18N_PLAN.md](apps/web/I18N_PLAN.md)** for full roadmap.
 
 ## Logging
 
 **Backend** (`backend/logs/`): Structured JSON logging with rotation (10MB, 5 backups)
 - `app.log` - All logs, `error.log` - Errors only, `requests.log` - HTTP requests, `performance.log` - Slow requests
 
-**Frontend** (`lib/logger.ts`): Sends to `/api/logs/frontend` in production
+**Web Frontend** (`lib/logger.ts`): Sends to `/api/logs/frontend` in production
 ```typescript
 import { logError } from '@/lib/logger';
 logError('Failed to process', error, { context });
@@ -377,6 +483,11 @@ CANCELED can occur from any non-terminal state (except IN_TRANSIT and FAILED)
 FAILED → OPEN_FOR_BIDS (admin only retry)
 ```
 
+Also available in frontend via `@chaski/shared-utils`:
+```typescript
+import { isValidTransition, getStatusLabel, getStatusColor } from '@chaski/shared-utils'
+```
+
 ## Route-Package Matching Algorithm
 
 The matching algorithm finds packages along a courier's route within a configurable deviation distance.
@@ -439,10 +550,20 @@ REGISTRATION_COUNTRY_ALLOWLIST=US       # Comma-separated country codes (e.g., "
 # Email, OAuth, Stripe, AWS, Twilio - see .env.example
 ```
 
-**Frontend `.env.local`:** Copy from `.env.example`
+**Web App `.env.local`:** Copy from `.env.example`
 ```bash
 NEXT_PUBLIC_API_URL=http://localhost:8000
 NEXT_PUBLIC_GOOGLE_PLACES_API_KEY=your-key  # For address autocomplete
+```
+
+**Mobile App:** Configure in `app.json` or via environment:
+```javascript
+// apps/mobile/app.json → extra
+{
+  "extra": {
+    "apiUrl": "http://localhost:8000"
+  }
+}
 ```
 
 ## Deployment
@@ -452,3 +573,11 @@ See **[DEPLOYMENT.md](DEPLOYMENT.md)** for Heroku deployment guide including:
 - PostgreSQL with PostGIS and Redis add-ons
 - Stripe Identity webhook configuration
 - Environment variables and migrations
+
+### Mobile Deployment (EAS Build)
+```bash
+cd apps/mobile
+eas build --profile development   # Development client
+eas build --profile preview       # Internal testing
+eas build --profile production    # App store release
+```

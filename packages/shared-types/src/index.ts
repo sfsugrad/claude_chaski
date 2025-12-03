@@ -46,6 +46,12 @@ export interface AuthResponse {
   message: string
 }
 
+export interface MobileAuthResponse {
+  message: string
+  access_token: string
+  token_type: string
+}
+
 export interface ForgotPasswordData {
   email: string
 }

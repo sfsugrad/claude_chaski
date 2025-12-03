@@ -114,7 +114,7 @@ app.add_middleware(
 
 # CORS middleware
 # Restrict allowed origins based on environment
-allowed_origins = ["http://localhost:3000", "http://localhost:3001"]
+allowed_origins = ["http://localhost:3000", "http://localhost:3001", "http://localhost:8081"]
 if settings.ENVIRONMENT == "production":
     # Add production frontend URL when deployed
     # allowed_origins = ["https://yourdomain.com"]
