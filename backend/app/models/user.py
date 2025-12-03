@@ -22,9 +22,27 @@ class User(Base):
 
     hashed_password = Column(String, nullable=False)
 
-    # Full name - encrypted only (not queried)
-    full_name_encrypted = Column(String, nullable=True)  # Encrypted version
+    # Name fields - encrypted only (not queried)
+    first_name_encrypted = Column(String, nullable=True)  # Encrypted version
+    first_name = Column(String, nullable=True)  # Plaintext for transition
+    middle_name_encrypted = Column(String, nullable=True)  # Encrypted version (optional)
+    middle_name = Column(String, nullable=True)  # Plaintext for transition (optional)
+    last_name_encrypted = Column(String, nullable=True)  # Encrypted version
+    last_name = Column(String, nullable=True)  # Plaintext for transition
+
+    # Full name - DEPRECATED: kept for backwards compatibility, computed from first/middle/last
+    full_name_encrypted = Column(String, nullable=True)  # DEPRECATED: Remove after migration
     full_name = Column(String, nullable=True)  # DEPRECATED: Remove after migration
+
+    @property
+    def computed_full_name(self) -> str:
+        """Compute full name from first, middle, and last name."""
+        parts = [self.first_name]
+        if self.middle_name:
+            parts.append(self.middle_name)
+        if self.last_name:
+            parts.append(self.last_name)
+        return ' '.join(filter(None, parts)) or self.full_name or ''
 
     # Phone number - hash for uniqueness check, encrypted for storage
     phone_number_hash = Column(String, unique=True, index=True, nullable=True)  # SHA256 hash for lookup

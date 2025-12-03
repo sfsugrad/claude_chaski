@@ -1,14 +1,20 @@
+'use client'
+
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 
 export default function TermsOfServicePage() {
+  const t = useTranslations('legal.terms')
+  const tLegal = useTranslations('legal')
+
   return (
     <div className="min-h-screen bg-surface-50">
       {/* Header */}
       <header className="bg-white border-b border-surface-200">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <Link href="/" className="text-2xl font-bold text-gradient">
-            Chaski
+            MyChaski
           </Link>
           <LanguageSwitcher />
         </div>
@@ -17,129 +23,395 @@ export default function TermsOfServicePage() {
       {/* Content */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="bg-white rounded-lg shadow-sm p-8">
-          <h1 className="text-3xl font-bold text-surface-900 mb-2">Terms of Service</h1>
-          <p className="text-sm text-surface-500 mb-8">Version 1.0 | Last Updated: December 2024</p>
+          <h1 className="text-3xl font-bold text-surface-900 mb-2">{t('title')}</h1>
+          <p className="text-sm text-surface-500 mb-8">{t('version')}</p>
 
           <div className="prose prose-surface max-w-none space-y-6">
+            {/* Section 1 */}
             <section>
-              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">1. Acceptance of Terms</h2>
+              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">{t('section1Title')}</h2>
               <p className="text-surface-600 leading-relaxed">
-                By accessing or using the Chaski platform ("Service"), you agree to be bound by these Terms of Service ("Terms").
-                If you do not agree to these Terms, please do not use the Service. We reserve the right to update these Terms at any time,
-                and your continued use of the Service constitutes acceptance of any changes.
+                {t('section1Content')}
               </p>
             </section>
 
+            {/* Section 2 */}
             <section>
-              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">2. Description of Service</h2>
-              <p className="text-surface-600 leading-relaxed">
-                Chaski is a peer-to-peer logistics platform that connects individuals who need packages delivered ("Senders")
-                with individuals traveling along similar routes who can carry those packages ("Couriers"). Chaski acts as an
-                intermediary and does not itself provide delivery services.
+              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">{t('section2Title')}</h2>
+              <p className="text-surface-600 leading-relaxed mb-4">
+                {t('section2Content')}
+              </p>
+              <p className="text-surface-600 leading-relaxed mb-2">
+                {t('section2DoesNot')}
+              </p>
+              <ul className="list-disc list-inside text-surface-600 space-y-2 ml-4">
+                <li>{t('section2Item1')}</li>
+                <li>{t('section2Item2')}</li>
+                <li>{t('section2Item3')}</li>
+                <li>{t('section2Item4')}</li>
+                <li>{t('section2Item5')}</li>
+              </ul>
+              <p className="text-surface-600 leading-relaxed mt-3 font-medium">
+                {t('section2NotCarrier')}
+              </p>
+              <p className="text-surface-600 leading-relaxed mt-3">
+                {t('section2NoGuarantee')}
+              </p>
+              <p className="text-surface-600 leading-relaxed mt-3">
+                {t('section2NoCommercial')}
               </p>
             </section>
 
+            {/* Section 3 */}
             <section>
-              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">3. User Accounts</h2>
+              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">{t('section3Title')}</h2>
               <p className="text-surface-600 leading-relaxed mb-3">
-                To use certain features of the Service, you must register for an account. You agree to:
+                {t('section3Intro')}
               </p>
               <ul className="list-disc list-inside text-surface-600 space-y-2 ml-4">
-                <li>Provide accurate, current, and complete information during registration</li>
-                <li>Maintain the security of your password and account</li>
-                <li>Notify us immediately of any unauthorized use of your account</li>
-                <li>Accept responsibility for all activities that occur under your account</li>
+                <li>{t('section3Item1')}</li>
+                <li>{t('section3Item2')}</li>
+                <li>{t('section3Item3')}</li>
+                <li>{t('section3Item4')}</li>
               </ul>
             </section>
 
+            {/* Section 4 */}
             <section>
-              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">4. User Responsibilities</h2>
-              <h3 className="text-lg font-medium text-surface-800 mt-4 mb-2">4.1 All Users</h3>
-              <ul className="list-disc list-inside text-surface-600 space-y-2 ml-4">
-                <li>Comply with all applicable laws and regulations</li>
-                <li>Use the Service only for lawful purposes</li>
-                <li>Not engage in any fraudulent or deceptive practices</li>
-                <li>Treat other users with respect</li>
-              </ul>
-
-              <h3 className="text-lg font-medium text-surface-800 mt-4 mb-2">4.2 Senders</h3>
-              <ul className="list-disc list-inside text-surface-600 space-y-2 ml-4">
-                <li>Provide accurate descriptions of packages</li>
-                <li>Not ship prohibited items (illegal goods, hazardous materials, etc.)</li>
-                <li>Properly package items to prevent damage</li>
-                <li>Pay all agreed-upon fees in a timely manner</li>
-              </ul>
-
-              <h3 className="text-lg font-medium text-surface-800 mt-4 mb-2">4.3 Couriers</h3>
-              <ul className="list-disc list-inside text-surface-600 space-y-2 ml-4">
-                <li>Complete ID verification before accepting deliveries</li>
-                <li>Handle packages with reasonable care</li>
-                <li>Deliver packages within agreed timeframes</li>
-                <li>Maintain appropriate insurance coverage as required by law</li>
-              </ul>
-            </section>
-
-            <section>
-              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">5. Prohibited Items</h2>
+              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">{t('section4Title')}</h2>
               <p className="text-surface-600 leading-relaxed mb-3">
-                The following items may not be shipped using our Service:
+                {t('section4Intro')}
               </p>
               <ul className="list-disc list-inside text-surface-600 space-y-2 ml-4">
-                <li>Illegal drugs or controlled substances</li>
-                <li>Weapons, ammunition, or explosives</li>
-                <li>Hazardous or flammable materials</li>
-                <li>Stolen property</li>
-                <li>Perishable items without proper packaging</li>
-                <li>Live animals</li>
-                <li>Items prohibited by law in the origin or destination jurisdiction</li>
+                <li>{t('section4Item1')}</li>
+                <li>{t('section4Item2')}</li>
+                <li>{t('section4Item3')}</li>
+                <li>{t('section4Item4')}</li>
+              </ul>
+              <p className="text-surface-600 leading-relaxed mt-3">
+                {t('section4Suspension')}
+              </p>
+            </section>
+
+            {/* Section 5 */}
+            <section>
+              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">{t('section5Title')}</h2>
+              <p className="text-surface-600 leading-relaxed mb-3">
+                {t('section5Intro')}
+              </p>
+              <ul className="list-disc list-inside text-surface-600 space-y-2 ml-4">
+                <li>{t('section5Item1')}</li>
+                <li>{t('section5Item2')}</li>
+                <li>{t('section5Item3')}</li>
+                <li>{t('section5Item4')}</li>
+                <li>{t('section5Item5')}</li>
+              </ul>
+              <div className="bg-warning-50 border border-warning-200 rounded-lg p-4 mt-4">
+                <p className="text-warning-800">
+                  {t('section5Failure')}
+                </p>
+              </div>
+              <p className="text-surface-600 leading-relaxed mt-3 font-medium">
+                {t('section5Additional')}
+              </p>
+              <p className="text-surface-600 leading-relaxed mt-3">
+                {t('section5NoGuarantee')}
+              </p>
+              <div className="bg-surface-100 border border-surface-300 rounded-lg p-4 mt-4">
+                <p className="text-surface-700 leading-relaxed font-medium">{t('section5GPSConsentTitle')}</p>
+                <p className="text-surface-600 leading-relaxed mt-2">
+                  {t('section5GPSConsent')}
+                </p>
+              </div>
+            </section>
+
+            {/* Section 6 */}
+            <section>
+              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">{t('section6Title')}</h2>
+              <p className="text-surface-600 leading-relaxed mb-3">
+                {t('section6Intro')}
+              </p>
+              <ul className="list-disc list-inside text-surface-600 space-y-2 ml-4">
+                <li>{t('section6Item1')}</li>
+                <li>{t('section6Item2')}</li>
+                <li>{t('section6Item3')}</li>
+                <li>{t('section6Item4')}</li>
+              </ul>
+              <p className="text-surface-600 leading-relaxed mt-4">
+                {t('section6ResponsibilityIntro')}
+              </p>
+              <ul className="list-disc list-inside text-surface-600 space-y-2 ml-4 mt-2">
+                <li>{t('section6ResponsibilityItem1')}</li>
+                <li>{t('section6ResponsibilityItem2')}</li>
+                <li>{t('section6ResponsibilityItem3')}</li>
+                <li>{t('section6ResponsibilityItem4')}</li>
+              </ul>
+              <p className="text-surface-600 leading-relaxed mt-4 font-medium">
+                {t('section6NoInsurance')}
+              </p>
+              <p className="text-surface-600 leading-relaxed mt-2">
+                {t('section6NoEmployment')}
+              </p>
+              <p className="text-surface-600 leading-relaxed mt-3">
+                {t('section6TaxResponsibility')}
+              </p>
+              <p className="text-surface-600 leading-relaxed mt-3">
+                {t('section6LocalLaws')}
+              </p>
+            </section>
+
+            {/* Section 7 */}
+            <section>
+              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">{t('section7Title')}</h2>
+              <p className="text-surface-600 leading-relaxed mb-3">
+                {t('section7Intro')}
+              </p>
+              <ul className="list-disc list-inside text-surface-600 space-y-2 ml-4">
+                <li>{t('section7Item1')}</li>
+                <li>{t('section7Item2')}</li>
+                <li>{t('section7Item3')}</li>
+                <li>{t('section7Item4')}</li>
+                <li>{t('section7Item5')}</li>
+                <li>{t('section7Item6')}</li>
+                <li>{t('section7Item7')}</li>
+                <li>{t('section7Item8')}</li>
+                <li>{t('section7Item9')}</li>
+              </ul>
+              <div className="bg-warning-50 border border-warning-200 rounded-lg p-4 mt-4">
+                <p className="text-warning-800">
+                  {t('section7MaxValue')}
+                </p>
+              </div>
+              <p className="text-surface-600 leading-relaxed mt-3">
+                {t('section7Disclosure')}
+              </p>
+              <p className="text-surface-600 leading-relaxed mt-2">
+                {t('section7NoInspection')}
+              </p>
+            </section>
+
+            {/* Section 8 */}
+            <section>
+              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">{t('section8Title')}</h2>
+              <p className="text-surface-600 leading-relaxed mb-3">
+                {t('section8Content')}
+              </p>
+              <p className="text-surface-600 leading-relaxed mb-2">
+                {t('section8DoesNot')}
+              </p>
+              <ul className="list-disc list-inside text-surface-600 space-y-2 ml-4">
+                <li>{t('section8Item1')}</li>
+                <li>{t('section8Item2')}</li>
+                <li>{t('section8Item3')}</li>
+                <li>{t('section8Item4')}</li>
+              </ul>
+              <div className="bg-surface-100 border border-surface-300 rounded-lg p-4 mt-4">
+                <p className="text-surface-700 leading-relaxed font-medium">{t('section8NoBailmentTitle')}</p>
+                <p className="text-surface-600 leading-relaxed mt-2">
+                  {t('section8NoBailmentContent')}
+                </p>
+              </div>
+              <div className="bg-surface-100 border border-surface-300 rounded-lg p-4 mt-4">
+                <p className="text-surface-700 leading-relaxed font-medium">{t('section8NoRetentionTitle')}</p>
+                <p className="text-surface-600 leading-relaxed mt-2">
+                  {t('section8NoRetention')}
+                </p>
+              </div>
+              <div className="bg-surface-100 border border-surface-300 rounded-lg p-4 mt-4">
+                <p className="text-surface-700 leading-relaxed font-medium">{t('section8PlatformAvailabilityTitle')}</p>
+                <p className="text-surface-600 leading-relaxed mt-2">
+                  {t('section8PlatformAvailability')}
+                </p>
+              </div>
+            </section>
+
+            {/* Section 9 */}
+            <section>
+              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">{t('section9Title')}</h2>
+              <p className="text-surface-600 leading-relaxed mb-3">
+                {t('section9Content1')}
+              </p>
+              <p className="text-surface-600 leading-relaxed mb-3">
+                {t('section9Content2')}
+              </p>
+              <p className="text-surface-600 leading-relaxed mb-3">
+                {t('section9FeesNonRefundable')}
+              </p>
+              <div className="bg-warning-50 border border-warning-200 rounded-lg p-4 mt-4">
+                <p className="text-warning-800 font-medium">{t('section9ChargebackTitle')}</p>
+                <p className="text-warning-700 leading-relaxed mt-2">
+                  {t('section9ChargebackContent')}
+                </p>
+              </div>
+            </section>
+
+            {/* Section 10 */}
+            <section>
+              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">{t('section10Title')}</h2>
+              <p className="text-surface-600 leading-relaxed mb-3">
+                {t('section10Intro')}
+              </p>
+              <ul className="list-disc list-inside text-surface-600 space-y-2 ml-4">
+                <li>{t('section10Item1')}</li>
+                <li>{t('section10Item2')}</li>
+                <li>{t('section10Item3')}</li>
+                <li>{t('section10Item4')}</li>
+                <li>{t('section10Item5')}</li>
+                <li>{t('section10Item6')}</li>
+              </ul>
+              <p className="text-surface-600 leading-relaxed mt-3">
+                {t('section10Violation')}
+              </p>
+              <div className="bg-surface-100 border border-surface-300 rounded-lg p-4 mt-4">
+                <p className="text-surface-700 leading-relaxed font-medium">{t('section10NoResponsibilityTitle')}</p>
+                <p className="text-surface-600 leading-relaxed mt-2">
+                  {t('section10NoResponsibilityContent')}
+                </p>
+              </div>
+              <div className="bg-surface-100 border border-surface-300 rounded-lg p-4 mt-4">
+                <p className="text-surface-700 leading-relaxed font-medium">{t('section10CommunicationTitle')}</p>
+                <p className="text-surface-600 leading-relaxed mt-2">
+                  {t('section10Communication')}
+                </p>
+              </div>
+            </section>
+
+            {/* Section 11 */}
+            <section>
+              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">{t('section11Title')}</h2>
+              <p className="text-surface-600 leading-relaxed mb-3">
+                {t('section11Intro')}
+              </p>
+              <ul className="list-disc list-inside text-surface-600 space-y-2 ml-4">
+                <li>{t('section11Item1')}</li>
+                <li>{t('section11Item2')}</li>
+                <li>{t('section11Item3')}</li>
+              </ul>
+              <p className="text-surface-600 leading-relaxed mt-3">
+                {t('section11Removal')}
+              </p>
+            </section>
+
+            {/* Section 12 */}
+            <section>
+              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">{t('section12Title')}</h2>
+              <p className="text-surface-600 leading-relaxed mb-3">
+                {t('section12Intro')}
+              </p>
+              <ul className="list-disc list-inside text-surface-600 space-y-2 ml-4">
+                <li>{t('section12Item1')}</li>
+                <li>{t('section12Item2')}</li>
+                <li>
+                  {t('section12Item3')}
+                  <ul className="list-disc list-inside text-surface-600 space-y-1 ml-6 mt-1">
+                    <li>{t('section12Item3a')}</li>
+                    <li>{t('section12Item3b')}</li>
+                  </ul>
+                </li>
               </ul>
             </section>
 
+            {/* Section 13 */}
             <section>
-              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">6. Fees and Payments</h2>
+              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">{t('section13Title')}</h2>
+              <p className="text-surface-600 leading-relaxed mb-3">
+                {t('section13Intro')}
+              </p>
+              <ul className="list-disc list-inside text-surface-600 space-y-2 ml-4">
+                <li>{t('section13Item1')}</li>
+                <li>{t('section13Item2')}</li>
+                <li>{t('section13Item3')}</li>
+                <li>{t('section13Item4')}</li>
+              </ul>
+            </section>
+
+            {/* Section 14 */}
+            <section>
+              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">{t('section14Title')}</h2>
+              <p className="text-surface-600 leading-relaxed mb-3">
+                {t('section14Content')}
+              </p>
+              <ul className="list-disc list-inside text-surface-600 space-y-2 ml-4">
+                <li>{t('section14Item1')}</li>
+                <li>{t('section14Item2')}</li>
+              </ul>
+              <div className="bg-warning-50 border border-warning-200 rounded-lg p-4 mt-4">
+                <p className="text-warning-800 leading-relaxed">
+                  {t('section14ArbitrationFirst')}
+                </p>
+              </div>
+            </section>
+
+            {/* Section 15 */}
+            <section>
+              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">{t('section15Title')}</h2>
               <p className="text-surface-600 leading-relaxed">
-                Chaski charges a service fee for facilitating transactions between Senders and Couriers.
-                Payment terms, fee structures, and refund policies are displayed at the time of transaction.
-                Couriers are paid through our secure payment system after successful delivery confirmation.
+                {t('section15Content')}
               </p>
             </section>
 
+            {/* Section 16 */}
             <section>
-              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">7. Limitation of Liability</h2>
+              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">{t('section16Title')}</h2>
               <p className="text-surface-600 leading-relaxed">
-                TO THE MAXIMUM EXTENT PERMITTED BY LAW, CHASKI SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-                SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS OR REVENUES, WHETHER INCURRED
-                DIRECTLY OR INDIRECTLY. OUR TOTAL LIABILITY FOR ANY CLAIM ARISING FROM THESE TERMS OR YOUR USE OF
-                THE SERVICE IS LIMITED TO THE AMOUNT YOU PAID TO CHASKI IN THE PAST 12 MONTHS.
+                {t('section16Content')}
               </p>
             </section>
 
+            {/* Section 17 */}
             <section>
-              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">8. Dispute Resolution</h2>
+              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">{t('section17Title')}</h2>
               <p className="text-surface-600 leading-relaxed">
-                Any disputes arising from these Terms or your use of the Service shall be resolved through binding
-                arbitration in accordance with the rules of the American Arbitration Association. You agree to waive
-                your right to a jury trial and to participate in any class action lawsuit.
+                {t('section17Content')}
               </p>
             </section>
 
+            {/* Section 18 */}
             <section>
-              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">9. Termination</h2>
+              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">{t('section18Title')}</h2>
               <p className="text-surface-600 leading-relaxed">
-                We reserve the right to suspend or terminate your account at any time for any reason, including
-                violation of these Terms. Upon termination, your right to use the Service will immediately cease.
-                You may also terminate your account at any time by contacting our support team.
+                {t('section18Content')}
               </p>
+              <div className="bg-surface-100 border border-surface-300 rounded-lg p-4 mt-4">
+                <p className="text-surface-700 leading-relaxed font-medium">{t('section18UserContentTitle')}</p>
+                <p className="text-surface-600 leading-relaxed mt-2">
+                  {t('section18UserContent')}
+                </p>
+              </div>
             </section>
 
+            {/* Section 19 */}
             <section>
-              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">10. Contact Information</h2>
+              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">{t('section19Title')}</h2>
               <p className="text-surface-600 leading-relaxed">
-                If you have any questions about these Terms, please contact us at:
+                {t('section19Content')}
               </p>
               <p className="text-surface-600 mt-2">
-                Email: <a href="mailto:legal@chaski.com" className="text-primary-600 hover:text-primary-700">legal@chaski.com</a>
+                <a href="mailto:legal@mychaski.com" className="text-primary-600 hover:text-primary-700">
+                  legal@mychaski.com
+                </a>
               </p>
+            </section>
+
+            {/* Section 20 - Final Acknowledgement */}
+            <section>
+              <h2 className="text-xl font-semibold text-surface-900 mt-8 mb-4">{t('section20Title')}</h2>
+              <p className="text-surface-600 leading-relaxed mb-3">
+                {t('section20Intro')}
+              </p>
+              <ul className="list-disc list-inside text-surface-600 space-y-2 ml-4">
+                <li>{t('section20Item1')}</li>
+                <li>{t('section20Item2')}</li>
+                <li>{t('section20Item3')}</li>
+              </ul>
+              <div className="bg-primary-50 border border-primary-200 rounded-lg p-4 mt-4">
+                <p className="text-primary-800 leading-relaxed">
+                  {t('privacyReference')}{' '}
+                  <Link href="/legal/privacy" className="text-primary-600 hover:text-primary-700 underline">
+                    Privacy Policy
+                  </Link>.
+                </p>
+              </div>
             </section>
           </div>
 
@@ -149,7 +421,7 @@ export default function TermsOfServicePage() {
               href="/register"
               className="text-primary-600 hover:text-primary-700 font-medium"
             >
-              &larr; Back to Registration
+              &larr; {tLegal('backToRegistration')}
             </Link>
           </div>
         </div>

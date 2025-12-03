@@ -5,12 +5,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Quick Reference
 
 ```bash
-# Monorepo Commands (from root)
+# First-time setup
+npm install -g pnpm@9                     # Install pnpm if needed
 pnpm install                              # Install all dependencies
+pnpm build:packages                       # Build shared packages (required before running apps)
+
+# Monorepo Commands (from root)
 pnpm dev                                  # Start all apps in dev mode
+pnpm dev:web                              # Start web app only
+pnpm dev:mobile                           # Start mobile app only
 pnpm build                                # Build all packages and apps
-pnpm dev --filter=@chaski/web             # Start web app only
-pnpm dev --filter=@chaski/mobile          # Start mobile app only
+pnpm lint                                 # Lint all apps
+pnpm type-check                           # Type-check all apps
 
 # Backend (from backend/)
 source venv/bin/activate && uvicorn main:app --reload --port 8000  # Dev server

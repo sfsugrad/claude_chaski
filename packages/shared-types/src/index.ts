@@ -2,13 +2,19 @@
 export interface RegisterData {
   email: string
   password: string
-  full_name: string
+  first_name: string
+  middle_name?: string
+  last_name: string
   role: 'sender' | 'courier' | 'both'
   phone_number?: string
   max_deviation_km?: number
   default_address?: string
   default_address_lat?: number
   default_address_lng?: number
+  preferred_language?: string
+  terms_accepted: boolean
+  privacy_accepted: boolean
+  courier_agreement_accepted?: boolean
 }
 
 export interface LoginData {
@@ -20,7 +26,10 @@ export interface LoginData {
 export interface UserResponse {
   id: number
   email: string
-  full_name: string
+  first_name: string
+  middle_name: string | null
+  last_name: string
+  full_name: string  // Computed for backwards compatibility
   role: string
   phone_number: string | null
   is_active: boolean
@@ -62,7 +71,9 @@ export interface ResetPasswordData {
 }
 
 export interface UserUpdate {
-  full_name?: string
+  first_name?: string
+  middle_name?: string
+  last_name?: string
   phone_number?: string
   max_deviation_km?: number
   default_address?: string
@@ -724,7 +735,10 @@ export interface AdminVerificationResponse extends VerificationResponse {
 export interface AdminUser {
   id: number
   email: string
-  full_name: string
+  first_name: string
+  middle_name: string | null
+  last_name: string
+  full_name: string  // Computed for backwards compatibility
   role: string
   phone_number: string | null
   is_active: boolean
@@ -775,7 +789,9 @@ export interface AdminStats {
 export interface CreateUserData {
   email: string
   password: string
-  full_name: string
+  first_name: string
+  middle_name?: string
+  last_name: string
   role: string
   phone_number?: string
   max_deviation_km?: number

@@ -86,7 +86,7 @@ def clear_auth_cookie(response: Response) -> None:
     )
 
 # Current legal document versions - update when documents change
-TERMS_VERSION = "1.0"
+TERMS_VERSION = "2.1"
 PRIVACY_VERSION = "1.0"
 COURIER_AGREEMENT_VERSION = "1.0"
 
@@ -94,10 +94,12 @@ COURIER_AGREEMENT_VERSION = "1.0"
 class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(..., description="Password with enhanced security requirements")
-    full_name: str = Field(..., min_length=1)
+    first_name: str = Field(..., min_length=1, description="User's first name")
+    middle_name: str | None = Field(default=None, description="User's middle name (optional)")
+    last_name: str = Field(..., min_length=1, description="User's last name")
     role: str = Field(..., pattern="^(sender|courier|both)$")
     phone_number: str = Field(..., min_length=10, description="Phone number in E.164 format (required)")
-    max_deviation_km: int | None = Field(default=5, ge=1, le=50)
+    max_deviation_km: int | None = Field(default=5, ge=1, le=80)
     default_address: str | None = None
     default_address_lat: float | None = None
     default_address_lng: float | None = None
@@ -129,7 +131,10 @@ class MobileLoginResponse(BaseModel):
 class UserResponse(BaseModel):
     id: int
     email: str
-    full_name: str
+    first_name: str
+    middle_name: str | None = None
+    last_name: str
+    full_name: str  # Computed for backwards compatibility
     role: str
     phone_number: str | None
     is_active: bool
@@ -150,9 +155,11 @@ class UserResponse(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    full_name: str | None = None
+    first_name: str | None = None
+    middle_name: str | None = None
+    last_name: str | None = None
     phone_number: str | None = None
-    max_deviation_km: int | None = Field(default=None, ge=1, le=50)
+    max_deviation_km: int | None = Field(default=None, ge=1, le=80)
     default_address: str | None = None
     default_address_lat: float | None = None
     default_address_lng: float | None = None
@@ -291,13 +298,25 @@ async def register(request: Request, user_data: UserRegister, db: Session = Depe
 
     # Sanitize all user inputs to prevent XSS
     sanitized_email = sanitize_email(user_data.email)
-    sanitized_full_name = sanitize_plain_text(user_data.full_name)
+    sanitized_first_name = sanitize_plain_text(user_data.first_name)
+    sanitized_middle_name = sanitize_plain_text(user_data.middle_name) if user_data.middle_name else None
+    sanitized_last_name = sanitize_plain_text(user_data.last_name)
     sanitized_phone = sanitize_phone(user_data.phone_number) if user_data.phone_number else None
     sanitized_default_address = sanitize_plain_text(user_data.default_address) if user_data.default_address else None
+
+    # Compute full name for backwards compatibility
+    full_name_parts = [sanitized_first_name]
+    if sanitized_middle_name:
+        full_name_parts.append(sanitized_middle_name)
+    full_name_parts.append(sanitized_last_name)
+    sanitized_full_name = ' '.join(full_name_parts)
 
     # Encrypt PII data and create hashes for lookup
     encryption_service = get_encryption_service()
     encrypted_email = encryption_service.encrypt(sanitized_email) if encryption_service else None
+    encrypted_first_name = encryption_service.encrypt(sanitized_first_name) if encryption_service else None
+    encrypted_middle_name = encryption_service.encrypt(sanitized_middle_name) if encryption_service and sanitized_middle_name else None
+    encrypted_last_name = encryption_service.encrypt(sanitized_last_name) if encryption_service else None
     encrypted_full_name = encryption_service.encrypt(sanitized_full_name) if encryption_service else None
     encrypted_phone = encryption_service.encrypt(sanitized_phone) if encryption_service and sanitized_phone else None
 
@@ -318,7 +337,14 @@ async def register(request: Request, user_data: UserRegister, db: Session = Depe
         email_encrypted=encrypted_email,
         email=sanitized_email,  # DEPRECATED: kept for transition period
         hashed_password=hashed_password,
-        # Full name: encrypted only (not queried)
+        # Name fields: encrypted for storage, plaintext for transition
+        first_name_encrypted=encrypted_first_name,
+        first_name=sanitized_first_name,
+        middle_name_encrypted=encrypted_middle_name,
+        middle_name=sanitized_middle_name,
+        last_name_encrypted=encrypted_last_name,
+        last_name=sanitized_last_name,
+        # Full name: computed for backwards compatibility
         full_name_encrypted=encrypted_full_name,
         full_name=sanitized_full_name,  # DEPRECATED: kept for transition period
         role=user_role,
@@ -706,10 +732,16 @@ async def get_current_user_info(
         Rating.rated_user_id == current_user.id
     ).count()
 
+    # Compute full_name for backwards compatibility
+    full_name = current_user.computed_full_name if hasattr(current_user, 'computed_full_name') else current_user.full_name
+
     return UserResponse(
         id=current_user.id,
         email=current_user.email,
-        full_name=current_user.full_name,
+        first_name=current_user.first_name or '',
+        middle_name=current_user.middle_name,
+        last_name=current_user.last_name or '',
+        full_name=full_name or '',
         role=current_user.role.value,
         phone_number=current_user.phone_number,
         is_active=current_user.is_active,
@@ -736,9 +768,11 @@ async def update_current_user(
     Update current authenticated user's profile.
 
     All fields are optional. Only provided fields will be updated.
-    - **full_name**: User's full name
+    - **first_name**: User's first name
+    - **middle_name**: User's middle name (optional)
+    - **last_name**: User's last name
     - **phone_number**: Phone number
-    - **max_deviation_km**: Maximum deviation distance for couriers (1-50 km)
+    - **max_deviation_km**: Maximum deviation distance for couriers (1-80 km / ~50 miles)
     - **default_address**: Default address for package pickup
     - **default_address_lat**: Latitude of default address
     - **default_address_lng**: Longitude of default address
@@ -749,12 +783,38 @@ async def update_current_user(
     # Track changes for audit log
     changes = {}
 
-    # Update only provided fields (with sanitization and dual-write for PII)
-    if user_data.full_name is not None:
-        sanitized_name = sanitize_plain_text(user_data.full_name)
-        changes["full_name"] = {"old": current_user.full_name, "new": sanitized_name}
-        current_user.full_name = sanitized_name
-        current_user.full_name_encrypted = encryption_service.encrypt(sanitized_name) if encryption_service else None
+    # Update name fields
+    name_changed = False
+    if user_data.first_name is not None:
+        sanitized_first = sanitize_plain_text(user_data.first_name)
+        changes["first_name"] = {"old": current_user.first_name, "new": sanitized_first}
+        current_user.first_name = sanitized_first
+        current_user.first_name_encrypted = encryption_service.encrypt(sanitized_first) if encryption_service else None
+        name_changed = True
+    if user_data.middle_name is not None:
+        sanitized_middle = sanitize_plain_text(user_data.middle_name) if user_data.middle_name else None
+        changes["middle_name"] = {"old": current_user.middle_name, "new": sanitized_middle}
+        current_user.middle_name = sanitized_middle
+        current_user.middle_name_encrypted = encryption_service.encrypt(sanitized_middle) if encryption_service and sanitized_middle else None
+        name_changed = True
+    if user_data.last_name is not None:
+        sanitized_last = sanitize_plain_text(user_data.last_name)
+        changes["last_name"] = {"old": current_user.last_name, "new": sanitized_last}
+        current_user.last_name = sanitized_last
+        current_user.last_name_encrypted = encryption_service.encrypt(sanitized_last) if encryption_service else None
+        name_changed = True
+
+    # Update computed full_name if any name field changed
+    if name_changed:
+        full_name_parts = [current_user.first_name or '']
+        if current_user.middle_name:
+            full_name_parts.append(current_user.middle_name)
+        if current_user.last_name:
+            full_name_parts.append(current_user.last_name)
+        computed_full_name = ' '.join(filter(None, full_name_parts))
+        current_user.full_name = computed_full_name
+        current_user.full_name_encrypted = encryption_service.encrypt(computed_full_name) if encryption_service else None
+
     if user_data.phone_number is not None:
         sanitized_phone_update = sanitize_phone(user_data.phone_number)
         changes["phone_number"] = {"old": current_user.phone_number, "new": sanitized_phone_update}
@@ -789,10 +849,16 @@ async def update_current_user(
         Rating.rated_user_id == current_user.id
     ).count()
 
+    # Compute full_name for backwards compatibility
+    full_name = current_user.computed_full_name if hasattr(current_user, 'computed_full_name') else current_user.full_name
+
     return UserResponse(
         id=current_user.id,
         email=current_user.email,
-        full_name=current_user.full_name,
+        first_name=current_user.first_name or '',
+        middle_name=current_user.middle_name,
+        last_name=current_user.last_name or '',
+        full_name=full_name or '',
         role=current_user.role.value,
         phone_number=current_user.phone_number,
         is_active=current_user.is_active,

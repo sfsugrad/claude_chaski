@@ -123,6 +123,7 @@ export default function RegisterPage() {
   const locale = useLocale()
   const t = useTranslations('auth')
   const tCommon = useTranslations('common')
+  const tPrivacy = useTranslations('legal.privacy')
 
   // Map locale to country code for phone input
   const getDefaultCountry = (locale: string) => {
@@ -138,7 +139,9 @@ export default function RegisterPage() {
     email: '',
     password: '',
     confirmPassword: '',
-    full_name: '',
+    first_name: '',
+    middle_name: '',
+    last_name: '',
     role: 'sender' as 'sender' | 'courier' | 'both',
     phone_number: '',
     max_deviation_km: 5,
@@ -175,7 +178,7 @@ export default function RegisterPage() {
   }
 
   const validateForm = () => {
-    if (!formData.email || !formData.password || !formData.full_name) {
+    if (!formData.email || !formData.password || !formData.first_name || !formData.last_name) {
       setError(t('allFieldsRequired'))
       return false
     }
@@ -210,7 +213,39 @@ export default function RegisterPage() {
       return false
     }
 
-    if (formData.max_deviation_km < 1 || formData.max_deviation_km > 50) {
+    // Validate first name - must be at least 2 characters and contain only letters, spaces, hyphens, and apostrophes
+    const trimmedFirstName = formData.first_name.trim()
+    if (trimmedFirstName.length < 2) {
+      setError(t('nameTooShort'))
+      return false
+    }
+    // Allow letters (including accented), spaces, hyphens, and apostrophes
+    const nameRegex = /^[\p{L}\s\-']+$/u
+    if (!nameRegex.test(trimmedFirstName)) {
+      setError(t('invalidName'))
+      return false
+    }
+
+    // Validate last name - must be at least 2 characters
+    const trimmedLastName = formData.last_name.trim()
+    if (trimmedLastName.length < 2) {
+      setError(t('nameTooShort'))
+      return false
+    }
+    if (!nameRegex.test(trimmedLastName)) {
+      setError(t('invalidName'))
+      return false
+    }
+
+    // Validate middle name if provided (optional)
+    if (formData.middle_name.trim()) {
+      if (!nameRegex.test(formData.middle_name.trim())) {
+        setError(t('invalidName'))
+        return false
+      }
+    }
+
+    if (formData.max_deviation_km < 1 || formData.max_deviation_km > 80) {
       setError(t('deviationRange'))
       return false
     }
@@ -336,18 +371,46 @@ export default function RegisterPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Full Name */}
+              {/* Name Fields */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* First Name */}
+                <Input
+                  label={t('firstName')}
+                  id="first_name"
+                  name="first_name"
+                  type="text"
+                  required
+                  value={formData.first_name}
+                  onChange={handleChange}
+                  placeholder={t('firstNamePlaceholder')}
+                  leftIcon={<UserIcon />}
+                  autoComplete="given-name"
+                />
+
+                {/* Last Name */}
+                <Input
+                  label={t('lastName')}
+                  id="last_name"
+                  name="last_name"
+                  type="text"
+                  required
+                  value={formData.last_name}
+                  onChange={handleChange}
+                  placeholder={t('lastNamePlaceholder')}
+                  autoComplete="family-name"
+                />
+              </div>
+
+              {/* Middle Name (Optional) */}
               <Input
-                label={t('fullName')}
-                id="full_name"
-                name="full_name"
+                label={t('middleName')}
+                id="middle_name"
+                name="middle_name"
                 type="text"
-                required
-                value={formData.full_name}
+                value={formData.middle_name}
                 onChange={handleChange}
-                placeholder={t('fullNamePlaceholder')}
-                leftIcon={<UserIcon />}
-                autoComplete="name"
+                placeholder={t('middleNamePlaceholder')}
+                autoComplete="additional-name"
               />
 
               {/* Email */}
@@ -497,7 +560,7 @@ export default function RegisterPage() {
               {(formData.role === 'courier' || formData.role === 'both') && (
                 <div className="form-group">
                   <label htmlFor="max_deviation_km" className="label">
-                    {t('maxDeviation')} (miles)
+                    {t('maxDeviation')}
                   </label>
                   <input
                     id="max_deviation_km"
@@ -505,11 +568,11 @@ export default function RegisterPage() {
                     type="number"
                     min="1"
                     max="50"
-                    step="0.5"
-                    value={kmToMiles(formData.max_deviation_km).toFixed(1)}
+                    step="1"
+                    value={Math.round(kmToMiles(formData.max_deviation_km))}
                     onChange={(e) => setFormData((prev) => ({
                       ...prev,
-                      max_deviation_km: milesToKm(parseFloat(e.target.value) || 3),
+                      max_deviation_km: Math.round(milesToKm(parseFloat(e.target.value) || 3)),
                     }))}
                     className="input"
                   />
@@ -522,6 +585,11 @@ export default function RegisterPage() {
               {/* Legal Agreements Section */}
               <div className="space-y-4 border-t border-surface-200 pt-5 mt-5">
                 <h3 className="text-sm font-medium text-surface-700">Legal Agreements</h3>
+
+                {/* Privacy-friendly summary */}
+                <p className="text-xs text-surface-500 italic">
+                  {tPrivacy('friendlySummary')}
+                </p>
 
                 {/* Terms of Service */}
                 <div className="flex items-start">
