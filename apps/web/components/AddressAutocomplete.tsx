@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 
 interface AddressAutocompleteProps {
   id: string
@@ -32,6 +32,17 @@ export default function AddressAutocomplete({
 }: AddressAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const autocompleteRef = useRef<any>(null)
+  const isInitializedRef = useRef(false)
+  const onChangeRef = useRef(onChange)
+  // Track if we're processing a place selection to prevent race conditions
+  const isSelectingPlaceRef = useRef(false)
+  // Store the last valid coordinates to prevent them from being reset
+  const lastValidCoordsRef = useRef<{ lat: number; lng: number } | null>(null)
+
+  // Keep the ref updated with the latest callback
+  useEffect(() => {
+    onChangeRef.current = onChange
+  }, [onChange])
 
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY
@@ -41,6 +52,10 @@ export default function AddressAutocomplete({
       console.warn('Google Places API key not found. Autocomplete disabled.')
       return
     }
+
+    // Don't reinitialize if autocomplete already exists
+    if (isInitializedRef.current) return
+    isInitializedRef.current = true
 
     // Load Google Places API script if not already loaded
     if (!window.google) {
@@ -70,33 +85,64 @@ export default function AddressAutocomplete({
       autocompleteRef.current.addListener('place_changed', () => {
         const place = autocompleteRef.current.getPlace()
 
+        // If getPlace() returns an object without geometry, it means the user
+        // pressed enter or clicked away without selecting from the dropdown.
         if (!place.geometry || !place.geometry.location) {
-          console.error('No geometry data for selected place')
           return
         }
+
+        // Mark that we're selecting a place to prevent onChange handler from resetting
+        isSelectingPlaceRef.current = true
 
         const address = place.formatted_address || ''
         const lat = place.geometry.location.lat()
         const lng = place.geometry.location.lng()
 
-        onChange(address, lat, lng)
+        // Store valid coordinates
+        lastValidCoordsRef.current = { lat, lng }
+
+        // Sync input value with the formatted address
+        if (inputRef.current) {
+          inputRef.current.value = address
+        }
+
+        onChangeRef.current(address, lat, lng)
+
+        // Reset the flag after a short delay to allow the state update to complete
+        setTimeout(() => {
+          isSelectingPlaceRef.current = false
+        }, 100)
       })
     }
 
-    // Cleanup
+    // Cleanup only on unmount
     return () => {
       if (autocompleteRef.current && window.google) {
         window.google.maps.event.clearInstanceListeners(autocompleteRef.current)
+        autocompleteRef.current = null
+        isInitializedRef.current = false
       }
     }
-  }, [onChange])
+  }, [])
+
+  // Sync input value when prop changes (for controlled behavior)
+  useEffect(() => {
+    // Only sync if we're not in the middle of a place selection
+    if (inputRef.current && !isSelectingPlaceRef.current && inputRef.current.value !== value) {
+      inputRef.current.value = value
+    }
+  }, [value])
 
   // Handle manual input changes
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // If user types manually, we don't have coordinates yet
-    // The parent component should handle this case
-    onChange(e.target.value, 0, 0)
-  }
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    // If we're in the middle of selecting a place, ignore this event
+    if (isSelectingPlaceRef.current) {
+      return
+    }
+    // User is typing - reset coordinates
+    lastValidCoordsRef.current = null
+    onChangeRef.current(e.target.value, 0, 0)
+  }, [])
 
   return (
     <input
@@ -104,7 +150,7 @@ export default function AddressAutocomplete({
       id={id}
       name={name}
       type="text"
-      value={value}
+      defaultValue={value}
       onChange={handleInputChange}
       placeholder={placeholder}
       required={required}

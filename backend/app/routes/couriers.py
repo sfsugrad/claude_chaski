@@ -12,6 +12,7 @@ from app.utils.email import send_route_match_found_email
 from app.services.audit_service import log_route_create, log_route_update, log_route_delete
 from app.services.route_deactivation_service import (
     has_active_deliveries,
+    has_accepted_packages,
     handle_route_deactivation
 )
 from pydantic import BaseModel, Field
@@ -30,7 +31,7 @@ class RouteCreate(BaseModel):
     end_address: str = Field(..., min_length=1)
     end_lat: float = Field(..., ge=-90, le=90)
     end_lng: float = Field(..., ge=-180, le=180)
-    max_deviation_km: int = Field(default=5, ge=1, le=50)
+    max_deviation_km: int = Field(default=5, ge=1, le=81)  # 81 km ≈ 50 miles
     departure_time: datetime | None = None
     trip_date: datetime | None = None
 
@@ -38,7 +39,7 @@ class RouteUpdate(BaseModel):
     end_address: str | None = Field(None, min_length=1)
     end_lat: float | None = Field(None, ge=-90, le=90)
     end_lng: float | None = Field(None, ge=-180, le=180)
-    max_deviation_km: int | None = Field(None, ge=1, le=50)
+    max_deviation_km: int | None = Field(None, ge=1, le=81)  # 81 km ≈ 50 miles
     departure_time: datetime | None = None
     trip_date: datetime | None = None
 
@@ -134,6 +135,15 @@ async def create_route(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Cannot create new route while you have active deliveries. Complete or cancel packages {package_ids} first."
+        )
+
+    # Check for accepted packages (BID_SELECTED) that would block route change
+    has_accepted, accepted_packages = has_accepted_packages(db, current_user.id)
+    if has_accepted:
+        package_ids = [p.id for p in accepted_packages]
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cannot create new route while you have accepted packages awaiting pickup. Complete or cancel packages {package_ids} first."
         )
 
     # Find existing active routes
@@ -340,6 +350,15 @@ async def delete_route(
             detail=f"Cannot deactivate route while you have active deliveries. Complete or cancel packages {package_ids} first."
         )
 
+    # Check for accepted packages (BID_SELECTED) that would block deactivation
+    has_accepted, accepted_packages = has_accepted_packages(db, current_user.id)
+    if has_accepted:
+        package_ids = [p.id for p in accepted_packages]
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cannot deactivate route while you have accepted packages awaiting pickup. Complete or cancel packages {package_ids} first."
+        )
+
     # Handle bid cleanup before deactivation
     deactivation_result = await handle_route_deactivation(db, current_user.id, route_id)
 
@@ -403,6 +422,15 @@ async def activate_route(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Cannot switch routes while you have active deliveries. Complete or cancel packages {package_ids} first."
+        )
+
+    # Check for accepted packages (BID_SELECTED) that would block route switch
+    has_accepted, accepted_packages = has_accepted_packages(db, current_user.id)
+    if has_accepted:
+        package_ids = [p.id for p in accepted_packages]
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cannot switch routes while you have accepted packages awaiting pickup. Complete or cancel packages {package_ids} first."
         )
 
     # Find and deactivate existing active routes (one active route per courier)

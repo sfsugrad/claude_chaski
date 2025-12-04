@@ -39,6 +39,28 @@ def has_active_deliveries(db: Session, courier_id: int) -> Tuple[bool, List[Pack
     return len(active_packages) > 0, active_packages
 
 
+def has_accepted_packages(db: Session, courier_id: int) -> Tuple[bool, List[Package]]:
+    """
+    Check if courier has packages in BID_SELECTED status (accepted but not yet picked up).
+
+    Args:
+        db: Database session
+        courier_id: The courier's user ID
+
+    Returns:
+        Tuple of (has_accepted_packages, list_of_accepted_packages)
+    """
+    accepted_packages = db.query(Package).filter(
+        and_(
+            Package.courier_id == courier_id,
+            Package.is_active == True,
+            Package.status == PackageStatus.BID_SELECTED
+        )
+    ).all()
+
+    return len(accepted_packages) > 0, accepted_packages
+
+
 def withdraw_pending_bids_for_courier(
     db: Session,
     courier_id: int,
@@ -144,9 +166,11 @@ async def handle_route_deactivation(
     """
     Complete route deactivation handler. Call this BEFORE setting is_active=False.
 
+    Note: Routes with accepted packages (BID_SELECTED) are blocked at the API level,
+    so this function only needs to withdraw pending bids.
+
     1. Withdraw pending bids
-    2. Cancel selected bids (not yet picked up)
-    3. Create notifications
+    2. Create notifications
 
     Args:
         db: Database session
@@ -168,29 +192,13 @@ async def handle_route_deactivation(
     withdrawn_ids = withdraw_pending_bids_for_courier(db, courier_id, route_id)
     result["bids_withdrawn"] = len(withdrawn_ids)
 
-    # Cancel selected bids and reset packages
-    cancelled = cancel_selected_bids_for_courier(db, courier_id)
-    result["bids_cancelled"] = len(cancelled)
-    result["packages_reset"] = cancelled
-
-    # Send notifications to affected senders
-    for pkg_info in cancelled:
-        description_preview = pkg_info["description"][:30] if pkg_info["description"] else "Package"
-        await create_notification_with_broadcast(
-            db=db,
-            user_id=pkg_info["sender_id"],
-            notification_type=NotificationType.BID_CANCELLED_BY_COURIER,
-            message=f"The courier you selected has cancelled. Your package '{description_preview}...' is open for new bids.",
-            package_id=pkg_info["package_id"]
-        )
-
     # Notify courier about withdrawn bids
-    if result["bids_withdrawn"] > 0 or result["bids_cancelled"] > 0:
+    if result["bids_withdrawn"] > 0:
         await create_notification_with_broadcast(
             db=db,
             user_id=courier_id,
             notification_type=NotificationType.ROUTE_DEACTIVATED,
-            message=f"Route deactivated. {result['bids_withdrawn']} pending bid(s) withdrawn, {result['bids_cancelled']} selected bid(s) cancelled.",
+            message=f"Route deactivated. {result['bids_withdrawn']} pending bid(s) withdrawn.",
             package_id=None
         )
 

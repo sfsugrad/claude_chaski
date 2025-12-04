@@ -46,7 +46,24 @@ export default function RatingModal({
       setRating(0)
       setComment('')
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to submit rating')
+      // Handle various error response formats from FastAPI
+      const detail = err.response?.data?.detail;
+      let errorMessage = 'Failed to submit rating';
+
+      if (Array.isArray(detail)) {
+        // FastAPI validation errors come as array of objects with {type, loc, msg, input}
+        errorMessage = detail.map((e: any) => {
+          if (typeof e === 'string') return e;
+          return e.msg || JSON.stringify(e);
+        }).join(', ');
+      } else if (typeof detail === 'string') {
+        errorMessage = detail;
+      } else if (detail && typeof detail === 'object') {
+        // Single validation error object
+        errorMessage = detail.msg || JSON.stringify(detail);
+      }
+
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false)
     }

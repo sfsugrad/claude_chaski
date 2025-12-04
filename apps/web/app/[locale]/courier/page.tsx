@@ -162,8 +162,22 @@ function CourierDashboardContent() {
     try {
       await couriersAPI.deleteRoute(routeId)
       await loadRoutes()
-    } catch (err) {
-      alert('Failed to delete route')
+    } catch (err: any) {
+      console.error('Delete route error:', err)
+      let errorMessage = 'Failed to deactivate route'
+
+      // Try different error structures
+      if (err.response?.data?.detail) {
+        errorMessage = err.response.data.detail
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message
+      } else if (err.message === 'Network Error') {
+        errorMessage = 'Unable to connect to the server. Please check your connection and try again.'
+      } else if (err.message) {
+        errorMessage = err.message
+      }
+
+      setError(errorMessage)
     }
   }
 
@@ -179,8 +193,18 @@ function CourierDashboardContent() {
       await couriersAPI.activateRoute(routeId)
       await loadRoutes()
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Failed to activate route'
-      alert(errorMessage)
+      console.error('Activate route error:', err)
+      let errorMessage = 'Failed to activate route'
+
+      if (err.response?.data?.detail) {
+        errorMessage = err.response.data.detail
+      } else if (err.message === 'Network Error') {
+        errorMessage = 'Unable to connect to the server. Please check your connection and try again.'
+      } else if (err.message) {
+        errorMessage = err.message
+      }
+
+      setError(errorMessage)
     }
   }
 
@@ -236,7 +260,7 @@ function CourierDashboardContent() {
         </FadeIn>
 
         {error && (
-          <Alert variant="error" className="mb-4">
+          <Alert variant="error" className="mb-4" dismissible onDismiss={() => setError('')}>
             {error}
           </Alert>
         )}
