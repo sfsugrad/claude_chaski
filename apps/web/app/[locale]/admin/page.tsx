@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { authAPI, adminAPI, AdminUser, AdminPackage, AdminStats, MatchingJobResult, UserResponse, AdminRoute, AdminRouteCreate } from '@/lib/api'
+import { authAPI, adminAPI, AdminUser, AdminPackage, AdminStats, MatchingJobResult, UserResponse, AdminRoute, AdminRouteCreate, UserFilters, PackageFilters, RouteFilters } from '@/lib/api'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
 import { kmToMiles, milesToKm } from '@/lib/distance'
 import {
@@ -52,6 +52,8 @@ export default function AdminPage() {
   const [userRoleFilter, setUserRoleFilter] = useState<string>('all')
   const [userVerificationFilter, setUserVerificationFilter] = useState<string>('all')
   const [userActiveFilter, setUserActiveFilter] = useState<string>('all')
+  const [userSearchQuery, setUserSearchQuery] = useState<string>('')
+  const [packageSearchQuery, setPackageSearchQuery] = useState<string>('')
   const [showCreateUserModal, setShowCreateUserModal] = useState(false)
   const [newUserData, setNewUserData] = useState({
     email: '',
@@ -86,6 +88,23 @@ export default function AdminPage() {
   })
   const [createRouteError, setCreateRouteError] = useState('')
   const [createRouteLoading, setCreateRouteLoading] = useState(false)
+
+  // Pagination state for users
+  const [usersPage, setUsersPage] = useState(0)
+  const [usersLimit] = useState(20)
+  const [usersTotal, setUsersTotal] = useState(0)
+
+  // Pagination state for packages
+  const [packagesPage, setPackagesPage] = useState(0)
+  const [packagesLimit] = useState(20)
+  const [packagesTotal, setPackagesTotal] = useState(0)
+
+  // Pagination state for routes
+  const [routesPage, setRoutesPage] = useState(0)
+  const [routesLimit] = useState(20)
+  const [routesTotal, setRoutesTotal] = useState(0)
+  const [routeActiveFilter, setRouteActiveFilter] = useState<string>('all')
+  const [routeSearchQuery, setRouteSearchQuery] = useState<string>('')
 
   // Chart data computations
   const userRoleChartData = useMemo(() => [
@@ -166,31 +185,111 @@ export default function AdminPage() {
     }
   }
 
+  // Build user filters from state
+  const getUserFilters = useCallback((): UserFilters => {
+    const filters: UserFilters = {}
+    if (userRoleFilter !== 'all') filters.role = userRoleFilter
+    if (userVerificationFilter === 'verified') filters.is_verified = true
+    else if (userVerificationFilter === 'unverified') filters.is_verified = false
+    if (userActiveFilter === 'active') filters.is_active = true
+    else if (userActiveFilter === 'inactive') filters.is_active = false
+    if (userSearchQuery.trim()) filters.search = userSearchQuery.trim()
+    return filters
+  }, [userRoleFilter, userVerificationFilter, userActiveFilter, userSearchQuery])
+
+  // Build package filters from state
+  const getPackageFilters = useCallback((): PackageFilters => {
+    const filters: PackageFilters = {}
+    if (statusFilter !== 'all') filters.status = statusFilter
+    if (activeFilter === 'active') filters.is_active = true
+    else if (activeFilter === 'inactive') filters.is_active = false
+    if (bidStatusFilter !== 'all') filters.bid_status = bidStatusFilter
+    if (packageSearchQuery.trim()) filters.search = packageSearchQuery.trim()
+    return filters
+  }, [statusFilter, activeFilter, bidStatusFilter, packageSearchQuery])
+
+  // Load users with pagination and filters
+  const loadUsers = useCallback(async () => {
+    try {
+      const skip = usersPage * usersLimit
+      const filters = getUserFilters()
+      const response = await adminAPI.getUsers(skip, usersLimit, filters)
+      setUsers(response.data.users)
+      setUsersTotal(response.data.total)
+    } catch (err: any) {
+      console.error('Error loading users:', err)
+    }
+  }, [usersPage, usersLimit, getUserFilters])
+
+  // Load packages with pagination and filters
+  const loadPackages = useCallback(async () => {
+    try {
+      const skip = packagesPage * packagesLimit
+      const filters = getPackageFilters()
+      const response = await adminAPI.getPackages(skip, packagesLimit, filters)
+      setPackages(response.data.packages)
+      setPackagesTotal(response.data.total)
+    } catch (err: any) {
+      console.error('Error loading packages:', err)
+    }
+  }, [packagesPage, packagesLimit, getPackageFilters])
+
+  // Build route filters from state
+  const getRouteFilters = useCallback((): RouteFilters => {
+    const filters: RouteFilters = {}
+    if (routeActiveFilter === 'active') filters.active_only = true
+    else if (routeActiveFilter === 'inactive') filters.active_only = false
+    if (routeSearchQuery.trim()) filters.search = routeSearchQuery.trim()
+    return filters
+  }, [routeActiveFilter, routeSearchQuery])
+
+  // Load routes with pagination and filters
+  const loadRoutes = useCallback(async () => {
+    try {
+      const skip = routesPage * routesLimit
+      const filters = getRouteFilters()
+      const response = await adminAPI.getRoutes(skip, routesLimit, filters)
+      setRoutes(response.data.routes)
+      setRoutesTotal(response.data.total)
+    } catch (err: any) {
+      console.error('Error loading routes:', err)
+    }
+  }, [routesPage, routesLimit, getRouteFilters])
+
   const loadData = async () => {
     const errors: string[] = []
 
-    // Load users
+    // Load users with pagination
     try {
-      const usersResponse = await adminAPI.getUsers()
-      setUsers(usersResponse.data)
+      const skip = usersPage * usersLimit
+      const filters = getUserFilters()
+      const usersResponse = await adminAPI.getUsers(skip, usersLimit, filters)
+      setUsers(usersResponse.data.users)
+      setUsersTotal(usersResponse.data.total)
     } catch (err: any) {
       console.error('Error loading users:', err)
       errors.push(`Failed to load users: ${err.response?.data?.detail || err.message}`)
     }
 
-    // Load packages
+    // Load packages with pagination
     try {
-      const packagesResponse = await adminAPI.getPackages()
-      setPackages(packagesResponse.data)
+      const skip = packagesPage * packagesLimit
+      const filters = getPackageFilters()
+      const packagesResponse = await adminAPI.getPackages(skip, packagesLimit, filters)
+      setPackages(packagesResponse.data.packages)
+      setPackagesTotal(packagesResponse.data.total)
     } catch (err: any) {
       console.error('Error loading packages:', err)
       errors.push(`Failed to load packages: ${err.response?.data?.detail || err.message}`)
     }
 
-    // Load routes
+    // Load routes with pagination
     try {
-      const routesResponse = await adminAPI.getRoutes()
-      setRoutes(routesResponse.data)
+      const skip = routesPage * routesLimit
+      const filters = getRouteFilters()
+      const routesResponse = await adminAPI.getRoutes(skip, routesLimit, filters)
+      setRoutes(routesResponse.data.routes)
+      setRoutesTotal(routesResponse.data.total)
     } catch (err: any) {
       console.error('Error loading routes:', err)
       errors.push(`Failed to load routes: ${err.response?.data?.detail || err.message}`)
@@ -211,6 +310,41 @@ export default function AdminPage() {
       console.error('Data loading errors:', errors)
     }
   }
+
+  // Reload users when filters or page changes
+  useEffect(() => {
+    if (user) {
+      loadUsers()
+    }
+  }, [usersPage, userRoleFilter, userVerificationFilter, userActiveFilter, userSearchQuery, loadUsers])
+
+  // Reload packages when filters or page changes
+  useEffect(() => {
+    if (user) {
+      loadPackages()
+    }
+  }, [packagesPage, statusFilter, activeFilter, bidStatusFilter, packageSearchQuery, loadPackages])
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setUsersPage(0)
+  }, [userRoleFilter, userVerificationFilter, userActiveFilter, userSearchQuery])
+
+  useEffect(() => {
+    setPackagesPage(0)
+  }, [statusFilter, activeFilter, bidStatusFilter, packageSearchQuery])
+
+  // Reload routes when filters or page changes
+  useEffect(() => {
+    if (user) {
+      loadRoutes()
+    }
+  }, [routesPage, routeActiveFilter, routeSearchQuery, loadRoutes])
+
+  // Reset routes to first page when filter changes
+  useEffect(() => {
+    setRoutesPage(0)
+  }, [routeActiveFilter, routeSearchQuery])
 
   const handleRoleChange = async (userId: number, newRole: string) => {
     try {
@@ -1030,84 +1164,107 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Filters */}
+            {/* Search and Filters */}
             <div className="bg-white rounded-lg shadow p-4 mb-6">
-              <div className="flex items-center gap-6">
+              <div className="flex flex-col gap-4">
+                {/* Search Input */}
                 <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium text-gray-700">Role:</label>
-                  <select
-                    value={userRoleFilter}
-                    onChange={(e) => setUserRoleFilter(e.target.value)}
-                    className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option value="all">All Roles</option>
-                    <option value="sender">Sender</option>
-                    <option value="courier">Courier</option>
-                    <option value="both">Both</option>
-                    <option value="admin">Admin</option>
-                  </select>
+                  <div className="relative flex-1 max-w-md">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Search by name or email..."
+                      value={userSearchQuery}
+                      onChange={(e) => setUserSearchQuery(e.target.value)}
+                      className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                    {userSearchQuery && (
+                      <button
+                        onClick={() => setUserSearchQuery('')}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                      >
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium text-gray-700">Verification:</label>
-                  <select
-                    value={userVerificationFilter}
-                    onChange={(e) => setUserVerificationFilter(e.target.value)}
-                    className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option value="all">All Users</option>
-                    <option value="verified">Verified Only</option>
-                    <option value="unverified">Unverified Only</option>
-                  </select>
-                </div>
+                {/* Filters Row */}
+                <div className="flex items-center gap-6 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700">Role:</label>
+                    <select
+                      value={userRoleFilter}
+                      onChange={(e) => setUserRoleFilter(e.target.value)}
+                      className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="all">All Roles</option>
+                      <option value="sender">Sender</option>
+                      <option value="courier">Courier</option>
+                      <option value="both">Both</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </div>
 
-                <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium text-gray-700">Status:</label>
-                  <select
-                    value={userActiveFilter}
-                    onChange={(e) => setUserActiveFilter(e.target.value)}
-                    className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option value="all">All Users</option>
-                    <option value="active">Active Only</option>
-                    <option value="inactive">Inactive Only</option>
-                  </select>
-                </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700">Verification:</label>
+                    <select
+                      value={userVerificationFilter}
+                      onChange={(e) => setUserVerificationFilter(e.target.value)}
+                      className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="all">All Users</option>
+                      <option value="verified">Verified Only</option>
+                      <option value="unverified">Unverified Only</option>
+                    </select>
+                  </div>
 
-                <div className="text-sm text-gray-600 ml-auto">
-                  Showing {getFilteredUsers().length} of {users.length} users
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700">Status:</label>
+                    <select
+                      value={userActiveFilter}
+                      onChange={(e) => setUserActiveFilter(e.target.value)}
+                      className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="all">All Users</option>
+                      <option value="active">Active Only</option>
+                      <option value="inactive">Inactive Only</option>
+                    </select>
+                  </div>
+
+                  <div className="text-sm text-gray-600 ml-auto">
+                    Showing {users.length} of {usersTotal} users
+                  </div>
                 </div>
               </div>
             </div>
 
-            {getFilteredUsers().length === 0 ? (
+            {users.length === 0 ? (
               <div className="bg-white rounded-lg shadow p-8 text-center">
                 <div className="text-gray-600 mb-4">
-                  {users.length === 0
+                  {usersTotal === 0
                     ? 'No users found'
                     : 'No users match the selected filters'}
                 </div>
-                {users.length > 0 && (
+                {(usersTotal > 0 || userSearchQuery) && (
                   <button
                     onClick={() => {
                       setUserRoleFilter('all')
                       setUserVerificationFilter('all')
                       setUserActiveFilter('all')
+                      setUserSearchQuery('')
                     }}
                     className="text-purple-600 hover:text-purple-700 text-sm underline"
                   >
                     Clear filters
                   </button>
                 )}
-              </div>
-            ) : users.length === 0 ? (
-              <div className="bg-white rounded-lg shadow p-8 text-center">
-                <div className="text-gray-600 mb-4">
-                  Admin API endpoints not yet implemented
-                </div>
-                <div className="text-sm text-gray-500">
-                  User management features will be available once backend admin routes are created
-                </div>
               </div>
             ) : (
               <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -1141,7 +1298,7 @@ export default function AdminPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {getFilteredUsers().map((u) => (
+                    {users.map((u) => (
                       <tr key={u.id} className={!u.is_active ? 'bg-gray-50 opacity-60' : ''}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <Link
@@ -1263,6 +1420,31 @@ export default function AdminPage() {
                     ))}
                   </tbody>
                 </table>
+
+                {/* Pagination Controls */}
+                {usersTotal > usersLimit && (
+                  <div className="bg-gray-50 px-6 py-3 flex items-center justify-between border-t border-gray-200">
+                    <div className="text-sm text-gray-700">
+                      Page {usersPage + 1} of {Math.ceil(usersTotal / usersLimit)}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setUsersPage(Math.max(0, usersPage - 1))}
+                        disabled={usersPage === 0}
+                        className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        onClick={() => setUsersPage(usersPage + 1)}
+                        disabled={(usersPage + 1) * usersLimit >= usersTotal}
+                        className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1274,7 +1456,7 @@ export default function AdminPage() {
               <h2 className="text-2xl font-bold">Package Management</h2>
               <div className="flex items-center gap-4">
                 <div className="text-gray-600">
-                  Total Packages: {packages.length}
+                  Total Packages: {packagesTotal}
                 </div>
                 <button
                   onClick={() => router.push('/packages/create')}
@@ -1285,74 +1467,106 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Filters */}
+            {/* Search and Filters */}
             <div className="bg-white rounded-lg shadow p-4 mb-6">
-              <div className="flex items-center gap-6">
+              <div className="flex flex-col gap-4">
+                {/* Search Input */}
                 <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium text-gray-700">Status:</label>
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option value="all">All Statuses</option>
-                    <option value="new">New</option>
-                    <option value="open_for_bids">Open for Bids</option>
-                    <option value="bid_selected">Bid Selected</option>
-                    <option value="pending_pickup">Pending Pickup</option>
-                    <option value="in_transit">In Transit</option>
-                    <option value="delivered">Delivered</option>
-                    <option value="canceled">Canceled</option>
-                    <option value="failed">Failed</option>
-                  </select>
+                  <div className="relative flex-1 max-w-md">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Search by tracking ID or sender name..."
+                      value={packageSearchQuery}
+                      onChange={(e) => setPackageSearchQuery(e.target.value)}
+                      className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                    {packageSearchQuery && (
+                      <button
+                        onClick={() => setPackageSearchQuery('')}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                      >
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium text-gray-700">Active Status:</label>
-                  <select
-                    value={activeFilter}
-                    onChange={(e) => setActiveFilter(e.target.value)}
-                    className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option value="all">All Packages</option>
-                    <option value="active">Active Only</option>
-                    <option value="inactive">Inactive Only</option>
-                  </select>
-                </div>
+                {/* Filters Row */}
+                <div className="flex items-center gap-6 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700">Status:</label>
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="all">All Statuses</option>
+                      <option value="new">New</option>
+                      <option value="open_for_bids">Open for Bids</option>
+                      <option value="bid_selected">Bid Selected</option>
+                      <option value="pending_pickup">Pending Pickup</option>
+                      <option value="in_transit">In Transit</option>
+                      <option value="delivered">Delivered</option>
+                      <option value="canceled">Canceled</option>
+                      <option value="failed">Failed</option>
+                    </select>
+                  </div>
 
-                <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium text-gray-700">Bid Status:</label>
-                  <select
-                    value={bidStatusFilter}
-                    onChange={(e) => setBidStatusFilter(e.target.value)}
-                    className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option value="all">All Bids</option>
-                    <option value="no_bids">No Bids</option>
-                    <option value="has_bids">Has Bids</option>
-                    <option value="has_selected_bid">Has Selected Bid</option>
-                  </select>
-                </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700">Active Status:</label>
+                    <select
+                      value={activeFilter}
+                      onChange={(e) => setActiveFilter(e.target.value)}
+                      className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="all">All Packages</option>
+                      <option value="active">Active Only</option>
+                      <option value="inactive">Inactive Only</option>
+                    </select>
+                  </div>
 
-                <div className="text-sm text-gray-600 ml-auto">
-                  Showing {getFilteredPackages().length} of {packages.length} packages
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700">Bid Status:</label>
+                    <select
+                      value={bidStatusFilter}
+                      onChange={(e) => setBidStatusFilter(e.target.value)}
+                      className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="all">All Bids</option>
+                      <option value="no_bids">No Bids</option>
+                      <option value="has_bids">Has Bids</option>
+                      <option value="has_selected_bid">Has Selected Bid</option>
+                    </select>
+                  </div>
+
+                  <div className="text-sm text-gray-600 ml-auto">
+                    Showing {packages.length} of {packagesTotal} packages
+                  </div>
                 </div>
               </div>
             </div>
 
-            {getFilteredPackages().length === 0 ? (
+            {packages.length === 0 ? (
               <div className="bg-white rounded-lg shadow p-8 text-center">
                 <div className="text-gray-600 mb-4">
-                  {packages.length === 0
+                  {packagesTotal === 0
                     ? 'No packages found'
                     : 'No packages match the selected filters'}
                 </div>
-                {packages.length > 0 && (
+                {(packagesTotal > 0 || packageSearchQuery) && (
                   <button
                     onClick={() => {
                       setStatusFilter('all')
                       setActiveFilter('all')
                       setBidStatusFilter('all')
+                      setPackageSearchQuery('')
                     }}
                     className="text-purple-600 hover:text-purple-700 text-sm underline"
                   >
@@ -1398,7 +1612,7 @@ export default function AdminPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {getFilteredPackages().map((pkg) => {
+                    {packages.map((pkg) => {
                       const sender = users.find(u => u.id === pkg.sender_id)
                       return (
                         <tr key={pkg.id} className={!pkg.is_active ? 'bg-gray-50 opacity-60' : ''}>
@@ -1492,6 +1706,31 @@ export default function AdminPage() {
                     })}
                   </tbody>
                 </table>
+
+                {/* Pagination Controls */}
+                {packagesTotal > packagesLimit && (
+                  <div className="bg-gray-50 px-6 py-3 flex items-center justify-between border-t border-gray-200">
+                    <div className="text-sm text-gray-700">
+                      Page {packagesPage + 1} of {Math.ceil(packagesTotal / packagesLimit)}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setPackagesPage(Math.max(0, packagesPage - 1))}
+                        disabled={packagesPage === 0}
+                        className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        onClick={() => setPackagesPage(packagesPage + 1)}
+                        disabled={(packagesPage + 1) * packagesLimit >= packagesTotal}
+                        className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1503,7 +1742,7 @@ export default function AdminPage() {
               <div>
                 <h2 className="text-2xl font-bold">Courier Routes</h2>
                 <div className="text-gray-600 text-sm mt-1">
-                  Total Routes: {routes.length} ({routes.filter(r => r.is_active).length} active)
+                  Total Routes: {routesTotal}
                 </div>
               </div>
               <button
@@ -1517,9 +1756,77 @@ export default function AdminPage() {
               </button>
             </div>
 
+            {/* Search and Filters */}
+            <div className="bg-white rounded-lg shadow p-4 mb-6">
+              <div className="flex flex-col gap-4">
+                {/* Search Input */}
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1 max-w-md">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Search by courier name or email..."
+                      value={routeSearchQuery}
+                      onChange={(e) => setRouteSearchQuery(e.target.value)}
+                      className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                    {routeSearchQuery && (
+                      <button
+                        onClick={() => setRouteSearchQuery('')}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                      >
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Filters Row */}
+                <div className="flex items-center gap-6 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700">Status:</label>
+                    <select
+                      value={routeActiveFilter}
+                      onChange={(e) => setRouteActiveFilter(e.target.value)}
+                      className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="all">All Routes</option>
+                      <option value="active">Active Only</option>
+                      <option value="inactive">Inactive Only</option>
+                    </select>
+                  </div>
+
+                  <div className="text-sm text-gray-600 ml-auto">
+                    Showing {routes.length} of {routesTotal} routes
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {routes.length === 0 ? (
               <div className="bg-white rounded-lg shadow p-8 text-center">
-                <div className="text-gray-600">No courier routes found</div>
+                <div className="text-gray-600 mb-4">
+                  {routesTotal === 0
+                    ? 'No courier routes found'
+                    : 'No routes match the selected filter'}
+                </div>
+                {(routesTotal > 0 || routeSearchQuery) && (
+                  <button
+                    onClick={() => {
+                      setRouteActiveFilter('all')
+                      setRouteSearchQuery('')
+                    }}
+                    className="text-purple-600 hover:text-purple-700 text-sm underline"
+                  >
+                    Clear filters
+                  </button>
+                )}
               </div>
             ) : (
               <div className="bg-white rounded-lg shadow overflow-x-auto">
@@ -1602,6 +1909,31 @@ export default function AdminPage() {
                     ))}
                   </tbody>
                 </table>
+
+                {/* Pagination Controls */}
+                {routesTotal > routesLimit && (
+                  <div className="bg-gray-50 px-6 py-3 flex items-center justify-between border-t border-gray-200">
+                    <div className="text-sm text-gray-700">
+                      Page {routesPage + 1} of {Math.ceil(routesTotal / routesLimit)}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setRoutesPage(Math.max(0, routesPage - 1))}
+                        disabled={routesPage === 0}
+                        className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        onClick={() => setRoutesPage(routesPage + 1)}
+                        disabled={(routesPage + 1) * routesLimit >= routesTotal}
+                        className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

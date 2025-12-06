@@ -601,9 +601,67 @@ export interface AdminRoute {
   created_at: string
 }
 
+// Paginated response types
+export interface PaginatedUsersResponse {
+  users: AdminUser[]
+  total: number
+  skip: number
+  limit: number
+}
+
+export interface PaginatedPackagesResponse {
+  packages: AdminPackage[]
+  total: number
+  skip: number
+  limit: number
+}
+
+export interface UserFilters {
+  role?: string
+  is_verified?: boolean
+  is_active?: boolean
+  search?: string
+}
+
+export interface PackageFilters {
+  status?: string
+  is_active?: boolean
+  bid_status?: string
+  search?: string
+}
+
+export interface PaginatedRoutesResponse {
+  routes: AdminRoute[]
+  total: number
+  skip: number
+  limit: number
+}
+
+export interface RouteFilters {
+  active_only?: boolean
+  search?: string
+}
+
 export const adminAPI = {
   // Users
-  getUsers: () => api.get<AdminUser[]>('/admin/users'),
+  getUsers: (skip: number = 0, limit: number = 20, filters?: UserFilters) => {
+    const params = new URLSearchParams()
+    params.append('skip', skip.toString())
+    params.append('limit', limit.toString())
+    if (filters?.role && filters.role !== 'all') {
+      params.append('role', filters.role)
+    }
+    if (filters?.is_verified !== undefined) {
+      params.append('is_verified', filters.is_verified.toString())
+    }
+    if (filters?.is_active !== undefined) {
+      params.append('is_active', filters.is_active.toString())
+    }
+    if (filters?.search && filters.search.trim()) {
+      params.append('search', filters.search.trim())
+    }
+    return api.get<PaginatedUsersResponse>(`/admin/users?${params.toString()}`)
+  },
   getUser: (userId: number) => api.get<AdminUser>(`/admin/users/${userId}`),
   createUser: (data: CreateUserData) => api.post<AdminUser>('/admin/users', data),
   updateUserRole: (userId: number, role: string) =>
@@ -620,20 +678,40 @@ export const adminAPI = {
     api.put(`/admin/users/${userId}/profile`, data),
 
   // Packages
-  getPackages: (bidStatus?: string) => {
+  getPackages: (skip: number = 0, limit: number = 20, filters?: PackageFilters) => {
     const params = new URLSearchParams()
-    if (bidStatus && bidStatus !== 'all') {
-      params.append('bid_status', bidStatus)
+    params.append('skip', skip.toString())
+    params.append('limit', limit.toString())
+    if (filters?.status && filters.status !== 'all') {
+      params.append('status', filters.status)
     }
-    const queryString = params.toString()
-    return api.get<AdminPackage[]>(`/admin/packages${queryString ? `?${queryString}` : ''}`)
+    if (filters?.is_active !== undefined) {
+      params.append('is_active', filters.is_active.toString())
+    }
+    if (filters?.bid_status && filters.bid_status !== 'all') {
+      params.append('bid_status', filters.bid_status)
+    }
+    if (filters?.search && filters.search.trim()) {
+      params.append('search', filters.search.trim())
+    }
+    return api.get<PaginatedPackagesResponse>(`/admin/packages?${params.toString()}`)
   },
   togglePackageActive: (packageId: number, isActive: boolean) =>
     api.put(`/admin/packages/${packageId}/toggle-active`, { is_active: isActive }),
 
   // Routes
-  getRoutes: (activeOnly: boolean = false) =>
-    api.get<AdminRoute[]>(`/admin/routes?active_only=${activeOnly}`),
+  getRoutes: (skip: number = 0, limit: number = 20, filters?: RouteFilters) => {
+    const params = new URLSearchParams()
+    params.append('skip', skip.toString())
+    params.append('limit', limit.toString())
+    if (filters?.active_only !== undefined) {
+      params.append('active_only', filters.active_only.toString())
+    }
+    if (filters?.search && filters.search.trim()) {
+      params.append('search', filters.search.trim())
+    }
+    return api.get<PaginatedRoutesResponse>(`/admin/routes?${params.toString()}`)
+  },
   createRoute: (data: AdminRouteCreate) =>
     api.post<AdminRoute>('/admin/routes', data),
 

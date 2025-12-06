@@ -91,6 +91,20 @@ class PackageAdminResponse(BaseModel):
         from_attributes = True
 
 
+class PaginatedUsersResponse(BaseModel):
+    users: List[UserAdminResponse]
+    total: int
+    skip: int
+    limit: int
+
+
+class PaginatedPackagesResponse(BaseModel):
+    packages: List[PackageAdminResponse]
+    total: int
+    skip: int
+    limit: int
+
+
 class PlatformStats(BaseModel):
     total_users: int
     total_senders: int
@@ -167,6 +181,13 @@ class CourierRouteAdminResponse(BaseModel):
         from_attributes = True
 
 
+class PaginatedRoutesResponse(BaseModel):
+    routes: List[CourierRouteAdminResponse]
+    total: int
+    skip: int
+    limit: int
+
+
 class AdminRouteCreate(BaseModel):
     """Model for admin to create a route for a courier."""
     courier_id: int = Field(..., description="ID of the courier to assign the route to")
@@ -182,27 +203,72 @@ class AdminRouteCreate(BaseModel):
 
 
 # Admin User Management Endpoints
-@router.get("/users", response_model=List[UserAdminResponse])
+@router.get("/users", response_model=PaginatedUsersResponse)
 async def get_all_users(
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 20,
+    role: str | None = Query(None, description="Filter by role: sender, courier, both, admin"),
+    is_verified: bool | None = Query(None, description="Filter by email verification status"),
+    is_active: bool | None = Query(None, description="Filter by active status"),
+    search: str | None = Query(None, description="Search by first name, last name, or email"),
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
 ):
     """
-    Get all users in the system (admin only).
+    Get all users in the system with pagination (admin only).
 
     Args:
         skip: Number of records to skip (pagination)
         limit: Maximum number of records to return
+        role: Filter by user role
+        is_verified: Filter by email verification status
+        is_active: Filter by active status
+        search: Search term for first name, last name, or email
         db: Database session
         admin: Current admin user
 
     Returns:
-        List of all users
+        Paginated list of users with total count
     """
-    users = db.query(User).offset(skip).limit(limit).all()
-    return users
+    query = db.query(User)
+
+    # Apply search filter
+    if search:
+        search_term = f"%{search.strip().lower()}%"
+        query = query.filter(
+            or_(
+                func.lower(User.first_name).like(search_term),
+                func.lower(User.last_name).like(search_term),
+                func.lower(User.email).like(search_term)
+            )
+        )
+
+    # Apply filters
+    if role:
+        try:
+            user_role = UserRole[role.upper()]
+            query = query.filter(User.role == user_role)
+        except KeyError:
+            pass  # Invalid role, ignore filter
+
+    if is_verified is not None:
+        query = query.filter(User.is_verified == is_verified)
+
+    if is_active is not None:
+        query = query.filter(User.is_active == is_active)
+
+    # Get total count before pagination
+    total = query.count()
+
+    # Apply pagination
+    users = query.order_by(User.created_at.desc()).offset(skip).limit(limit).all()
+
+    return PaginatedUsersResponse(
+        users=users,
+        total=total,
+        skip=skip,
+        limit=limit
+    )
 
 
 @router.post("/users", status_code=status.HTTP_201_CREATED, response_model=UserAdminResponse)
@@ -869,11 +935,14 @@ async def delete_user(
 
 
 # Admin Package Management Endpoints
-@router.get("/packages", response_model=List[PackageAdminResponse])
+@router.get("/packages", response_model=PaginatedPackagesResponse)
 async def get_all_packages(
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 20,
+    status: str | None = Query(None, description="Filter by package status"),
+    is_active: bool | None = Query(None, description="Filter by active status"),
     bid_status: str | None = Query(None, description="Filter by bid status: no_bids, has_bids, has_selected_bid"),
+    search: str | None = Query(None, description="Search by tracking ID or sender name"),
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
 ):
@@ -883,15 +952,42 @@ async def get_all_packages(
     Args:
         skip: Number of records to skip (pagination)
         limit: Maximum number of records to return
+        status: Filter by package status
+        is_active: Filter by active status
         bid_status: Filter by bid status (no_bids, has_bids, has_selected_bid)
+        search: Search term for tracking ID or sender name
         db: Database session
         admin: Current admin user
 
     Returns:
-        List of all packages with bid counts and matched routes counts
+        Paginated list of packages with bid counts and matched routes counts
     """
     # Build base query with ordering (newest first)
     query = db.query(Package).order_by(Package.created_at.desc())
+
+    # Apply search filter
+    if search:
+        search_term = f"%{search.strip().lower()}%"
+        # Join with User table to search by sender name
+        query = query.join(User, Package.sender_id == User.id).filter(
+            or_(
+                func.lower(Package.tracking_id).like(search_term),
+                func.lower(User.first_name).like(search_term),
+                func.lower(User.last_name).like(search_term)
+            )
+        )
+
+    # Apply status filter
+    if status:
+        try:
+            package_status = PackageStatus[status.upper()]
+            query = query.filter(Package.status == package_status)
+        except KeyError:
+            pass  # Invalid status, ignore filter
+
+    # Apply is_active filter
+    if is_active is not None:
+        query = query.filter(Package.is_active == is_active)
 
     # Apply bid_status filter at DB level using subqueries for efficiency
     if bid_status:
@@ -919,6 +1015,9 @@ async def get_all_packages(
         elif bid_status == "has_selected_bid":
             # Packages with a selected bid
             query = query.filter(Package.selected_bid_id != None)
+
+    # Get total count before pagination
+    total = query.count()
 
     # Apply pagination at DB level BEFORE fetching
     packages = query.offset(skip).limit(limit).all()
@@ -971,35 +1070,56 @@ async def get_all_packages(
             has_selected_bid=has_selected_bid,
         ))
 
-    return result
+    return PaginatedPackagesResponse(
+        packages=result,
+        total=total,
+        skip=skip,
+        limit=limit
+    )
 
 
 # Admin Route Management Endpoints
-@router.get("/routes", response_model=List[CourierRouteAdminResponse])
+@router.get("/routes", response_model=PaginatedRoutesResponse)
 async def get_all_routes(
-    active_only: bool = False,
+    active_only: bool | None = Query(None, description="Filter by active status"),
+    search: str | None = Query(None, description="Search by courier name or email"),
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 20,
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin_user)
 ):
     """
-    Get all courier routes with courier information (admin only).
+    Get all courier routes with courier information and pagination (admin only).
 
     Args:
-        active_only: If True, only return active routes
+        active_only: If True, only return active routes. If False, only inactive. If None, return all.
+        search: Search term for courier name or email
         skip: Number of records to skip (pagination)
         limit: Maximum number of records to return
         db: Database session
         admin: Current admin user
 
     Returns:
-        List of all courier routes with courier details
+        Paginated list of courier routes with courier details
     """
     query = db.query(CourierRoute).join(User, CourierRoute.courier_id == User.id)
 
-    if active_only:
-        query = query.filter(CourierRoute.is_active == True)
+    # Apply search filter
+    if search:
+        search_term = f"%{search.strip().lower()}%"
+        query = query.filter(
+            or_(
+                func.lower(User.first_name).like(search_term),
+                func.lower(User.last_name).like(search_term),
+                func.lower(User.email).like(search_term)
+            )
+        )
+
+    if active_only is not None:
+        query = query.filter(CourierRoute.is_active == active_only)
+
+    # Get total count before pagination
+    total = query.count()
 
     routes = query.order_by(desc(CourierRoute.created_at)).offset(skip).limit(limit).all()
 
@@ -1025,7 +1145,12 @@ async def get_all_routes(
             created_at=route.created_at
         ))
 
-    return result
+    return PaginatedRoutesResponse(
+        routes=result,
+        total=total,
+        skip=skip,
+        limit=limit
+    )
 
 
 @router.post("/routes", status_code=status.HTTP_201_CREATED, response_model=CourierRouteAdminResponse)
