@@ -76,14 +76,16 @@ export default function IDVerificationCompletePage() {
       hasChecked.current = true
 
       try {
-        const response = await idVerificationAPI.getStatus()
+        // Use refreshStatus to poll Stripe directly (works without webhooks in local dev)
+        const response = await idVerificationAPI.refreshStatus()
         const isTerminal = processVerificationStatus(response.data)
 
         // Start polling if not in a terminal state
         if (!isTerminal && !pollIntervalRef.current) {
           pollIntervalRef.current = setInterval(async () => {
             try {
-              const pollResponse = await idVerificationAPI.getStatus()
+              // Use refreshStatus for polling too - it fetches latest status from Stripe
+              const pollResponse = await idVerificationAPI.refreshStatus()
               processVerificationStatus(pollResponse.data)
             } catch (error) {
               console.error('Polling error:', error)

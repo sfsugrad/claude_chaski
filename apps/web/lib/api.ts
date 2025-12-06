@@ -1361,6 +1361,10 @@ export const idVerificationAPI = {
   cancelVerification: () =>
     api.post('/id-verification/cancel'),
 
+  // Refresh verification status from Stripe (polls Stripe directly, useful for local dev without webhooks)
+  refreshStatus: () =>
+    api.post<IDVerificationStatusResponse>('/id-verification/refresh'),
+
   // Admin endpoints
   admin: {
     // Get pending verifications

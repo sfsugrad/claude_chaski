@@ -246,6 +246,98 @@ async def cancel_verification(
     return {"message": "Verification cancelled successfully"}
 
 
+@router.post("/refresh", response_model=VerificationStatusResponse)
+async def refresh_verification_status(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Manually refresh verification status from Stripe.
+
+    Useful for local development without webhooks or when webhook delivery fails.
+    This endpoint polls Stripe for the current session status and updates the local record.
+    """
+    _require_courier_role(current_user)
+
+    # Find the most recent verification
+    verification = db.query(IDVerification).filter(
+        IDVerification.user_id == current_user.id
+    ).order_by(IDVerification.created_at.desc()).first()
+
+    if not verification:
+        return VerificationStatusResponse(
+            is_verified=False,
+            status=None,
+            can_start_verification=True,
+            verification=None
+        )
+
+    # Only refresh if in pending/processing state
+    if verification.status in [IDVerificationStatus.PENDING, IDVerificationStatus.PROCESSING]:
+        identity_service = get_stripe_identity_service()
+
+        # Fetch current status from Stripe
+        session_data = await identity_service.get_verification_session(
+            verification.stripe_verification_session_id
+        )
+
+        if session_data:
+            stripe_status = session_data.get("status")
+
+            # Map Stripe status to our status
+            if stripe_status == "verified":
+                verification.status = IDVerificationStatus.VERIFIED
+                verification.completed_at = datetime.now()
+
+                # Get report ID if available
+                if session_data.get("last_verification_report"):
+                    verification.stripe_verification_report_id = session_data["last_verification_report"]
+
+                # Update user's id_verified status
+                current_user.id_verified = True
+                db.commit()
+
+            elif stripe_status == "requires_input":
+                last_error = session_data.get("last_error")
+                if last_error:
+                    verification.failure_reason = str(last_error.get("reason", last_error)) if isinstance(last_error, dict) else str(last_error)
+                    verification.failure_code = last_error.get("code") if isinstance(last_error, dict) else None
+                    verification.status = IDVerificationStatus.REQUIRES_REVIEW
+                else:
+                    verification.status = IDVerificationStatus.PENDING
+                db.commit()
+
+            elif stripe_status == "processing":
+                if verification.status != IDVerificationStatus.PROCESSING:
+                    verification.status = IDVerificationStatus.PROCESSING
+                    verification.submitted_at = datetime.now()
+                    db.commit()
+
+            elif stripe_status == "canceled":
+                verification.status = IDVerificationStatus.EXPIRED
+                verification.completed_at = datetime.now()
+                db.commit()
+
+    # Return current status
+    return VerificationStatusResponse(
+        is_verified=current_user.id_verified,
+        status=verification.status.value if verification else None,
+        can_start_verification=verification.status in [
+            IDVerificationStatus.FAILED,
+            IDVerificationStatus.ADMIN_REJECTED,
+            IDVerificationStatus.EXPIRED
+        ] if verification else True,
+        verification={
+            "id": verification.id,
+            "status": verification.status.value,
+            "created_at": verification.created_at.isoformat() if verification.created_at else None,
+            "completed_at": verification.completed_at.isoformat() if verification.completed_at else None,
+            "rejection_reason": verification.rejection_reason,
+            "failure_reason": verification.failure_reason
+        } if verification else None
+    )
+
+
 # ==================== Webhook Endpoint ====================
 
 @router.post("/webhook")
