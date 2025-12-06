@@ -8,7 +8,39 @@ import ResetPasswordPage from '../page'
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
   useSearchParams: jest.fn(),
+  usePathname: jest.fn(() => '/en/reset-password'),
 }))
+
+// Mock next-intl
+jest.mock('next-intl', () => ({
+  useTranslations: () => (key: string) => {
+    const translations: Record<string, string> = {
+      resetPasswordTitle: 'Reset your password',
+      newPassword: 'New password',
+      confirmNewPassword: 'Confirm password',
+      resetPasswordButton: 'Reset password',
+      signIn: 'Sign in',
+      invalidResetLink: 'Invalid reset link. Please request a new one.',
+      requestNewLink: 'Request a new reset link',
+      allFieldsRequired: 'Please fill in all fields',
+      passwordTooShort: 'Password must be at least 8 characters',
+      passwordsDoNotMatch: 'Passwords do not match',
+      passwordResetSuccess: 'Password reset successful! Redirecting to login...',
+      resetFailed: 'An error occurred. Please try again.',
+      resetting: 'Resetting...',
+      passwordRequirements: 'Password must be at least 8 characters',
+    }
+    return translations[key] || key
+  },
+  useLocale: () => 'en',
+}))
+
+// Mock LanguageSwitcher
+jest.mock('@/components/LanguageSwitcher', () => {
+  return function MockLanguageSwitcher() {
+    return <div data-testid="language-switcher">EN</div>
+  }
+})
 
 // Mock the API functions
 const mockResetPassword = jest.fn()

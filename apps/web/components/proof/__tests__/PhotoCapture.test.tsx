@@ -178,7 +178,7 @@ describe('PhotoCapture Component', () => {
       fireEvent.change(fileInput, { target: { files: [file] } });
 
       await waitFor(() => {
-        const preview = screen.getByAlt('Captured proof');
+        const preview = screen.getByAltText('Captured proof');
         expect(preview).toBeInTheDocument();
         expect(preview).toHaveAttribute('src', 'data:image/png;base64,mockImageData');
       });
@@ -318,13 +318,13 @@ describe('PhotoCapture Component', () => {
       fireEvent.change(fileInput, { target: { files: [file] } });
 
       await waitFor(() => {
-        expect(screen.getByAlt('Captured proof')).toBeInTheDocument();
+        expect(screen.getByAltText('Captured proof')).toBeInTheDocument();
       });
 
       const clearButton = screen.getByText('Clear');
       fireEvent.click(clearButton);
 
-      expect(screen.queryByAlt('Captured proof')).not.toBeInTheDocument();
+      expect(screen.queryByAltText('Captured proof')).not.toBeInTheDocument();
       expect(screen.getByText('Take Photo or Upload')).toBeInTheDocument();
     });
 

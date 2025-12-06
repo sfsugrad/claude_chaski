@@ -2,6 +2,17 @@ import React from 'react'
 import { render, screen } from '@testing-library/react'
 import GoogleSignInButton from '../GoogleSignInButton'
 
+// Override the global next-intl mock to return readable text for tests
+jest.mock('next-intl', () => ({
+  useTranslations: () => (key: string) => {
+    const translations: Record<string, string> = {
+      continueWithGoogle: 'Continue with Google',
+    }
+    return translations[key] || key
+  },
+  useLocale: () => 'en',
+}))
+
 describe('GoogleSignInButton', () => {
   describe('Rendering', () => {
     it('renders button with Google text', () => {

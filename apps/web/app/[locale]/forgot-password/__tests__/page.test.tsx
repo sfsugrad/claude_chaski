@@ -3,6 +3,67 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ForgotPasswordPage from '../page'
 
+// Mock next/navigation
+jest.mock('next/navigation', () => ({
+  useRouter: jest.fn(() => ({
+    push: jest.fn(),
+  })),
+  usePathname: jest.fn(() => '/en/forgot-password'),
+}))
+
+// Mock next-intl
+jest.mock('next-intl', () => ({
+  useTranslations: () => (key: string) => {
+    const translations: Record<string, string> = {
+      forgotPasswordTitle: 'Forgot your password?',
+      forgotPasswordDescription: 'Enter your email address and we will send you a reset link.',
+      email: 'Email',
+      sendResetLink: 'Send reset link',
+      backToSignIn: 'Back to sign in',
+      signIn: 'Sign in',
+      emailRequired: 'Please enter your email address',
+      resetLinkSent: 'Reset link sent! Check your email.',
+      requestFailed: 'Failed to send reset link. Please try again.',
+      sending: 'Sending...',
+    }
+    return translations[key] || key
+  },
+  useLocale: () => 'en',
+}))
+
+// Mock LanguageSwitcher
+jest.mock('@/components/LanguageSwitcher', () => {
+  return function MockLanguageSwitcher() {
+    return <div data-testid="language-switcher">EN</div>
+  }
+})
+
+// Mock UI components
+jest.mock('@/components/ui', () => ({
+  Button: ({ children, isLoading, ...props }: any) => (
+    <button {...props}>{isLoading ? 'Sending...' : children}</button>
+  ),
+  Input: ({ label, leftIcon, error, helperText, ...props }: any) => (
+    <div className="form-group w-full">
+      {label && <label htmlFor={props.id} className="label">{label}</label>}
+      <div className="relative input-group">
+        {leftIcon && <span className="input-group-icon">{leftIcon}</span>}
+        <input {...props} className="input pl-10" />
+      </div>
+      {error && <p className="error-text">{error}</p>}
+      {helperText && <p className="helper-text">{helperText}</p>}
+    </div>
+  ),
+  Card: ({ children, className }: any) => <div className={`card ${className || ''}`}>{children}</div>,
+  CardBody: ({ children, className }: any) => <div className={`card-body ${className || ''}`}>{children}</div>,
+  Alert: ({ children, variant, dismissible, onDismiss }: any) => (
+    <div role="alert" className={`alert alert-${variant}`}>
+      {children}
+      {dismissible && <button onClick={onDismiss} aria-label="Dismiss">X</button>}
+    </div>
+  ),
+}))
+
 // Mock the API functions
 const mockForgotPassword = jest.fn()
 

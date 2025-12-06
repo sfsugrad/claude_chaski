@@ -7,7 +7,35 @@ import VerifyEmailPage from '../page'
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
   useSearchParams: jest.fn(),
+  usePathname: jest.fn(() => '/en/verify-email'),
 }))
+
+// Mock next-intl
+jest.mock('next-intl', () => ({
+  useTranslations: () => (key: string) => {
+    const translations: Record<string, string> = {
+      title: 'Email Verification',
+      verifying: 'Verifying your email...',
+      success: 'Success!',
+      successMessage: 'Your email has been verified successfully!',
+      redirecting: 'Redirecting to login page...',
+      failed: 'Verification Failed',
+      invalidLink: 'Invalid verification link',
+      failedMessage: 'Email verification failed. The link may be invalid or expired.',
+      goToLogin: 'Go to Login',
+      registerAgain: 'Register Again',
+    }
+    return translations[key] || key
+  },
+  useLocale: () => 'en',
+}))
+
+// Mock LanguageSwitcher
+jest.mock('@/components/LanguageSwitcher', () => {
+  return function MockLanguageSwitcher() {
+    return <div data-testid="language-switcher">EN</div>
+  }
+})
 
 // Mock the verificationAPI
 const mockVerifyEmail = jest.fn()

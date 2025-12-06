@@ -534,10 +534,16 @@ export interface AdminStats {
 export interface CreateUserData {
   email: string
   password: string
-  full_name: string
+  first_name: string
+  middle_name?: string
+  last_name: string
   role: string
-  phone_number?: string
+  phone_number: string
   max_deviation_km?: number
+  default_address?: string
+  default_address_lat?: number
+  default_address_lng?: number
+  preferred_language?: string
 }
 
 export interface MatchingJobResult {

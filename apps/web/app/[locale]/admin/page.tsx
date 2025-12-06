@@ -56,11 +56,19 @@ export default function AdminPage() {
   const [newUserData, setNewUserData] = useState({
     email: '',
     password: '',
-    full_name: '',
+    confirmPassword: '',
+    first_name: '',
+    middle_name: '',
+    last_name: '',
     role: 'sender',
     phone_number: '',
-    max_deviation_km: 5
+    max_deviation_km: 5,
+    default_address: '',
+    default_address_lat: 0,
+    default_address_lng: 0,
+    preferred_language: 'en'
   })
+  const [createUserError, setCreateUserError] = useState('')
   const [matchingJobRunning, setMatchingJobRunning] = useState(false)
   const [matchingJobResult, setMatchingJobResult] = useState<MatchingJobResult | null>(null)
   const [showCreateRouteModal, setShowCreateRouteModal] = useState(false)
@@ -339,25 +347,123 @@ export default function AdminPage() {
     }
   }
 
+  // Password validation helpers
+  const validatePasswordRequirements = (password: string) => {
+    return {
+      minLength: password.length >= 12,
+      hasUppercase: /[A-Z]/.test(password),
+      hasLowercase: /[a-z]/.test(password),
+      hasDigit: /\d/.test(password),
+      hasSpecial: /[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\\/;`~]/.test(password),
+    }
+  }
+
+  const isPasswordValid = (password: string) => {
+    const reqs = validatePasswordRequirements(password)
+    return Object.values(reqs).every(Boolean)
+  }
+
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault()
+    setCreateUserError('')
+
+    // Validate first name
+    if (!newUserData.first_name.trim() || newUserData.first_name.trim().length < 2) {
+      setCreateUserError('First name must be at least 2 characters')
+      return
+    }
+
+    // Validate last name
+    if (!newUserData.last_name.trim() || newUserData.last_name.trim().length < 2) {
+      setCreateUserError('Last name must be at least 2 characters')
+      return
+    }
+
+    // Validate phone number (E.164 format)
+    const phoneRegex = /^\+1\d{10}$/
+    if (!phoneRegex.test(newUserData.phone_number)) {
+      setCreateUserError('Phone number must be in US format (+1XXXXXXXXXX)')
+      return
+    }
+
+    // Validate password strength
+    if (!isPasswordValid(newUserData.password)) {
+      setCreateUserError('Password must be at least 12 characters with uppercase, lowercase, digit, and special character')
+      return
+    }
+
+    // Validate password confirmation
+    if (newUserData.password !== newUserData.confirmPassword) {
+      setCreateUserError('Passwords do not match')
+      return
+    }
+
+    // Validate default address for sender/both roles
+    if ((newUserData.role === 'sender' || newUserData.role === 'both') && newUserData.default_address && !newUserData.default_address_lat) {
+      setCreateUserError('Please select a valid address from the suggestions')
+      return
+    }
+
     try {
-      await adminAPI.createUser(newUserData)
+      // Prepare data for API (exclude confirmPassword and clean up optional fields)
+      const { confirmPassword, ...rawData } = newUserData
+      const apiData = {
+        email: rawData.email,
+        password: rawData.password,
+        first_name: rawData.first_name.trim(),
+        last_name: rawData.last_name.trim(),
+        role: rawData.role,
+        phone_number: rawData.phone_number,
+        preferred_language: rawData.preferred_language,
+        // Only include optional fields if they have values
+        ...(rawData.middle_name?.trim() && { middle_name: rawData.middle_name.trim() }),
+        ...(rawData.default_address?.trim() && {
+          default_address: rawData.default_address.trim(),
+          default_address_lat: rawData.default_address_lat,
+          default_address_lng: rawData.default_address_lng,
+        }),
+        // Only include max_deviation_km for courier/both roles
+        ...((rawData.role === 'courier' || rawData.role === 'both') && { max_deviation_km: rawData.max_deviation_km }),
+      }
+      await adminAPI.createUser(apiData)
       await loadData()
       setShowCreateUserModal(false)
       setNewUserData({
         email: '',
         password: '',
-        full_name: '',
+        confirmPassword: '',
+        first_name: '',
+        middle_name: '',
+        last_name: '',
         role: 'sender',
         phone_number: '',
-        max_deviation_km: 5
+        max_deviation_km: 5,
+        default_address: '',
+        default_address_lat: 0,
+        default_address_lng: 0,
+        preferred_language: 'en'
       })
+      setCreateUserError('')
       alert('User created successfully')
     } catch (err: any) {
       console.error('Error creating user:', err)
-      const errorMessage = err.response?.data?.detail || 'Failed to create user'
-      alert(errorMessage)
+      console.error('Error response:', err.response?.data)
+      const errorDetail = err.response?.data?.detail
+      let errorMessage = 'Failed to create user'
+      if (typeof errorDetail === 'string') {
+        errorMessage = errorDetail
+      } else if (errorDetail?.message) {
+        errorMessage = errorDetail.message
+        if (errorDetail.errors && Array.isArray(errorDetail.errors)) {
+          errorMessage += ': ' + errorDetail.errors.join(', ')
+        }
+      } else if (Array.isArray(errorDetail)) {
+        // Pydantic validation errors come as an array
+        errorMessage = errorDetail.map((e: any) => e.msg || e.message || JSON.stringify(e)).join(', ')
+      } else if (errorDetail) {
+        errorMessage = JSON.stringify(errorDetail)
+      }
+      setCreateUserError(errorMessage)
     }
   }
 
@@ -1504,12 +1610,15 @@ export default function AdminPage() {
 
       {/* Create User Modal */}
       {showCreateUserModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold">Create New User</h3>
               <button
-                onClick={() => setShowCreateUserModal(false)}
+                onClick={() => {
+                  setShowCreateUserModal(false)
+                  setCreateUserError('')
+                }}
                 className="text-gray-500 hover:text-gray-700"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1518,7 +1627,58 @@ export default function AdminPage() {
               </button>
             </div>
 
+            {createUserError && (
+              <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded text-sm">
+                {createUserError}
+              </div>
+            )}
+
             <form onSubmit={handleCreateUser} className="space-y-4">
+              {/* Name Fields */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    First Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    minLength={2}
+                    value={newUserData.first_name}
+                    onChange={(e) => setNewUserData({ ...newUserData, first_name: e.target.value })}
+                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="John"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Last Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    minLength={2}
+                    value={newUserData.last_name}
+                    onChange={(e) => setNewUserData({ ...newUserData, last_name: e.target.value })}
+                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="Doe"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Middle Name
+                </label>
+                <input
+                  type="text"
+                  value={newUserData.middle_name}
+                  onChange={(e) => setNewUserData({ ...newUserData, middle_name: e.target.value })}
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="(Optional)"
+                />
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Email *
@@ -1540,83 +1700,158 @@ export default function AdminPage() {
                 <input
                   type="password"
                   required
-                  minLength={8}
+                  minLength={12}
                   value={newUserData.password}
                   onChange={(e) => setNewUserData({ ...newUserData, password: e.target.value })}
                   className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  placeholder="At least 8 characters"
+                  placeholder="At least 12 characters"
                 />
+                {/* Password Requirements */}
+                {newUserData.password && (
+                  <div className="mt-2 p-2 bg-gray-50 rounded border text-xs">
+                    <p className="font-medium mb-1">Password requirements:</p>
+                    <ul className="space-y-0.5">
+                      {[
+                        { key: 'minLength', label: '12+ characters', met: validatePasswordRequirements(newUserData.password).minLength },
+                        { key: 'hasUppercase', label: 'Uppercase (A-Z)', met: validatePasswordRequirements(newUserData.password).hasUppercase },
+                        { key: 'hasLowercase', label: 'Lowercase (a-z)', met: validatePasswordRequirements(newUserData.password).hasLowercase },
+                        { key: 'hasDigit', label: 'Digit (0-9)', met: validatePasswordRequirements(newUserData.password).hasDigit },
+                        { key: 'hasSpecial', label: 'Special char (!@#$...)', met: validatePasswordRequirements(newUserData.password).hasSpecial },
+                      ].map((item) => (
+                        <li key={item.key} className={`flex items-center gap-1 ${item.met ? 'text-green-600' : 'text-red-600'}`}>
+                          {item.met ? '✓' : '✗'} {item.label}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Full Name *
+                  Confirm Password *
                 </label>
                 <input
-                  type="text"
+                  type="password"
                   required
-                  value={newUserData.full_name}
-                  onChange={(e) => setNewUserData({ ...newUserData, full_name: e.target.value })}
-                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  placeholder="John Doe"
+                  value={newUserData.confirmPassword}
+                  onChange={(e) => setNewUserData({ ...newUserData, confirmPassword: e.target.value })}
+                  className={`w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                    newUserData.confirmPassword && newUserData.password !== newUserData.confirmPassword
+                      ? 'border-red-500'
+                      : 'border-gray-300'
+                  }`}
+                  placeholder="Confirm password"
                 />
+                {newUserData.confirmPassword && newUserData.password !== newUserData.confirmPassword && (
+                  <p className="text-red-500 text-xs mt-1">Passwords do not match</p>
+                )}
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Role *
-                </label>
-                <select
-                  required
-                  value={newUserData.role}
-                  onChange={(e) => setNewUserData({ ...newUserData, role: e.target.value })}
-                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="sender">Sender</option>
-                  <option value="courier">Courier</option>
-                  <option value="both">Both</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Phone Number
+                  Phone Number *
                 </label>
                 <input
                   type="tel"
+                  required
                   value={newUserData.phone_number}
                   onChange={(e) => setNewUserData({ ...newUserData, phone_number: e.target.value })}
                   className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  placeholder="+1234567890"
+                  placeholder="+12125551234"
                 />
+                <p className="text-xs text-gray-500 mt-1">US format: +1 followed by 10 digits</p>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Max Deviation (miles)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="50"
-                  step="0.5"
-                  value={kmToMiles(newUserData.max_deviation_km).toFixed(1)}
-                  onChange={(e) => setNewUserData({ ...newUserData, max_deviation_km: milesToKm(parseFloat(e.target.value) || 3) })}
-                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Role *
+                  </label>
+                  <select
+                    required
+                    value={newUserData.role}
+                    onChange={(e) => setNewUserData({ ...newUserData, role: e.target.value })}
+                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="sender">Sender</option>
+                    <option value="courier">Courier</option>
+                    <option value="both">Both</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Language
+                  </label>
+                  <select
+                    value={newUserData.preferred_language}
+                    onChange={(e) => setNewUserData({ ...newUserData, preferred_language: e.target.value })}
+                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="en">English</option>
+                    <option value="fr">Français</option>
+                    <option value="es">Español</option>
+                  </select>
+                </div>
               </div>
+
+              {/* Default Address - Only for sender or both roles */}
+              {(newUserData.role === 'sender' || newUserData.role === 'both') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Default Address
+                  </label>
+                  <AddressAutocomplete
+                    id="default_address"
+                    name="default_address"
+                    value={newUserData.default_address}
+                    onChange={(address, lat, lng) => setNewUserData({
+                      ...newUserData,
+                      default_address: address,
+                      default_address_lat: lat,
+                      default_address_lng: lng
+                    })}
+                    placeholder="Enter default pickup address"
+                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Optional default address for package pickups</p>
+                </div>
+              )}
+
+              {/* Max Deviation - Only for courier or both roles */}
+              {(newUserData.role === 'courier' || newUserData.role === 'both') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Max Deviation (miles)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="50"
+                    step="0.5"
+                    value={kmToMiles(newUserData.max_deviation_km).toFixed(1)}
+                    onChange={(e) => setNewUserData({ ...newUserData, max_deviation_km: milesToKm(parseFloat(e.target.value) || 5) })}
+                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">How far off route to look for packages (1-50 miles)</p>
+                </div>
+              )}
 
               <div className="flex gap-3 mt-6">
                 <button
                   type="submit"
-                  className="flex-1 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition"
+                  disabled={!isPasswordValid(newUserData.password) || newUserData.password !== newUserData.confirmPassword}
+                  className="flex-1 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Create User
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowCreateUserModal(false)}
+                  onClick={() => {
+                    setShowCreateUserModal(false)
+                    setCreateUserError('')
+                  }}
                   className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400 transition"
                 >
                   Cancel

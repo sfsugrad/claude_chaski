@@ -13,9 +13,12 @@ jest.mock('next/navigation', () => ({
 const mockGetCurrentUser = jest.fn()
 const mockGetUser = jest.fn()
 const mockGetPackages = jest.fn()
+const mockGetRoutes = jest.fn()
 const mockUpdateUserRole = jest.fn()
 const mockToggleUserActive = jest.fn()
 const mockToggleUserVerified = jest.fn()
+const mockToggleUserPhoneVerified = jest.fn()
+const mockToggleUserIdVerified = jest.fn()
 const mockUpdateUserProfile = jest.fn()
 
 jest.mock('@/lib/api', () => ({
@@ -31,9 +34,12 @@ jest.mock('@/lib/api', () => ({
   adminAPI: {
     getUser: (userId: number) => mockGetUser(userId),
     getPackages: () => mockGetPackages(),
+    getRoutes: () => mockGetRoutes(),
     updateUserRole: (userId: number, role: string) => mockUpdateUserRole(userId, role),
     toggleUserActive: (userId: number, isActive: boolean) => mockToggleUserActive(userId, isActive),
     toggleUserVerified: (userId: number, isVerified: boolean) => mockToggleUserVerified(userId, isVerified),
+    toggleUserPhoneVerified: (userId: number, phoneVerified: boolean) => mockToggleUserPhoneVerified(userId, phoneVerified),
+    toggleUserIdVerified: (userId: number, idVerified: boolean) => mockToggleUserIdVerified(userId, idVerified),
     updateUserProfile: (userId: number, data: any) => mockUpdateUserProfile(userId, data),
   },
 }))
@@ -87,7 +93,10 @@ describe('UserDetailPage', () => {
     mockGetCurrentUser.mockResolvedValue({ data: mockAdminUser })
     mockGetUser.mockResolvedValue({ data: mockTargetUser })
     mockGetPackages.mockResolvedValue({ data: [] })
+    mockGetRoutes.mockResolvedValue({ data: [] })
     mockToggleUserVerified.mockResolvedValue({ data: { ...mockTargetUser, is_verified: false } })
+    mockToggleUserPhoneVerified.mockResolvedValue({ data: { ...mockTargetUser, phone_verified: false } })
+    mockToggleUserIdVerified.mockResolvedValue({ data: { ...mockTargetUser, id_verified: false } })
     mockToggleUserActive.mockResolvedValue({ data: { ...mockTargetUser, is_active: false } })
     mockUpdateUserRole.mockResolvedValue({ data: { ...mockTargetUser, role: 'courier' } })
     mockUpdateUserProfile.mockResolvedValue({ data: mockTargetUser })

@@ -13,12 +13,16 @@ const mockGetCurrentUser = jest.fn()
 const mockLogout = jest.fn()
 const mockGetUsers = jest.fn()
 const mockGetPackages = jest.fn()
+const mockGetRoutes = jest.fn()
 const mockGetStats = jest.fn()
 const mockUpdateUserRole = jest.fn()
 const mockToggleUserActive = jest.fn()
 const mockToggleUserVerified = jest.fn()
+const mockToggleUserPhoneVerified = jest.fn()
+const mockToggleUserIdVerified = jest.fn()
 const mockTogglePackageActive = jest.fn()
 const mockCreateUser = jest.fn()
+const mockCreateRoute = jest.fn()
 const mockRunMatchingJob = jest.fn()
 
 jest.mock('@/lib/api', () => ({
@@ -35,12 +39,16 @@ jest.mock('@/lib/api', () => ({
   adminAPI: {
     getUsers: () => mockGetUsers(),
     getPackages: () => mockGetPackages(),
+    getRoutes: () => mockGetRoutes(),
     getStats: () => mockGetStats(),
     updateUserRole: (userId: number, role: string) => mockUpdateUserRole(userId, role),
     toggleUserActive: (userId: number, isActive: boolean) => mockToggleUserActive(userId, isActive),
     toggleUserVerified: (userId: number, isVerified: boolean) => mockToggleUserVerified(userId, isVerified),
+    toggleUserPhoneVerified: (userId: number, phoneVerified: boolean) => mockToggleUserPhoneVerified(userId, phoneVerified),
+    toggleUserIdVerified: (userId: number, idVerified: boolean) => mockToggleUserIdVerified(userId, idVerified),
     togglePackageActive: (packageId: number, isActive: boolean) => mockTogglePackageActive(packageId, isActive),
     createUser: (data: any) => mockCreateUser(data),
+    createRoute: (data: any) => mockCreateRoute(data),
     runMatchingJob: (dryRun: boolean, hours: number) => mockRunMatchingJob(dryRun, hours),
   },
 }))
@@ -82,6 +90,7 @@ const setupAdminMocks = (options: {
   user?: any
   users?: any[]
   packages?: any[]
+  routes?: any[]
   stats?: any
   userError?: Error
 } = {}) => {
@@ -94,6 +103,7 @@ const setupAdminMocks = (options: {
     },
     users = [],
     packages = [],
+    routes = [],
     stats = {
       total_users: 0,
       total_senders: 0,
@@ -116,6 +126,7 @@ const setupAdminMocks = (options: {
   }
   mockGetUsers.mockResolvedValue({ data: users })
   mockGetPackages.mockResolvedValue({ data: packages })
+  mockGetRoutes.mockResolvedValue({ data: routes })
   mockGetStats.mockResolvedValue({ data: stats })
   mockLogout.mockResolvedValue({ data: { message: 'Logged out' } })
 }

@@ -7,6 +7,72 @@ import RegisterPage from '../page'
 // Mock next/navigation
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
+  usePathname: jest.fn(() => '/en/register'),
+  useSearchParams: jest.fn(() => ({ get: jest.fn() })),
+}))
+
+// Mock next-intl
+jest.mock('next-intl', () => ({
+  useTranslations: () => (key: string) => {
+    const translations: Record<string, string> = {
+      registerTitle: 'Create your account',
+      firstName: 'First name',
+      lastName: 'Last name',
+      middleName: 'Middle name',
+      email: 'Email',
+      password: 'Password',
+      confirmPassword: 'Confirm password',
+      phoneNumber: 'Phone number',
+      iWantTo: 'I want to',
+      sendPackages: 'Send packages',
+      deliverPackages: 'Deliver packages',
+      bothSendAndDeliver: 'Both send and deliver',
+      maxRouteDeviation: 'Maximum route deviation',
+      createAccount: 'Create account',
+      signIn: 'Sign in',
+      allFieldsRequired: 'Please fill in all required fields',
+      passwordTooShort: 'Password must be at least 8 characters',
+      passwordsDoNotMatch: 'Passwords do not match',
+      validEmail: 'Please enter a valid email',
+      maxDeviationRange: 'Must be between 1 and 50',
+      registrationFailed: 'Registration failed. Please try again.',
+      creatingAccount: 'Creating account...',
+      title: 'Privacy Policy',
+      termsLabel: 'I accept the terms',
+      courierAgreementLabel: 'I accept the courier agreement',
+      privacyLabel: 'I accept the privacy policy',
+    }
+    return translations[key] || key
+  },
+  useLocale: () => 'en',
+}))
+
+// Mock LanguageSwitcher
+jest.mock('@/components/LanguageSwitcher', () => {
+  return function MockLanguageSwitcher() {
+    return <div data-testid="language-switcher">EN</div>
+  }
+})
+
+// Mock react-phone-number-input
+jest.mock('react-phone-number-input', () => {
+  return function MockPhoneInput({ value, onChange, id, ...props }: any) {
+    return (
+      <input
+        id={id}
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        data-testid="phone-input"
+        {...props}
+      />
+    )
+  }
+})
+
+// Mock @/lib/distance
+jest.mock('@/lib/distance', () => ({
+  kmToMiles: (km: number) => km * 0.621371,
+  milesToKm: (miles: number) => miles * 1.60934,
 }))
 
 // Mock the API functions
@@ -83,9 +149,14 @@ describe('RegisterPage', () => {
       expect(screen.getByText('Create your account')).toBeInTheDocument()
     })
 
-    it('renders full name input', () => {
+    it('renders first name input', () => {
       render(<RegisterPage />)
-      expect(screen.getByLabelText(/full name/i)).toBeInTheDocument()
+      expect(screen.getByLabelText(/first name/i)).toBeInTheDocument()
+    })
+
+    it('renders last name input', () => {
+      render(<RegisterPage />)
+      expect(screen.getByLabelText(/last name/i)).toBeInTheDocument()
     })
 
     it('renders email input', () => {
@@ -184,7 +255,8 @@ describe('RegisterPage', () => {
     it('shows error for short password', async () => {
       render(<RegisterPage />)
 
-      await userEvent.type(screen.getByLabelText(/full name/i), 'Test User')
+      await userEvent.type(screen.getByLabelText(/first name/i), 'Test')
+      await userEvent.type(screen.getByLabelText(/last name/i), 'User')
       await userEvent.type(screen.getByLabelText(/email/i), 'test@example.com')
       await userEvent.type(screen.getByLabelText(/^password/i), 'short')
       await userEvent.type(screen.getByLabelText(/confirm password/i), 'short')
@@ -201,7 +273,8 @@ describe('RegisterPage', () => {
     it('shows error for password mismatch', async () => {
       render(<RegisterPage />)
 
-      await userEvent.type(screen.getByLabelText(/full name/i), 'Test User')
+      await userEvent.type(screen.getByLabelText(/first name/i), 'Test')
+      await userEvent.type(screen.getByLabelText(/last name/i), 'User')
       await userEvent.type(screen.getByLabelText(/email/i), 'test@example.com')
       await userEvent.type(screen.getByLabelText(/^password/i), 'password123')
       await userEvent.type(screen.getByLabelText(/confirm password/i), 'differentpassword')
@@ -218,7 +291,8 @@ describe('RegisterPage', () => {
     it('shows error for invalid email', async () => {
       render(<RegisterPage />)
 
-      await userEvent.type(screen.getByLabelText(/full name/i), 'Test User')
+      await userEvent.type(screen.getByLabelText(/first name/i), 'Test')
+      await userEvent.type(screen.getByLabelText(/last name/i), 'User')
       await userEvent.type(screen.getByLabelText(/email/i), 'invalid-email')
       await userEvent.type(screen.getByLabelText(/^password/i), 'password123')
       await userEvent.type(screen.getByLabelText(/confirm password/i), 'password123')
@@ -235,7 +309,8 @@ describe('RegisterPage', () => {
     it('shows error for invalid max deviation', async () => {
       render(<RegisterPage />)
 
-      await userEvent.type(screen.getByLabelText(/full name/i), 'Test User')
+      await userEvent.type(screen.getByLabelText(/first name/i), 'Test')
+      await userEvent.type(screen.getByLabelText(/last name/i), 'User')
       await userEvent.type(screen.getByLabelText(/email/i), 'test@example.com')
       await userEvent.type(screen.getByLabelText(/^password/i), 'password123')
       await userEvent.type(screen.getByLabelText(/confirm password/i), 'password123')
@@ -263,7 +338,8 @@ describe('RegisterPage', () => {
 
       render(<RegisterPage />)
 
-      await userEvent.type(screen.getByLabelText(/full name/i), 'Test User')
+      await userEvent.type(screen.getByLabelText(/first name/i), 'Test')
+      await userEvent.type(screen.getByLabelText(/last name/i), 'User')
       await userEvent.type(screen.getByLabelText(/email/i), 'test@example.com')
       await userEvent.type(screen.getByLabelText(/^password/i), 'password123')
       await userEvent.type(screen.getByLabelText(/confirm password/i), 'password123')
@@ -281,7 +357,8 @@ describe('RegisterPage', () => {
 
       render(<RegisterPage />)
 
-      await userEvent.type(screen.getByLabelText(/full name/i), 'Test User')
+      await userEvent.type(screen.getByLabelText(/first name/i), 'Test')
+      await userEvent.type(screen.getByLabelText(/last name/i), 'User')
       await userEvent.type(screen.getByLabelText(/email/i), 'test@example.com')
       await userEvent.type(screen.getByLabelText(/^password/i), 'password123')
       await userEvent.type(screen.getByLabelText(/confirm password/i), 'password123')
@@ -299,7 +376,8 @@ describe('RegisterPage', () => {
 
       render(<RegisterPage />)
 
-      await userEvent.type(screen.getByLabelText(/full name/i), 'Test User')
+      await userEvent.type(screen.getByLabelText(/first name/i), 'Test')
+      await userEvent.type(screen.getByLabelText(/last name/i), 'User')
       await userEvent.type(screen.getByLabelText(/email/i), 'test@example.com')
       await userEvent.type(screen.getByLabelText(/^password/i), 'password123')
       await userEvent.type(screen.getByLabelText(/confirm password/i), 'password123')
@@ -321,7 +399,8 @@ describe('RegisterPage', () => {
 
       render(<RegisterPage />)
 
-      await userEvent.type(screen.getByLabelText(/full name/i), 'Test User')
+      await userEvent.type(screen.getByLabelText(/first name/i), 'Test')
+      await userEvent.type(screen.getByLabelText(/last name/i), 'User')
       await userEvent.type(screen.getByLabelText(/email/i), 'test@example.com')
       await userEvent.type(screen.getByLabelText(/^password/i), 'password123')
       await userEvent.type(screen.getByLabelText(/confirm password/i), 'password123')
@@ -339,7 +418,8 @@ describe('RegisterPage', () => {
 
       render(<RegisterPage />)
 
-      await userEvent.type(screen.getByLabelText(/full name/i), 'Test User')
+      await userEvent.type(screen.getByLabelText(/first name/i), 'Test')
+      await userEvent.type(screen.getByLabelText(/last name/i), 'User')
       await userEvent.type(screen.getByLabelText(/email/i), 'test@example.com')
       await userEvent.type(screen.getByLabelText(/^password/i), 'password123')
       await userEvent.type(screen.getByLabelText(/confirm password/i), 'password123')

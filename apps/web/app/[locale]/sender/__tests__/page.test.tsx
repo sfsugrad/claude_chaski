@@ -7,6 +7,8 @@ import { packagesAPI, authAPI, ratingsAPI } from '@/lib/api'
 // Mock next/navigation
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
+  usePathname: jest.fn(() => '/en/sender'),
+  useSearchParams: jest.fn(() => ({ get: jest.fn() })),
 }))
 
 // Mock the Navbar component to avoid NotificationDropdown dependencies

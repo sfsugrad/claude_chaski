@@ -48,6 +48,7 @@ from app.services.jwt_blacklist import JWTBlacklistService
 from app.services.session_tracker import SessionTracker
 from app.utils.input_sanitizer import sanitize_plain_text, sanitize_email, sanitize_phone
 from app.utils.geo_restriction import get_country_from_ip, is_country_allowed
+from app.utils.name_validator import validate_name_field
 from app.utils.phone_validator import validate_us_phone_number
 from app.models.audit_log import AuditLog, AuditAction
 from pydantic import BaseModel, EmailStr, Field
@@ -194,6 +195,11 @@ async def register(request: Request, user_data: UserRegister, db: Session = Depe
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
         )
+
+    # Validate name fields
+    validate_name_field(user_data.first_name, "first name", required=True)
+    validate_name_field(user_data.middle_name, "middle name", required=False)
+    validate_name_field(user_data.last_name, "last name", required=True)
 
     # Validate and check phone number (required, must be US format)
     if user_data.phone_number:
@@ -777,6 +783,14 @@ async def update_current_user(
     - **default_address_lat**: Latitude of default address
     - **default_address_lng**: Longitude of default address
     """
+    # Validate name fields if provided
+    if user_data.first_name is not None:
+        validate_name_field(user_data.first_name, "first name", required=True)
+    if user_data.middle_name is not None and user_data.middle_name.strip():
+        validate_name_field(user_data.middle_name, "middle name", required=False)
+    if user_data.last_name is not None:
+        validate_name_field(user_data.last_name, "last name", required=True)
+
     # Get encryption service for PII dual-write
     encryption_service = get_encryption_service()
 

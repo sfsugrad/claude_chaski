@@ -15,6 +15,8 @@ from app.utils.dependencies import get_current_admin_user
 from app.utils.encryption import get_encryption_service
 from app.utils.password_validator import validate_password
 from app.utils.phone_validator import validate_us_phone_number
+from app.utils.input_sanitizer import sanitize_plain_text
+from app.utils.name_validator import validate_name_field
 from app.services.audit_service import (
     log_user_create,
     log_user_update,
@@ -109,10 +111,16 @@ class UpdateUserRole(BaseModel):
 class CreateUserRequest(BaseModel):
     email: EmailStr
     password: str
-    full_name: str
+    first_name: str = Field(..., min_length=1, description="User's first name")
+    middle_name: str | None = Field(default=None, description="User's middle name (optional)")
+    last_name: str = Field(..., min_length=1, description="User's last name")
     role: str
-    phone_number: str | None = None
-    max_deviation_km: int = 5
+    phone_number: str
+    max_deviation_km: float = Field(default=8.0, ge=1.6, le=80.5)  # ~1-50 miles in km
+    default_address: str | None = None
+    default_address_lat: float | None = None
+    default_address_lng: float | None = None
+    preferred_language: str = Field(default='en', pattern="^(en|fr|es)$")
 
 
 class AuditLogResponse(BaseModel):
@@ -168,7 +176,7 @@ class AdminRouteCreate(BaseModel):
     end_address: str = Field(..., min_length=1)
     end_lat: float = Field(..., ge=-90, le=90)
     end_lng: float = Field(..., ge=-180, le=180)
-    max_deviation_km: int = Field(default=5, ge=1, le=50)
+    max_deviation_km: float = Field(default=8.0, ge=1.6, le=80.5)  # ~1-50 miles in km
     departure_time: datetime | None = None
     trip_date: datetime | None = None
 
@@ -230,9 +238,13 @@ async def create_user(
             detail="Email already registered"
         )
 
-    # Validate US phone number format if provided
-    if user_data.phone_number:
-        validate_us_phone_number(user_data.phone_number)
+    # Validate US phone number format (required)
+    validate_us_phone_number(user_data.phone_number)
+
+    # Validate name fields
+    validate_name_field(user_data.first_name, "first name", required=True)
+    validate_name_field(user_data.middle_name, "middle name", required=False)
+    validate_name_field(user_data.last_name, "last name", required=True)
 
     # Validate role
     role_upper = user_data.role.upper()
@@ -255,23 +267,50 @@ async def create_user(
             }
         )
 
+    # Sanitize user input
+    sanitized_first_name = sanitize_plain_text(user_data.first_name)
+    sanitized_middle_name = sanitize_plain_text(user_data.middle_name) if user_data.middle_name else None
+    sanitized_last_name = sanitize_plain_text(user_data.last_name)
+    sanitized_default_address = sanitize_plain_text(user_data.default_address) if user_data.default_address else None
+
+    # Build full name from name parts
+    full_name_parts = [sanitized_first_name]
+    if sanitized_middle_name:
+        full_name_parts.append(sanitized_middle_name)
+    full_name_parts.append(sanitized_last_name)
+    full_name = ' '.join(full_name_parts)
+
     # Encrypt PII data (dual-write: store both plain text and encrypted)
     encryption_service = get_encryption_service()
     encrypted_email = encryption_service.encrypt(user_data.email) if encryption_service else None
-    encrypted_full_name = encryption_service.encrypt(user_data.full_name) if encryption_service else None
-    encrypted_phone = encryption_service.encrypt(user_data.phone_number) if encryption_service and user_data.phone_number else None
+    encrypted_full_name = encryption_service.encrypt(full_name) if encryption_service else None
+    encrypted_first_name = encryption_service.encrypt(sanitized_first_name) if encryption_service else None
+    encrypted_middle_name = encryption_service.encrypt(sanitized_middle_name) if encryption_service and sanitized_middle_name else None
+    encrypted_last_name = encryption_service.encrypt(sanitized_last_name) if encryption_service else None
+    encrypted_phone = encryption_service.encrypt(user_data.phone_number) if encryption_service else None
 
     # Create new user
     new_user = User(
         email=user_data.email,
         email_encrypted=encrypted_email,
         hashed_password=get_password_hash(user_data.password),
-        full_name=user_data.full_name,
+        full_name=full_name,
         full_name_encrypted=encrypted_full_name,
+        first_name=sanitized_first_name,
+        first_name_encrypted=encrypted_first_name,
+        middle_name=sanitized_middle_name,
+        middle_name_encrypted=encrypted_middle_name,
+        last_name=sanitized_last_name,
+        last_name_encrypted=encrypted_last_name,
         role=user_role,
         phone_number=user_data.phone_number,
         phone_number_encrypted=encrypted_phone,
+        phone_verified=True,  # Admin-created users have phone pre-verified
         max_deviation_km=user_data.max_deviation_km,
+        default_address=sanitized_default_address,
+        default_address_lat=user_data.default_address_lat,
+        default_address_lng=user_data.default_address_lng,
+        preferred_language=user_data.preferred_language,
         is_verified=True,  # Admin-created users are auto-verified
         is_active=True
     )

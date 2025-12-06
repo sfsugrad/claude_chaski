@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Critical Rules
+
+1. **Never duplicate shared code** - Use `@chaski/shared-types`, `@chaski/shared-utils`, `@chaski/shared-i18n`, and `@chaski/api-client`
+2. **API calls through centralized clients only** - Web: `lib/api.ts`, Mobile: `@chaski/api-client` with fetch adapter
+3. **Package status changes via state machine only** - Use `package_status.py` functions, never direct status updates
+4. **Backend utilities in `app/utils/`** - Never duplicate utility functions
+5. **Build packages first** - Run `pnpm build:packages` before running apps after pulling changes
+6. **Node.js 18+** - Required by monorepo (see `engines` in root package.json)
+
 ## Quick Reference
 
 ```bash
@@ -481,18 +490,22 @@ const isCourierFullyVerified = user.is_verified && user.phone_verified && user.i
 Transitions enforced in `app/services/package_status.py` - always use `validate_transition()` or `transition_package()`:
 
 ```
-NEW → OPEN_FOR_BIDS → BID_SELECTED → PENDING_PICKUP → IN_TRANSIT → DELIVERED
-                          ↓                ↓              ↓
-                    OPEN_FOR_BIDS*       FAILED         FAILED
+NEW → OPEN_FOR_BIDS → BID_SELECTED → IN_TRANSIT → DELIVERED
+                          ↓              ↓
+                    OPEN_FOR_BIDS*     FAILED
 
 CANCELED can occur from any non-terminal state (except IN_TRANSIT and FAILED)
 FAILED → OPEN_FOR_BIDS (admin only retry)
 ```
 
+**Note:** `PENDING_PICKUP` exists in the enum but is currently unused - packages transition directly from `BID_SELECTED` to `IN_TRANSIT`.
+
 Also available in frontend via `@chaski/shared-utils`:
 ```typescript
 import { isValidTransition, getStatusLabel, getStatusColor } from '@chaski/shared-utils'
 ```
+
+See **[backend/docs/PACKAGE_LIFECYCLE.md](backend/docs/PACKAGE_LIFECYCLE.md)** for detailed flowcharts including bidding timeline, notifications, and edge cases.
 
 ## Route-Package Matching Algorithm
 
@@ -518,7 +531,7 @@ The matching algorithm finds packages along a courier's route within a configura
 
 **Note:** The algorithm uses Shapely's Cartesian distance, not the spherical `point_to_line_distance` in `geo.py`. At LA-SD scale (~180km), expect ~10-20% distance variance between the two methods.
 
-See **[backend/docs/MATCHING_FEATURE.html](backend/docs/MATCHING_FEATURE.html)** for detailed documentation.
+See **[backend/docs/MATCHING_FEATURE.html](backend/docs/MATCHING_FEATURE.html)** for detailed documentation and **[backend/docs/MATCHING_API.md](backend/docs/MATCHING_API.md)** for API endpoint reference.
 
 ## Bidding System
 
@@ -587,3 +600,29 @@ eas build --profile development   # Development client
 eas build --profile preview       # Internal testing
 eas build --profile production    # App store release
 ```
+
+## Common Issues
+
+**"Module not found" for shared packages:**
+```bash
+pnpm build:packages  # Rebuild shared packages
+```
+
+**Tests failing after pulling changes:**
+```bash
+pnpm install && pnpm build:packages
+```
+
+**CSRF token errors on web:**
+- Ensure `withCredentials: true` in axios config
+- Check that backend CORS includes frontend origin
+- Verify `X-CSRF-Token` header is being sent
+
+**WebSocket connection issues:**
+- Web uses cookie auth automatically
+- Mobile must pass token via query param: `/api/ws?token=xxx`
+- Check Redis is running (required for WebSocket pub/sub)
+
+**PostGIS errors:**
+- Ensure PostGIS extension is enabled: `CREATE EXTENSION postgis;`
+- Tests use SQLite (no PostGIS) - see `tests/conftest.py`

@@ -8,6 +8,36 @@ import LoginPage from '../page'
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
   useSearchParams: jest.fn(),
+  usePathname: jest.fn(() => '/en/login'),
+}))
+
+// Mock next-intl
+jest.mock('next-intl', () => ({
+  useTranslations: () => (key: string) => {
+    const translations: Record<string, string> = {
+      loginTitle: 'Sign in to your account',
+      loginSubtitle: 'Welcome back',
+      email: 'Email',
+      emailPlaceholder: 'Enter your email',
+      password: 'Password',
+      enterPassword: 'Enter your password',
+      signIn: 'Sign in',
+      rememberMe: 'Remember me',
+      forgotPassword: 'Forgot password?',
+      noAccount: "Don't have an account?",
+      createAccount: 'Create one now',
+      orContinueWithEmail: 'or continue with email',
+      registrationSuccess: 'Registration successful! Please sign in.',
+      emailVerifiedSuccess: 'Email verified! You can now sign in.',
+      passwordResetSuccess: 'Password reset successful! Please sign in.',
+      allFieldsRequired: 'Please fill in all fields',
+      invalidCredentials: 'Invalid credentials',
+      loginFailed: 'Login failed. Please try again.',
+      loading: 'Loading...',
+    }
+    return translations[key] || key
+  },
+  useLocale: () => 'en',
 }))
 
 // Mock the API functions
@@ -25,6 +55,13 @@ jest.mock('@/lib/api', () => ({
 jest.mock('@/components/GoogleSignInButton', () => {
   return function MockGoogleSignInButton() {
     return <button data-testid="google-signin">Continue with Google</button>
+  }
+})
+
+// Mock LanguageSwitcher
+jest.mock('@/components/LanguageSwitcher', () => {
+  return function MockLanguageSwitcher() {
+    return <div data-testid="language-switcher">EN</div>
   }
 })
 

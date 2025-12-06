@@ -6,6 +6,8 @@ import CourierPage from '../page'
 // Mock dependencies
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
+  usePathname: jest.fn(() => '/en/courier'),
+  useSearchParams: jest.fn(() => ({ get: jest.fn() })),
 }))
 
 // Mock the API functions

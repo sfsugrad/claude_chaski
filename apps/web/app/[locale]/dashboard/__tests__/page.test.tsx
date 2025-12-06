@@ -7,6 +7,8 @@ import DashboardPage from '../page'
 // Mock next/navigation
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
+  usePathname: jest.fn(() => '/en/dashboard'),
+  useSearchParams: jest.fn(() => ({ get: jest.fn() })),
 }))
 
 // Mock the API functions

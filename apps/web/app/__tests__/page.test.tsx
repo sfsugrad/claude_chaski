@@ -1,6 +1,44 @@
 import React from 'react'
 import { render, screen } from '@testing-library/react'
-import Home from '../page'
+import Home from '../[locale]/page'
+
+// Mock next-intl
+jest.mock('next-intl', () => ({
+  useTranslations: () => (key: string) => {
+    const translations: Record<string, string> = {
+      title: 'Connect Senders with Couriers',
+      subtitle: 'Smart logistics platform for everyone',
+      senderCard: "I'm a Sender",
+      senderDescription: 'Need to send a package? Find a courier traveling your route.',
+      senderAction: 'Send a Package',
+      courierCard: "I'm a Courier",
+      courierDescription: 'Earn money by delivering packages along your route.',
+      courierAction: 'Find Packages',
+      whyChoose: 'Why Choose Chaski?',
+      cta: 'Ready to get started?',
+      signIn: 'Sign in',
+      getStarted: 'Get Started',
+      register: 'Register',
+    }
+    return translations[key] || key
+  },
+  useLocale: () => 'en',
+}))
+
+// Mock next/navigation
+jest.mock('next/navigation', () => ({
+  usePathname: jest.fn(() => '/en'),
+  useRouter: jest.fn(() => ({
+    push: jest.fn(),
+  })),
+}))
+
+// Mock LanguageSwitcher
+jest.mock('@/components/LanguageSwitcher', () => {
+  return function MockLanguageSwitcher() {
+    return <div data-testid="language-switcher">EN</div>
+  }
+})
 
 describe('Home Page', () => {
   describe('Rendering', () => {
