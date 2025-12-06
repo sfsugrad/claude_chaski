@@ -93,8 +93,8 @@ export function PackageWizard() {
   const loadUsers = async () => {
     setLoadingUsers(true);
     try {
-      const response = await adminAPI.getUsers();
-      setUsers(response.data);
+      const response = await adminAPI.getUsers(0, 1000);
+      setUsers(response.data.users);
     } catch (err) {
       console.error('Error loading users:', err);
     } finally {

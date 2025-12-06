@@ -596,9 +596,9 @@ See **[DEPLOYMENT.md](DEPLOYMENT.md)** for Heroku deployment guide including:
 ### Mobile Deployment (EAS Build)
 ```bash
 cd apps/mobile
-eas build --profile development   # Development client
-eas build --profile preview       # Internal testing
-eas build --profile production    # App store release
+pnpm build:dev      # Development client
+pnpm build:preview  # Internal testing
+pnpm build:prod     # App store release
 ```
 
 ## Common Issues

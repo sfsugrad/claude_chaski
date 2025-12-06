@@ -18,10 +18,24 @@ export default function VerificationBanner() {
   const [idVerificationLoading, setIdVerificationLoading] = useState(false)
   const pathname = usePathname()
 
-  // Don't show on auth pages
-  const isAuthPage = pathname?.includes('/login') || pathname?.includes('/register') || pathname?.includes('/verify')
+  // Don't show on auth pages or public landing pages - check for common auth-related paths
+  // Also exclude the home page (just locale, e.g., /en, /fr, /es)
+  const isPublicPage = !pathname ||
+    pathname.match(/^\/[a-z]{2}$/) || // Home page like /en, /fr, /es
+    pathname.includes('/login') ||
+    pathname.includes('/register') ||
+    pathname.includes('/verify') ||
+    pathname.includes('/forgot-password') ||
+    pathname.includes('/reset-password')
 
   useEffect(() => {
+    // Don't fetch user data on public/auth pages
+    if (isPublicPage) {
+      setUser(null)
+      setIdVerificationStatus(null)
+      return
+    }
+
     const fetchUser = async () => {
       try {
         const response = await authAPI.getCurrentUser()
@@ -42,7 +56,7 @@ export default function VerificationBanner() {
       }
     }
     fetchUser()
-  }, [pathname])
+  }, [pathname, isPublicPage])
 
   const handleResendEmail = async () => {
     if (!user?.email || emailSending) return
@@ -118,7 +132,7 @@ export default function VerificationBanner() {
   }
 
   // Don't render anything if on auth pages or no user
-  if (isAuthPage || !user) {
+  if (isPublicPage || !user) {
     return null
   }
 
