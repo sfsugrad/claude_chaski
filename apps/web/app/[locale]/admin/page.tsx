@@ -618,6 +618,10 @@ export default function AdminPage() {
       setCreateRouteError('Please select addresses from the autocomplete suggestions')
       return
     }
+    if (!newRouteData.trip_date) {
+      setCreateRouteError('Please select a trip date')
+      return
+    }
 
     setCreateRouteLoading(true)
 
@@ -2318,10 +2322,11 @@ export default function AdminPage() {
               {/* Trip Date */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Trip Date
+                  Trip Date *
                 </label>
                 <input
                   type="date"
+                  required
                   value={newRouteData.trip_date}
                   onChange={(e) => setNewRouteData({ ...newRouteData, trip_date: e.target.value })}
                   min={new Date().toISOString().split('T')[0]}
