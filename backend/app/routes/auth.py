@@ -18,7 +18,7 @@ from app.utils.auth import get_password_hash, verify_password, create_access_tok
 from app.utils.dependencies import get_current_user
 from app.utils.email import send_verification_email, send_welcome_email, send_password_reset_email, generate_verification_token
 from app.utils.oauth import oauth
-from app.utils.sms import send_verification_code
+from app.utils.sms import send_verification_code, verify_code_with_twilio
 from app.utils.encryption import get_encryption_service
 from app.utils.password_validator import validate_password
 from app.services.audit_service import (
@@ -1337,6 +1337,7 @@ async def verify_phone_number(
 ):
     """
     Verify phone number using the code sent via SMS.
+    Supports both Twilio Verify API and local code verification.
     """
     if current_user.phone_verified:
         raise HTTPException(
@@ -1344,6 +1345,35 @@ async def verify_phone_number(
             detail="Phone number is already verified"
         )
 
+    if not current_user.phone_number:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No phone number associated with this account"
+        )
+
+    # Try Twilio Verify API first if configured
+    if settings.TWILIO_VERIFY_SERVICE_SID:
+        verified = await verify_code_with_twilio(current_user.phone_number, verify_data.code)
+        if verified:
+            # Mark phone as verified
+            current_user.phone_verified = True
+            current_user.phone_verification_code = None
+            current_user.phone_verification_code_expires_at = None
+            db.commit()
+
+            logger.info(f"Phone number verified for user {current_user.id} via Twilio Verify")
+
+            return {
+                "message": "Phone number verified successfully",
+                "phone_verified": True
+            }
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid verification code"
+            )
+
+    # Fallback to local code verification
     if not current_user.phone_verification_code:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
