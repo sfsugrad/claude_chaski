@@ -2,6 +2,8 @@
 
 import React from 'react';
 import { clsx } from 'clsx';
+import PhoneInput from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
 import AddressAutocomplete from '@/components/AddressAutocomplete';
 
 export interface LocationData {
@@ -11,6 +13,11 @@ export interface LocationData {
   contactName?: string;
   contactPhone?: string;
 }
+
+// Sanitize contact name: only allow letters, spaces, hyphens, apostrophes, and periods
+const sanitizeContactName = (value: string): string => {
+  return value.replace(/[^a-zA-Z\s\-'.]/g, '');
+};
 
 export interface LocationInputProps {
   pickup: LocationData;
@@ -115,19 +122,22 @@ export function LocationInput({
                 <input
                   type="text"
                   value={pickup.contactName || ''}
-                  onChange={(e) => onPickupChange({ ...pickup, contactName: e.target.value })}
+                  onChange={(e) => onPickupChange({ ...pickup, contactName: sanitizeContactName(e.target.value) })}
                   placeholder="Contact name"
+                  pattern="[a-zA-Z\s\-'.]*"
                   className="w-full px-3 py-2 border border-surface-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-success-500 focus:border-success-500"
                 />
               </div>
               <div>
                 <label className="block text-xs text-surface-500 mb-1">Phone (optional)</label>
-                <input
-                  type="tel"
+                <PhoneInput
+                  international
+                  defaultCountry="US"
+                  countries={['US']}
                   value={pickup.contactPhone || ''}
-                  onChange={(e) => onPickupChange({ ...pickup, contactPhone: e.target.value })}
-                  placeholder="+1 234 567 8900"
-                  className="w-full px-3 py-2 border border-surface-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-success-500 focus:border-success-500"
+                  onChange={(value) => onPickupChange({ ...pickup, contactPhone: value || '' })}
+                  placeholder="(555) 123-4567"
+                  className="location-phone-input location-phone-input-success"
                 />
               </div>
             </div>
@@ -145,19 +155,22 @@ export function LocationInput({
                 <input
                   type="text"
                   value={dropoff.contactName || ''}
-                  onChange={(e) => onDropoffChange({ ...dropoff, contactName: e.target.value })}
+                  onChange={(e) => onDropoffChange({ ...dropoff, contactName: sanitizeContactName(e.target.value) })}
                   placeholder="Contact name"
+                  pattern="[a-zA-Z\s\-'.]*"
                   className="w-full px-3 py-2 border border-surface-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 />
               </div>
               <div>
                 <label className="block text-xs text-surface-500 mb-1">Phone (optional)</label>
-                <input
-                  type="tel"
+                <PhoneInput
+                  international
+                  defaultCountry="US"
+                  countries={['US']}
                   value={dropoff.contactPhone || ''}
-                  onChange={(e) => onDropoffChange({ ...dropoff, contactPhone: e.target.value })}
-                  placeholder="+1 234 567 8900"
-                  className="w-full px-3 py-2 border border-surface-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  onChange={(value) => onDropoffChange({ ...dropoff, contactPhone: value || '' })}
+                  placeholder="(555) 123-4567"
+                  className="location-phone-input location-phone-input-primary"
                 />
               </div>
             </div>

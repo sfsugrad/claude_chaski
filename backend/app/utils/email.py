@@ -599,7 +599,7 @@ async def send_route_match_found_email(
         route_origin: Route starting point
         route_destination: Route ending point
     """
-    dashboard_url = f"{settings.FRONTEND_URL}/courier/dashboard"
+    dashboard_url = f"{settings.FRONTEND_URL}/courier"
 
     content = f"""
         <p>Hi {courier_name},</p>

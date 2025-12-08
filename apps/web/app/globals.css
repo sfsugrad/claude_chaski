@@ -324,6 +324,19 @@
     @apply text-surface-400 ml-1;
   }
 
+  /* Location phone input variants */
+  .location-phone-input .PhoneInput {
+    @apply text-sm py-2;
+  }
+
+  .location-phone-input-success .PhoneInput:focus-within {
+    @apply ring-2 ring-success-500 border-success-500;
+  }
+
+  .location-phone-input-primary .PhoneInput:focus-within {
+    @apply ring-2 ring-primary-500 border-primary-500;
+  }
+
   /* ----------------------------------------
      Cards
      ---------------------------------------- */

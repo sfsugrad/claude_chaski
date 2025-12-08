@@ -453,7 +453,7 @@ class TestEmailContentValidation:
         )
 
         message = mock_fm.send_message.call_args[0][0]
-        assert "/courier/dashboard" in message.body
+        assert "/courier" in message.body
 
     @patch('app.utils.email.fm')
     async def test_all_emails_are_html_type(self, mock_fm):
