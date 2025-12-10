@@ -53,9 +53,12 @@ export function PackageWizard() {
     dropoff_contact_phone: '',
     price: undefined,
     sender_id: undefined,
-    pickupData: { address: '', lat: 0, lng: 0 },
-    dropoffData: { address: '', lat: 0, lng: 0 },
+    pickupData: { address: '', lat: 0, lng: 0, isValidated: false },
+    dropoffData: { address: '', lat: 0, lng: 0, isValidated: false },
   });
+
+  // Track if user has attempted to proceed (to show validation errors)
+  const [showAddressValidation, setShowAddressValidation] = useState(false);
 
   useEffect(() => {
     checkAdminAndLoadUsers();
@@ -68,6 +71,8 @@ export function PackageWizard() {
       setCurrentUser(user);
 
       if (user.default_address && user.default_address_lat && user.default_address_lng) {
+        // Pre-filled addresses from user profile are considered validated
+        // since they have lat/lng coordinates from a previous Google Places selection
         setFormData((prev) => ({
           ...prev,
           pickup_address: user.default_address || '',
@@ -77,6 +82,7 @@ export function PackageWizard() {
             address: user.default_address || '',
             lat: user.default_address_lat || 0,
             lng: user.default_address_lng || 0,
+            isValidated: true,
           },
         }));
       }
@@ -164,6 +170,17 @@ export function PackageWizard() {
         }
         if (!formData.dropoff_address) {
           setError('Please provide a dropoff address');
+          return false;
+        }
+        // Check if addresses are validated by Google
+        if (!formData.pickupData.isValidated) {
+          setError('Please select a valid pickup address from the suggestions');
+          setShowAddressValidation(true);
+          return false;
+        }
+        if (!formData.dropoffData.isValidated) {
+          setError('Please select a valid dropoff address from the suggestions');
+          setShowAddressValidation(true);
           return false;
         }
         return true;
@@ -394,6 +411,7 @@ export function PackageWizard() {
                 onPickupChange={handlePickupChange}
                 onDropoffChange={handleDropoffChange}
                 showContactFields
+                showValidationErrors={showAddressValidation}
               />
 
               {currentUser?.default_address && (

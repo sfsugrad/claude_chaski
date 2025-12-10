@@ -730,6 +730,51 @@
 }
 
 /* ============================================
+   Google Places Autocomplete
+   ============================================ */
+.pac-container {
+  z-index: 10000 !important;
+  border-radius: 0.5rem;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  margin-top: 4px;
+  font-family: var(--font-sans);
+}
+
+.pac-item {
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: #374151;
+  border-top: 1px solid #f3f4f6;
+}
+
+.pac-item:first-child {
+  border-top: none;
+}
+
+.pac-item:hover {
+  background-color: #f9fafb;
+}
+
+.pac-item-selected {
+  background-color: #eff6ff;
+}
+
+.pac-icon {
+  margin-right: 0.75rem;
+}
+
+.pac-item-query {
+  font-weight: 500;
+  color: #111827;
+}
+
+.pac-matched {
+  font-weight: 600;
+}
+
+/* ============================================
    Utility Classes
    ============================================ */
 @layer utilities {

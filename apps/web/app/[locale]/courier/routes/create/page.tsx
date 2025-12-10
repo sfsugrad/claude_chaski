@@ -20,9 +20,14 @@ const deviationPresets = [
   { value: 32, label: '20 mi', description: 'Significant detour' },
 ];
 
+interface RouteFormData extends RouteCreate {
+  start_address_validated: boolean;
+  end_address_validated: boolean;
+}
+
 function CreateRouteContent() {
   const router = useRouter();
-  const [formData, setFormData] = useState<RouteCreate>({
+  const [formData, setFormData] = useState<RouteFormData>({
     start_address: '',
     start_lat: 0,
     start_lng: 0,
@@ -32,25 +37,30 @@ function CreateRouteContent() {
     max_deviation_km: 5,
     departure_time: '',
     trip_date: '',
+    start_address_validated: false,
+    end_address_validated: false,
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showAddressValidation, setShowAddressValidation] = useState(false);
 
-  const handleStartAddressChange = (address: string, lat: number, lng: number) => {
+  const handleStartAddressChange = (address: string, lat: number, lng: number, isValidated?: boolean) => {
     setFormData((prev) => ({
       ...prev,
       start_address: address,
       start_lat: lat,
       start_lng: lng,
+      start_address_validated: isValidated ?? false,
     }));
   };
 
-  const handleEndAddressChange = (address: string, lat: number, lng: number) => {
+  const handleEndAddressChange = (address: string, lat: number, lng: number, isValidated?: boolean) => {
     setFormData((prev) => ({
       ...prev,
       end_address: address,
       end_lat: lat,
       end_lng: lng,
+      end_address_validated: isValidated ?? false,
     }));
   };
 
@@ -60,6 +70,19 @@ function CreateRouteContent() {
 
     if (!formData.start_address || !formData.end_address) {
       setError('Please enter both start and end addresses');
+      return;
+    }
+
+    // Check if addresses are validated by Google
+    if (!formData.start_address_validated) {
+      setError('Please select a valid starting point from the suggestions');
+      setShowAddressValidation(true);
+      return;
+    }
+
+    if (!formData.end_address_validated) {
+      setError('Please select a valid destination from the suggestions');
+      setShowAddressValidation(true);
       return;
     }
 
@@ -167,6 +190,7 @@ function CreateRouteContent() {
                         placeholder="Where are you leaving from?"
                         required
                         className="w-full px-4 py-2.5 border border-surface-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-success-500 focus:border-success-500"
+                        showValidationError={showAddressValidation}
                       />
                     </div>
 
@@ -182,6 +206,7 @@ function CreateRouteContent() {
                         placeholder="Where are you going?"
                         required
                         className="w-full px-4 py-2.5 border border-surface-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        showValidationError={showAddressValidation}
                       />
                     </div>
                   </div>

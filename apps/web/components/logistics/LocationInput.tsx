@@ -12,6 +12,7 @@ export interface LocationData {
   lng: number;
   contactName?: string;
   contactPhone?: string;
+  isValidated?: boolean;
 }
 
 // Sanitize contact name: only allow letters, spaces, hyphens, apostrophes, and periods
@@ -26,6 +27,7 @@ export interface LocationInputProps {
   onDropoffChange: (data: LocationData) => void;
   showContactFields?: boolean;
   className?: string;
+  showValidationErrors?: boolean;
 }
 
 // Pickup marker icon (green)
@@ -49,13 +51,14 @@ export function LocationInput({
   onDropoffChange,
   showContactFields = false,
   className,
+  showValidationErrors = false,
 }: LocationInputProps) {
-  const handlePickupAddress = (address: string, lat: number, lng: number) => {
-    onPickupChange({ ...pickup, address, lat, lng });
+  const handlePickupAddress = (address: string, lat: number, lng: number, isValidated?: boolean) => {
+    onPickupChange({ ...pickup, address, lat, lng, isValidated });
   };
 
-  const handleDropoffAddress = (address: string, lat: number, lng: number) => {
-    onDropoffChange({ ...dropoff, address, lat, lng });
+  const handleDropoffAddress = (address: string, lat: number, lng: number, isValidated?: boolean) => {
+    onDropoffChange({ ...dropoff, address, lat, lng, isValidated });
   };
 
   return (
@@ -84,6 +87,7 @@ export function LocationInput({
               placeholder="Enter pickup address..."
               required
               className="w-full px-3 py-2.5 border border-surface-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-success-500 focus:border-success-500"
+              showValidationError={showValidationErrors}
             />
           </div>
 
@@ -100,6 +104,7 @@ export function LocationInput({
               placeholder="Enter dropoff address..."
               required
               className="w-full px-3 py-2.5 border border-surface-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              showValidationError={showValidationErrors}
             />
           </div>
         </div>
