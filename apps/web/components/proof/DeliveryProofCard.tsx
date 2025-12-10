@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { DeliveryProofResponse } from '@/lib/api'
-import { Card, CardHeader, CardContent } from '@/components/ui/Card'
+import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Modal } from '@/components/ui/Modal'
 
@@ -38,7 +38,7 @@ export function DeliveryProofCard({ proof }: DeliveryProofCardProps) {
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-4">
+        <CardBody className="space-y-4">
           {/* Proof Type Badge */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-surface-600">Proof Type:</span>
@@ -145,7 +145,7 @@ export function DeliveryProofCard({ proof }: DeliveryProofCardProps) {
               <p className="text-sm">{formatDate(proof.created_at)}</p>
             </div>
           </div>
-        </CardContent>
+        </CardBody>
       </Card>
 
       {/* Photo Modal */}

@@ -53,7 +53,8 @@
       },
       "eas": {
         "projectId": "your-project-id"
-      }
+      },
+      "googlePlacesApiKey": "AIzaSyCl3tW1fCGUhYneMvn5qZYLaIBNwYIfo8s"
     }
   }
 }

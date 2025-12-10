@@ -38,7 +38,8 @@ class RatingResponse(BaseModel):
     score: int
     comment: str | None
     created_at: datetime
-    rater_name: str | None = None  # Populated when fetching ratings
+    rater_name: str | None = None  # Populated when fetching ratings received
+    rated_user_name: str | None = None  # Populated when fetching ratings given
 
     class Config:
         from_attributes = True
@@ -294,6 +295,47 @@ async def get_package_ratings(
     ]
 
 
+@router.get("/my-given", response_model=RatingListResponse)
+async def get_my_given_ratings(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all ratings that the current user has given to others.
+    """
+    # Get ratings with rated user information
+    query = db.query(Rating, User.full_name).join(
+        User, Rating.rated_user_id == User.id
+    ).filter(Rating.rater_id == current_user.id)
+
+    total = query.count()
+
+    # Get paginated ratings
+    results = query.order_by(Rating.created_at.desc()).offset(skip).limit(limit).all()
+
+    ratings = [
+        RatingResponse(
+            id=rating.id,
+            rater_id=rating.rater_id,
+            rated_user_id=rating.rated_user_id,
+            package_id=rating.package_id,
+            score=rating.score,
+            comment=rating.comment,
+            created_at=rating.created_at,
+            rated_user_name=rated_user_name
+        )
+        for rating, rated_user_name in results
+    ]
+
+    return RatingListResponse(
+        ratings=ratings,
+        total=total,
+        average_rating=None  # Not meaningful for ratings given
+    )
+
+
 @router.get("/my-pending", response_model=list[dict])
 async def get_my_pending_ratings(
     current_user: User = Depends(get_current_user),
@@ -334,6 +376,7 @@ async def get_my_pending_ratings(
             if rated_user:
                 pending.append({
                     "package_id": pkg.id,
+                    "tracking_id": pkg.tracking_id,
                     "package_description": pkg.description,
                     "delivery_time": pkg.delivery_time.isoformat() if pkg.delivery_time else None,
                     "user_to_rate_id": rated_user.id,

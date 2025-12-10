@@ -7,13 +7,17 @@ import { authAPI, ratingsAPI, UserResponse, RatingResponse, UserRatingSummary } 
 import Navbar from '@/components/Navbar'
 import StarRating from '@/components/StarRating'
 
+type TabType = 'received' | 'given'
+
 export default function MyReviewsPage() {
   const router = useRouter()
   const [user, setUser] = useState<UserResponse | null>(null)
-  const [ratings, setRatings] = useState<RatingResponse[]>([])
+  const [receivedRatings, setReceivedRatings] = useState<RatingResponse[]>([])
+  const [givenRatings, setGivenRatings] = useState<RatingResponse[]>([])
   const [summary, setSummary] = useState<UserRatingSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [activeTab, setActiveTab] = useState<TabType>('received')
 
   useEffect(() => {
     loadData()
@@ -24,12 +28,14 @@ export default function MyReviewsPage() {
       const userResponse = await authAPI.getCurrentUser()
       setUser(userResponse.data)
 
-      const [ratingsResponse, summaryResponse] = await Promise.all([
+      const [receivedResponse, givenResponse, summaryResponse] = await Promise.all([
         ratingsAPI.getUserRatings(userResponse.data.id),
+        ratingsAPI.getMyGivenRatings(),
         ratingsAPI.getUserRatingSummary(userResponse.data.id)
       ])
 
-      setRatings(ratingsResponse.data.ratings)
+      setReceivedRatings(receivedResponse.data.ratings)
+      setGivenRatings(givenResponse.data.ratings)
       setSummary(summaryResponse.data)
     } catch (err) {
       setError('Please log in to view your reviews.')
@@ -50,6 +56,8 @@ export default function MyReviewsPage() {
     )
   }
 
+  const currentRatings = activeTab === 'received' ? receivedRatings : givenRatings
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar user={user} />
@@ -64,7 +72,7 @@ export default function MyReviewsPage() {
             ← Back to Dashboard
           </Link>
           <h1 className="text-3xl font-bold text-gray-900">My Reviews</h1>
-          <p className="text-gray-600 mt-1">See what others have said about you</p>
+          <p className="text-gray-600 mt-1">See reviews you've received and given</p>
         </div>
 
         {error && (
@@ -73,8 +81,8 @@ export default function MyReviewsPage() {
           </div>
         )}
 
-        {/* Rating Summary */}
-        {summary && (
+        {/* Rating Summary - Only show for received ratings */}
+        {summary && activeTab === 'received' && (
           <div className="bg-white rounded-lg shadow-md p-6 mb-8">
             <div className="flex items-center gap-6">
               <div className="text-center">
@@ -121,28 +129,61 @@ export default function MyReviewsPage() {
           </div>
         )}
 
-        {/* Reviews List */}
+        {/* Tabs */}
         <div className="bg-white rounded-lg shadow-md">
-          <div className="p-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">All Reviews</h2>
+          <div className="border-b border-gray-200">
+            <nav className="flex -mb-px">
+              <button
+                onClick={() => setActiveTab('received')}
+                className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'received'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Reviews Received ({receivedRatings.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('given')}
+                className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'given'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Reviews Given ({givenRatings.length})
+              </button>
+            </nav>
           </div>
 
-          {ratings.length === 0 ? (
+          {/* Reviews List */}
+          {currentRatings.length === 0 ? (
             <div className="p-8 text-center">
-              <div className="text-4xl mb-4">📝</div>
-              <p className="text-gray-600">You haven't received any reviews yet.</p>
+              <div className="text-4xl mb-4">{activeTab === 'received' ? '📝' : '✍️'}</div>
+              <p className="text-gray-600">
+                {activeTab === 'received'
+                  ? "You haven't received any reviews yet."
+                  : "You haven't given any reviews yet."}
+              </p>
               <p className="text-sm text-gray-500 mt-2">
-                Complete deliveries to start receiving reviews from other users.
+                {activeTab === 'received'
+                  ? 'Complete deliveries to start receiving reviews from other users.'
+                  : 'After a delivery is complete, you can rate your experience with the other party.'}
               </p>
             </div>
           ) : (
             <div className="divide-y divide-gray-200">
-              {ratings.map((rating) => (
+              {currentRatings.map((rating) => (
                 <div key={rating.id} className="p-4">
                   <div className="flex items-start justify-between mb-2">
                     <div>
                       <span className="font-medium text-gray-900">
-                        {rating.rater_name || 'Anonymous User'}
+                        {activeTab === 'received'
+                          ? rating.rater_name || 'Anonymous User'
+                          : rating.rated_user_name || 'Unknown User'}
+                      </span>
+                      <span className="text-gray-500 text-sm ml-2">
+                        {activeTab === 'received' ? '(reviewer)' : '(you reviewed)'}
                       </span>
                       <div className="mt-1">
                         <StarRating rating={rating.score} size="sm" />

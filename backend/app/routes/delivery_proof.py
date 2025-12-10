@@ -290,38 +290,47 @@ async def create_delivery_proof(
 
     # Handle signature data from canvas
     signature_s3_key = proof_data.signature_s3_key
+    signature_url_direct = None  # For storing base64 directly when S3 is not available
+
     if proof_data.signature_data and not signature_s3_key:
-        try:
-            # Decode base64 and upload
-            storage = get_file_storage()
-            # Remove data URL prefix if present
-            sig_data = proof_data.signature_data
-            if "," in sig_data:
-                sig_data = sig_data.split(",")[1]
-            signature_bytes = base64.b64decode(sig_data)
-            signature_s3_key = await storage.upload_file(
-                file_data=signature_bytes,
-                package_id=package.id,
-                file_type="signature",
-                content_type="image/png"
-            )
+        # Check if S3 is configured
+        from app.config import settings
+        if settings.AWS_ACCESS_KEY_ID and settings.AWS_SECRET_ACCESS_KEY:
+            try:
+                # Decode base64 and upload to S3
+                storage = get_file_storage()
+                # Remove data URL prefix if present
+                sig_data = proof_data.signature_data
+                if "," in sig_data:
+                    sig_data = sig_data.split(",")[1]
+                signature_bytes = base64.b64decode(sig_data)
+                signature_s3_key = await storage.upload_file(
+                    file_data=signature_bytes,
+                    package_id=package.id,
+                    file_type="signature",
+                    content_type="image/png"
+                )
 
-            # Audit log successful canvas signature upload
-            log_file_upload_success(
-                db, current_user, "delivery_signature_canvas",
-                signature_s3_key, package.id, request
-            )
-        except Exception as e:
-            # Audit log file upload failure
-            log_file_upload_failed(
-                db, current_user, "delivery_signature_canvas",
-                str(e), package.id, request
-            )
+                # Audit log successful canvas signature upload
+                log_file_upload_success(
+                    db, current_user, "delivery_signature_canvas",
+                    signature_s3_key, package.id, request
+                )
+            except Exception as e:
+                # Audit log file upload failure
+                log_file_upload_failed(
+                    db, current_user, "delivery_signature_canvas",
+                    str(e), package.id, request
+                )
 
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Failed to process signature: {str(e)}"
-            )
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Failed to process signature: {str(e)}"
+                )
+        else:
+            # S3 not configured - store base64 signature data directly in signature_url
+            logger.info(f"S3 not configured, storing signature data directly for package {package.id}")
+            signature_url_direct = proof_data.signature_data
 
     # Calculate distance from dropoff
     distance_from_dropoff = _calculate_distance_from_dropoff(
@@ -336,6 +345,7 @@ async def create_delivery_proof(
         courier_id=current_user.id,
         photo_s3_key=proof_data.photo_s3_key,
         signature_s3_key=signature_s3_key,
+        signature_url=signature_url_direct,  # Store base64 directly if S3 not configured
         recipient_name=proof_data.recipient_name,
         recipient_relationship=proof_data.recipient_relationship,
         notes=proof_data.notes,
@@ -375,6 +385,9 @@ async def create_delivery_proof(
             signature_url = await storage.generate_presigned_download_url(proof.signature_s3_key)
         except StorageError:
             signature_url = storage.get_public_url(proof.signature_s3_key)
+    elif proof.signature_url:
+        # Use directly stored base64 data (when S3 is not configured)
+        signature_url = proof.signature_url
 
     # Notify sender
     await create_notification_with_broadcast(
@@ -537,6 +550,9 @@ async def get_delivery_proof(
             signature_url = await storage.generate_presigned_download_url(proof.signature_s3_key)
         except StorageError:
             signature_url = storage.get_public_url(proof.signature_s3_key)
+    elif proof.signature_url:
+        # Use directly stored base64 data (when S3 is not configured)
+        signature_url = proof.signature_url
 
     return DeliveryProofResponse(
         id=proof.id,

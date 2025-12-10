@@ -63,6 +63,10 @@ function getNotificationLink(notification: DisplayNotification): string | null {
   if (notification.type === 'new_rating') {
     return '/profile/reviews'
   }
+  // Bid rejected/expired notifications go to bid history (courier can't access the package)
+  if (notification.type === 'bid_rejected' || notification.type === 'bid_deadline_expired') {
+    return '/courier?tab=history'
+  }
   // Package-related notifications go to package page
   if (notification.package_id) {
     return `/packages/${notification.package_id}`

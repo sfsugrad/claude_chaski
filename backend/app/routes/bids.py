@@ -73,6 +73,34 @@ class PackageBidsResponse(BaseModel):
     bid_count: int
 
 
+class BidWithPackageResponse(BaseModel):
+    """Bid response with package details for courier bid history."""
+    id: int
+    package_id: int
+    courier_id: int
+    courier_name: str
+    courier_rating: Optional[float]
+    courier_total_ratings: int
+    proposed_price: float
+    estimated_delivery_hours: Optional[int]
+    estimated_pickup_time: Optional[datetime]
+    message: Optional[str]
+    status: str
+    created_at: datetime
+    selected_at: Optional[datetime]
+    # Package details
+    package_tracking_id: str
+    package_description: str
+    package_status: str
+    package_pickup_address: str
+    package_dropoff_address: str
+    package_size: str
+    sender_name: str
+
+    class Config:
+        from_attributes = True
+
+
 def get_courier_bid_response(bid: CourierBid, courier: User, db: Session = None) -> BidResponse:
     """Convert a bid and courier to BidResponse."""
     # Compute ratings if db session provided
@@ -493,7 +521,8 @@ async def get_my_bids(
 
     if status_filter:
         try:
-            bid_status = BidStatus(status_filter)
+            # Convert to uppercase for case-insensitive matching
+            bid_status = BidStatus(status_filter.upper())
             query = query.filter(CourierBid.status == bid_status)
         except ValueError:
             raise HTTPException(
@@ -504,6 +533,84 @@ async def get_my_bids(
     bids = query.order_by(CourierBid.created_at.desc()).all()
 
     return [get_courier_bid_response(bid, current_user, db) for bid in bids]
+
+
+@router.get("/my-bids/history", response_model=List[BidWithPackageResponse])
+async def get_my_bids_history(
+    status_filter: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all bids for the current courier with package details.
+
+    Useful for bid history view showing which packages were bid on,
+    whether bids were accepted, and current package status.
+
+    Optional filter by status: pending, selected, rejected, withdrawn, expired
+    """
+    if current_user.role not in [UserRole.COURIER, UserRole.BOTH]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only couriers can view their bids"
+        )
+
+    query = db.query(CourierBid).filter(CourierBid.courier_id == current_user.id)
+
+    if status_filter:
+        try:
+            # Convert to uppercase for case-insensitive matching
+            bid_status = BidStatus(status_filter.upper())
+            query = query.filter(CourierBid.status == bid_status)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid status filter: {status_filter}"
+            )
+
+    bids = query.order_by(CourierBid.created_at.desc()).all()
+
+    # Build response with package details
+    result = []
+    for bid in bids:
+        package = db.query(Package).filter(Package.id == bid.package_id).first()
+        sender = db.query(User).filter(User.id == package.sender_id).first() if package else None
+
+        # Get courier ratings
+        courier_rating = None
+        courier_total_ratings = 0
+        total_ratings = db.query(Rating).filter(Rating.rated_user_id == current_user.id).count()
+        if total_ratings > 0:
+            avg_result = db.query(func.avg(Rating.score)).filter(
+                Rating.rated_user_id == current_user.id
+            ).scalar()
+            courier_rating = round(float(avg_result), 2) if avg_result else None
+        courier_total_ratings = total_ratings
+
+        result.append(BidWithPackageResponse(
+            id=bid.id,
+            package_id=bid.package_id,
+            courier_id=bid.courier_id,
+            courier_name=current_user.full_name,
+            courier_rating=courier_rating,
+            courier_total_ratings=courier_total_ratings,
+            proposed_price=bid.proposed_price,
+            estimated_delivery_hours=bid.estimated_delivery_hours,
+            estimated_pickup_time=bid.estimated_pickup_time,
+            message=bid.message,
+            status=bid.status.value,
+            created_at=bid.created_at,
+            selected_at=bid.selected_at,
+            package_tracking_id=package.tracking_id if package else "",
+            package_description=package.description if package else "",
+            package_status=package.status.value if package else "",
+            package_pickup_address=package.pickup_address if package else "",
+            package_dropoff_address=package.dropoff_address if package else "",
+            package_size=package.size.value if package else "",
+            sender_name=sender.full_name if sender else "Unknown"
+        ))
+
+    return result
 
 
 @router.get("/package/{tracking_id}", response_model=PackageBidsResponse)

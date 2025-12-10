@@ -389,6 +389,7 @@ export interface RatingResponse {
   comment: string | null
   created_at: string
   rater_name: string | null
+  rated_user_name: string | null
 }
 
 export interface RatingListResponse {
@@ -406,6 +407,7 @@ export interface UserRatingSummary {
 
 export interface PendingRating {
   package_id: number
+  tracking_id: string
   package_description: string
   delivery_time: string | null
   user_to_rate_id: number
@@ -425,6 +427,8 @@ export const ratingsAPI = {
     api.get<RatingResponse[]>(`/ratings/package/${trackingId}`),
   getMyPendingRatings: () =>
     api.get<PendingRating[]>('/ratings/my-pending'),
+  getMyGivenRatings: (skip: number = 0, limit: number = 20) =>
+    api.get<RatingListResponse>(`/ratings/my-given?skip=${skip}&limit=${limit}`),
 }
 
 // Message Types
@@ -1235,6 +1239,30 @@ export interface PackageBidsResponse {
   bid_count: number
 }
 
+export interface BidWithPackageResponse {
+  id: number
+  package_id: number
+  courier_id: number
+  courier_name: string
+  courier_rating: number | null
+  courier_total_ratings: number
+  proposed_price: number
+  estimated_delivery_hours: number | null
+  estimated_pickup_time: string | null
+  message: string | null
+  status: BidStatus
+  created_at: string
+  selected_at: string | null
+  // Package details
+  package_tracking_id: string
+  package_description: string
+  package_status: string
+  package_pickup_address: string
+  package_dropoff_address: string
+  package_size: string
+  sender_name: string
+}
+
 // Bids API
 export const bidsAPI = {
   // Create a bid on a package
@@ -1252,6 +1280,10 @@ export const bidsAPI = {
   // Get courier's bids with optional status filter
   getMyBids: (status?: BidStatus) =>
     api.get<BidResponse[]>(`/bids/my-bids${status ? `?status_filter=${status}` : ''}`),
+
+  // Get courier's bid history with package details
+  getMyBidsHistory: (status?: BidStatus) =>
+    api.get<BidWithPackageResponse[]>(`/bids/my-bids/history${status ? `?status_filter=${status}` : ''}`),
 
   // Get all bids for a package
   getPackageBids: (trackingId: string) =>

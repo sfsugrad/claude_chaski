@@ -37,7 +37,7 @@ export default function RatingModal({
 
     try {
       await ratingsAPI.create({
-        package_id: pendingRating.package_id,
+        tracking_id: pendingRating.tracking_id,
         score: rating,
         comment: comment.trim() || undefined,
       })

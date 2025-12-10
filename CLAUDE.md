@@ -178,7 +178,7 @@ Key migrations: `add_phone_verification_fields.py`, `add_account_lockout_column.
   - `id_verification.py` - IDVerification with IDVerificationStatus enum (8 states)
   - `audit_log.py` - AuditLog with AuditAction enum (28 action types)
   - `bid.py`, `delivery_proof.py`, `payment.py`, `tracking.py`, `analytics.py`, `notification.py`, `rating.py`, `message.py`
-- `app/routes/` - API endpoints organized by domain (auth, packages, couriers, matching, admin, bids, payments, payouts, delivery_proof, tracking, analytics, messages, ratings, notifications, notes, ws, logs, id_verification)
+- `app/routes/` - API endpoints organized by domain (auth, packages, couriers, matching, admin, bids, payments, payouts, delivery_proof, tracking, analytics, messages, ratings, notifications, notes, ws, logs, id_verification, gdpr)
 - `app/utils/` - Shared utilities:
   - `dependencies.py` - FastAPI dependencies (`get_current_user`, `get_current_admin_user`)
   - `auth.py` - JWT token and password hashing

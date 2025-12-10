@@ -8,16 +8,26 @@ Tests cover:
 - Getting courier's bids
 - Getting package bids
 - Confirming pickup
+- Bid history endpoint
 """
 
 import pytest
 from datetime import datetime, timezone, timedelta
+from unittest.mock import patch, AsyncMock
 
 from app.models.user import User, UserRole
 from app.models.package import Package, PackageStatus
 from app.models.bid import CourierBid, BidStatus
 from app.utils.auth import get_password_hash, create_access_token
 from app.utils.tracking_id import generate_tracking_id
+
+
+@pytest.fixture(autouse=True)
+def mock_jwt_blacklist():
+    """Mock JWT blacklist service for all tests to avoid Redis async issues."""
+    with patch("app.services.jwt_blacklist.JWTBlacklistService.is_token_blacklisted", new_callable=AsyncMock, return_value=False):
+        with patch("app.services.jwt_blacklist.JWTBlacklistService.is_token_valid_for_user", new_callable=AsyncMock, return_value=True):
+            yield
 
 
 @pytest.fixture
@@ -858,3 +868,388 @@ class TestBidDeadline:
 
         db_session.refresh(bidding_package)
         assert bidding_package.bid_deadline == original_deadline
+
+
+class TestGetMyBidsHistory:
+    """Tests for GET /api/bids/my-bids/history"""
+
+    def test_get_bids_history_success(self, client, db_session, courier_user, sender_user):
+        """Courier gets their bid history with package details."""
+        # Create a package
+        package = Package(
+            tracking_id=generate_tracking_id(),
+            sender_id=sender_user.id,
+            description="Test Package for History",
+            size="medium",
+            weight_kg=5.0,
+            pickup_address="123 Pickup St",
+            pickup_lat=40.7128,
+            pickup_lng=-74.0060,
+            dropoff_address="456 Dropoff Ave",
+            dropoff_lat=40.7580,
+            dropoff_lng=-73.9855,
+            price=25.0,
+            status=PackageStatus.OPEN_FOR_BIDS,
+            is_active=True
+        )
+        db_session.add(package)
+        db_session.commit()
+
+        # Create a bid
+        bid = CourierBid(
+            package_id=package.id,
+            courier_id=courier_user.id,
+            proposed_price=22.0,
+            estimated_delivery_hours=12,
+            message="I can deliver quickly",
+            status=BidStatus.PENDING
+        )
+        db_session.add(bid)
+        db_session.commit()
+
+        response = client.get(
+            "/api/bids/my-bids/history",
+            headers=get_auth_header(courier_user)
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+
+        bid_data = data[0]
+        assert bid_data["proposed_price"] == 22.0
+        assert bid_data["estimated_delivery_hours"] == 12
+        assert bid_data["message"] == "I can deliver quickly"
+        assert bid_data["status"].lower() == "pending"
+        # Package details
+        assert bid_data["package_tracking_id"] == package.tracking_id
+        assert bid_data["package_description"] == "Test Package for History"
+        assert bid_data["package_status"].lower() == "open_for_bids"
+        assert bid_data["package_pickup_address"] == "123 Pickup St"
+        assert bid_data["package_dropoff_address"] == "456 Dropoff Ave"
+        assert bid_data["package_size"].lower() == "medium"
+        assert bid_data["sender_name"] == sender_user.full_name
+
+    def test_get_bids_history_multiple_bids(self, client, db_session, courier_user, sender_user):
+        """Courier gets all bids in history."""
+        # Create multiple packages
+        package1 = Package(
+            tracking_id=generate_tracking_id(),
+            sender_id=sender_user.id,
+            description="Package 1",
+            size="small",
+            weight_kg=2.0,
+            pickup_address="123 Pickup St",
+            pickup_lat=40.7128,
+            pickup_lng=-74.0060,
+            dropoff_address="456 Dropoff Ave",
+            dropoff_lat=40.7580,
+            dropoff_lng=-73.9855,
+            status=PackageStatus.OPEN_FOR_BIDS,
+            is_active=True
+        )
+        package2 = Package(
+            tracking_id=generate_tracking_id(),
+            sender_id=sender_user.id,
+            description="Package 2",
+            size="large",
+            weight_kg=10.0,
+            pickup_address="789 Start Blvd",
+            pickup_lat=40.7128,
+            pickup_lng=-74.0060,
+            dropoff_address="321 End Way",
+            dropoff_lat=40.7580,
+            dropoff_lng=-73.9855,
+            status=PackageStatus.BID_SELECTED,
+            is_active=True
+        )
+        db_session.add_all([package1, package2])
+        db_session.commit()
+
+        # Create bids with different statuses
+        bid1 = CourierBid(
+            package_id=package1.id,
+            courier_id=courier_user.id,
+            proposed_price=15.0,
+            status=BidStatus.PENDING
+        )
+        bid2 = CourierBid(
+            package_id=package2.id,
+            courier_id=courier_user.id,
+            proposed_price=30.0,
+            status=BidStatus.SELECTED,
+            selected_at=datetime.now(timezone.utc)
+        )
+        db_session.add_all([bid1, bid2])
+        db_session.commit()
+
+        response = client.get(
+            "/api/bids/my-bids/history",
+            headers=get_auth_header(courier_user)
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 2
+
+        # Results should be ordered by created_at desc (newest first)
+        statuses = [bid["status"].lower() for bid in data]
+        assert "pending" in statuses
+        assert "selected" in statuses
+
+    def test_get_bids_history_with_status_filter(self, client, db_session, courier_user, sender_user):
+        """Courier can filter bid history by status."""
+        # Create packages
+        package1 = Package(
+            tracking_id=generate_tracking_id(),
+            sender_id=sender_user.id,
+            description="Pending Package",
+            size="small",
+            weight_kg=2.0,
+            pickup_address="123 Pickup",
+            pickup_lat=40.7128,
+            pickup_lng=-74.0060,
+            dropoff_address="456 Dropoff",
+            dropoff_lat=40.7580,
+            dropoff_lng=-73.9855,
+            status=PackageStatus.OPEN_FOR_BIDS,
+            is_active=True
+        )
+        package2 = Package(
+            tracking_id=generate_tracking_id(),
+            sender_id=sender_user.id,
+            description="Selected Package",
+            size="medium",
+            weight_kg=5.0,
+            pickup_address="789 Start",
+            pickup_lat=40.7128,
+            pickup_lng=-74.0060,
+            dropoff_address="321 End",
+            dropoff_lat=40.7580,
+            dropoff_lng=-73.9855,
+            status=PackageStatus.BID_SELECTED,
+            is_active=True
+        )
+        db_session.add_all([package1, package2])
+        db_session.commit()
+
+        # Create bids
+        bid1 = CourierBid(
+            package_id=package1.id,
+            courier_id=courier_user.id,
+            proposed_price=15.0,
+            status=BidStatus.PENDING
+        )
+        bid2 = CourierBid(
+            package_id=package2.id,
+            courier_id=courier_user.id,
+            proposed_price=25.0,
+            status=BidStatus.SELECTED
+        )
+        db_session.add_all([bid1, bid2])
+        db_session.commit()
+
+        # Filter by SELECTED status
+        response = client.get(
+            "/api/bids/my-bids/history?status_filter=SELECTED",
+            headers=get_auth_header(courier_user)
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["status"].lower() == "selected"
+        assert data[0]["package_description"] == "Selected Package"
+
+    def test_get_bids_history_filter_pending(self, client, db_session, courier_user, sender_user):
+        """Filter by pending status."""
+        package = Package(
+            tracking_id=generate_tracking_id(),
+            sender_id=sender_user.id,
+            description="Pending Bid Package",
+            size="small",
+            weight_kg=1.0,
+            pickup_address="123 Start",
+            pickup_lat=40.7128,
+            pickup_lng=-74.0060,
+            dropoff_address="456 End",
+            dropoff_lat=40.7580,
+            dropoff_lng=-73.9855,
+            status=PackageStatus.OPEN_FOR_BIDS,
+            is_active=True
+        )
+        db_session.add(package)
+        db_session.commit()
+
+        bid = CourierBid(
+            package_id=package.id,
+            courier_id=courier_user.id,
+            proposed_price=20.0,
+            status=BidStatus.PENDING
+        )
+        db_session.add(bid)
+        db_session.commit()
+
+        response = client.get(
+            "/api/bids/my-bids/history?status_filter=pending",
+            headers=get_auth_header(courier_user)
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["status"].lower() == "pending"
+
+    def test_get_bids_history_invalid_status_filter(self, client, courier_user):
+        """Invalid status filter returns error."""
+        response = client.get(
+            "/api/bids/my-bids/history?status_filter=invalid_status",
+            headers=get_auth_header(courier_user)
+        )
+
+        assert response.status_code == 400
+        assert "Invalid status filter" in response.json()["detail"]
+
+    def test_get_bids_history_empty(self, client, courier_user):
+        """Returns empty list when no bids exist."""
+        response = client.get(
+            "/api/bids/my-bids/history",
+            headers=get_auth_header(courier_user)
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data == []
+
+    def test_get_bids_history_sender_forbidden(self, client, sender_user):
+        """Sender cannot access bid history endpoint."""
+        response = client.get(
+            "/api/bids/my-bids/history",
+            headers=get_auth_header(sender_user)
+        )
+
+        assert response.status_code == 403
+        assert "Only couriers can view their bids" in response.json()["detail"]
+
+    def test_get_bids_history_both_role_allowed(self, client, db_session, both_role_user, sender_user):
+        """User with 'both' role can access bid history."""
+        package = Package(
+            tracking_id=generate_tracking_id(),
+            sender_id=sender_user.id,
+            description="Both Role Test Package",
+            size="small",
+            weight_kg=1.0,
+            pickup_address="123 Start",
+            pickup_lat=40.7128,
+            pickup_lng=-74.0060,
+            dropoff_address="456 End",
+            dropoff_lat=40.7580,
+            dropoff_lng=-73.9855,
+            status=PackageStatus.OPEN_FOR_BIDS,
+            is_active=True
+        )
+        db_session.add(package)
+        db_session.commit()
+
+        bid = CourierBid(
+            package_id=package.id,
+            courier_id=both_role_user.id,
+            proposed_price=18.0,
+            status=BidStatus.PENDING
+        )
+        db_session.add(bid)
+        db_session.commit()
+
+        response = client.get(
+            "/api/bids/my-bids/history",
+            headers=get_auth_header(both_role_user)
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+
+    def test_get_bids_history_shows_withdrawn_bids(self, client, db_session, courier_user, sender_user):
+        """Withdrawn bids appear in history."""
+        package = Package(
+            tracking_id=generate_tracking_id(),
+            sender_id=sender_user.id,
+            description="Withdrawn Bid Package",
+            size="small",
+            weight_kg=1.0,
+            pickup_address="123 Start",
+            pickup_lat=40.7128,
+            pickup_lng=-74.0060,
+            dropoff_address="456 End",
+            dropoff_lat=40.7580,
+            dropoff_lng=-73.9855,
+            status=PackageStatus.OPEN_FOR_BIDS,
+            is_active=True
+        )
+        db_session.add(package)
+        db_session.commit()
+
+        bid = CourierBid(
+            package_id=package.id,
+            courier_id=courier_user.id,
+            proposed_price=20.0,
+            status=BidStatus.WITHDRAWN,
+            withdrawn_at=datetime.now(timezone.utc)
+        )
+        db_session.add(bid)
+        db_session.commit()
+
+        response = client.get(
+            "/api/bids/my-bids/history?status_filter=withdrawn",
+            headers=get_auth_header(courier_user)
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["status"].lower() == "withdrawn"
+
+    def test_get_bids_history_shows_rejected_bids(self, client, db_session, courier_user, sender_user):
+        """Rejected bids appear in history."""
+        package = Package(
+            tracking_id=generate_tracking_id(),
+            sender_id=sender_user.id,
+            description="Rejected Bid Package",
+            size="small",
+            weight_kg=1.0,
+            pickup_address="123 Start",
+            pickup_lat=40.7128,
+            pickup_lng=-74.0060,
+            dropoff_address="456 End",
+            dropoff_lat=40.7580,
+            dropoff_lng=-73.9855,
+            status=PackageStatus.BID_SELECTED,
+            is_active=True
+        )
+        db_session.add(package)
+        db_session.commit()
+
+        bid = CourierBid(
+            package_id=package.id,
+            courier_id=courier_user.id,
+            proposed_price=20.0,
+            status=BidStatus.REJECTED
+        )
+        db_session.add(bid)
+        db_session.commit()
+
+        response = client.get(
+            "/api/bids/my-bids/history?status_filter=rejected",
+            headers=get_auth_header(courier_user)
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["status"].lower() == "rejected"
+
+    def test_get_bids_history_unauthenticated(self, client):
+        """Unauthenticated request is rejected."""
+        response = client.get("/api/bids/my-bids/history")
+
+        assert response.status_code == 401

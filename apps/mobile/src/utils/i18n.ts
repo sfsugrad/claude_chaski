@@ -24,6 +24,8 @@ i18n.use(initReactI18next).init({
   fallbackLng: DEFAULT_LOCALE,
   interpolation: {
     escapeValue: false, // React Native handles this
+    prefix: '{',
+    suffix: '}',
   },
   compatibilityJSON: 'v4', // Required for React Native
 })

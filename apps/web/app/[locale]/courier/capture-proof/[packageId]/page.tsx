@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { Card, CardHeader, CardContent } from '@/components/ui/Card'
+import Link from 'next/link'
+import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
@@ -25,7 +26,7 @@ const RECIPIENT_RELATIONSHIPS = [
 function CaptureProofContent() {
   const params = useParams()
   const router = useRouter()
-  const packageId = parseInt(params.packageId as string, 10)
+  const trackingId = params.packageId as string
 
   const [currentStep, setCurrentStep] = useState<ProofStep>('photo')
   const [loading, setLoading] = useState(true)
@@ -47,11 +48,12 @@ function CaptureProofContent() {
   useEffect(() => {
     const fetchPackage = async () => {
       try {
-        const response = await packagesAPI.getById(packageId)
+        const response = await packagesAPI.getByTrackingId(trackingId)
         setPkg(response.data)
 
         // Check if package is in the right status
-        if (!['picked_up', 'in_transit'].includes(response.data.status)) {
+        const status = response.data.status.toLowerCase()
+        if (!['picked_up', 'in_transit'].includes(status)) {
           setError(`Cannot capture proof for package in "${response.data.status}" status`)
         }
       } catch (err) {
@@ -62,7 +64,7 @@ function CaptureProofContent() {
     }
 
     fetchPackage()
-  }, [packageId])
+  }, [trackingId])
 
   // Get current location
   useEffect(() => {
@@ -97,7 +99,7 @@ function CaptureProofContent() {
 
     try {
       // Get pre-signed URL
-      const urlResponse = await proofAPI.getUploadUrl(packageId, 'photo', photoFile.type)
+      const urlResponse = await proofAPI.getUploadUrl(trackingId, 'photo', photoFile.type)
       const { upload_url, key, fields } = urlResponse.data
 
       // Upload to S3
@@ -114,11 +116,21 @@ function CaptureProofContent() {
     setError(null)
 
     try {
-      // Upload photo if present
+      // Try to upload photo if present
       let s3Key = photoS3Key
       if (photoFile && !photoS3Key) {
-        s3Key = await uploadPhoto()
-        setPhotoS3Key(s3Key)
+        try {
+          s3Key = await uploadPhoto()
+          setPhotoS3Key(s3Key)
+        } catch (photoErr) {
+          // Photo upload failed - continue if we have a signature
+          console.warn('Photo upload failed:', photoErr)
+          if (!signatureData) {
+            throw new Error('Photo upload failed and no signature provided. Please provide a signature or try again.')
+          }
+          // Continue without photo since we have a signature
+          s3Key = null
+        }
       }
 
       // Prepare proof data
@@ -135,10 +147,10 @@ function CaptureProofContent() {
       }
 
       // Create proof record
-      await proofAPI.create(packageId, proofData)
+      await proofAPI.create(trackingId, proofData)
 
       // Redirect to package details
-      router.push(`/packages/${packageId}?delivered=true`)
+      router.push(`/packages/${trackingId}?delivered=true`)
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to submit proof'
       setError(errorMessage)
@@ -183,10 +195,19 @@ function CaptureProofContent() {
       {/* Header */}
       <div className="bg-white border-b border-surface-200 px-4 py-4">
         <div className="max-w-lg mx-auto">
-          <h1 className="text-xl font-semibold">Delivery Proof</h1>
-          <p className="text-sm text-surface-600 mt-1">
-            {pkg?.dropoff_address}
-          </p>
+          <div className="flex items-center gap-3">
+            <Link href="/courier" className="text-surface-500 hover:text-surface-700">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+            </Link>
+            <div>
+              <h1 className="text-xl font-semibold">Delivery Proof</h1>
+              <p className="text-sm text-surface-600">
+                {pkg?.dropoff_address}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -235,7 +256,7 @@ function CaptureProofContent() {
                 Take a photo of the delivered package at the dropoff location
               </p>
             </CardHeader>
-            <CardContent>
+            <CardBody>
               <PhotoCapture
                 onCapture={handlePhotoCapture}
                 onClear={() => {
@@ -261,7 +282,7 @@ function CaptureProofContent() {
                   Next
                 </Button>
               </div>
-            </CardContent>
+            </CardBody>
           </Card>
         )}
 
@@ -274,7 +295,7 @@ function CaptureProofContent() {
                 Ask the recipient to sign below to confirm delivery
               </p>
             </CardHeader>
-            <CardContent>
+            <CardBody>
               <SignaturePad
                 onComplete={handleSignatureComplete}
                 onClear={() => setSignatureData(null)}
@@ -305,7 +326,7 @@ function CaptureProofContent() {
                   Next
                 </Button>
               </div>
-            </CardContent>
+            </CardBody>
           </Card>
         )}
 
@@ -318,7 +339,7 @@ function CaptureProofContent() {
                 Add optional information about the delivery
               </p>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardBody className="space-y-4">
               <Input
                 label="Recipient Name"
                 value={recipientName}
@@ -372,7 +393,7 @@ function CaptureProofContent() {
                   Review
                 </Button>
               </div>
-            </CardContent>
+            </CardBody>
           </Card>
         )}
 
@@ -385,7 +406,7 @@ function CaptureProofContent() {
                 Review the proof before submitting
               </p>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardBody className="space-y-4">
               {/* Preview captured proof */}
               <div className="grid grid-cols-2 gap-4">
                 {photoPreview && (
@@ -453,7 +474,7 @@ function CaptureProofContent() {
                   {submitting ? 'Submitting...' : 'Submit Proof'}
                 </Button>
               </div>
-            </CardContent>
+            </CardBody>
           </Card>
         )}
       </div>
