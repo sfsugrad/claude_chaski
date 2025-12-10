@@ -42,7 +42,8 @@
     "copied": "Copié !",
     "copyToClipboard": "Copier dans le presse-papiers",
     "noResults": "Aucun résultat trouvé",
-    "emptyState": "Rien ici pour le moment"
+    "emptyState": "Rien ici pour le moment",
+    "version": "Version"
   },
   "nav": {
     "home": "Accueil",
@@ -294,7 +295,8 @@
     "assignedCourier": "Coursier assigné",
     "price": "Prix",
     "notes": "Notes",
-    "addNotes": "Ajouter des notes",
+    "addNotes": "Ajouter une note...",
+    "noNotes": "Pas encore de notes",
     "packageNotes": "Notes du colis",
     "proofRequired": "Preuve de livraison requise",
     "proofRequiredDescription": "Le coursier doit télécharger une photo de preuve lors de la livraison",
@@ -440,7 +442,8 @@
     "messageSent": "Message envoyé",
     "regarding": "Concernant",
     "package": "Colis",
-    "startConversation": "Démarrer une conversation"
+    "startConversation": "Démarrer une conversation",
+    "send": "Envoyer"
   },
   "notifications": {
     "title": "Notifications",
@@ -615,6 +618,67 @@
     "minutes": "minutes",
     "hours": "heures",
     "days": "jours"
+  },
+  "help": {
+    "title": "Aide et Support",
+    "faq": "Questions Fréquentes",
+    "faqDescription": "Trouvez des réponses aux questions courantes",
+    "contactSupport": "Contacter le Support",
+    "contactDescription": "Obtenez de l'aide de notre équipe de support",
+    "termsOfService": "Conditions d'Utilisation",
+    "termsDescription": "Lisez nos termes et conditions",
+    "privacyPolicy": "Politique de Confidentialité",
+    "privacyDescription": "Découvrez comment nous protégeons vos données",
+    "appInfo": "Informations sur l'App",
+    "buildNumber": "Numéro de Build"
+  },
+  "faq": {
+    "title": "Questions Fréquentes",
+    "subtitle": "Trouvez des réponses aux questions courantes sur MyChaski",
+    "moreHelp": "Besoin d'aide supplémentaire ? Contactez-nous à",
+    "sections": {
+      "general": {
+        "title": "Général",
+        "q1": "Qu'est-ce que MyChaski ?",
+        "a1": "MyChaski est une plateforme de livraison entre particuliers qui connecte les personnes ayant besoin d'envoyer des colis avec des coursiers voyageant sur le même trajet. C'est un moyen économique et écologique d'expédier des articles.",
+        "q2": "Comment fonctionne MyChaski ?",
+        "a2": "Les expéditeurs créent des annonces de colis avec les lieux de collecte et de livraison. Les coursiers parcourent les colis sur leurs trajets et font des offres. Une fois une offre acceptée, le coursier récupère et livre le colis, et les deux parties peuvent s'évaluer mutuellement.",
+        "q3": "MyChaski est-il disponible dans ma région ?",
+        "a3": "MyChaski est actuellement disponible aux États-Unis. Nous travaillons à nous étendre à d'autres régions. Restez à l'écoute pour les mises à jour !"
+      },
+      "senders": {
+        "title": "Pour les Expéditeurs",
+        "q1": "Comment envoyer un colis ?",
+        "a1": "Créez un compte, vérifiez votre email et téléphone, puis appuyez sur 'Envoyer un Colis' pour entrer les détails de votre colis, les adresses de collecte et de livraison, et le prix souhaité. Les coursiers feront des offres sur votre annonce.",
+        "q2": "Comment choisir un coursier ?",
+        "a2": "Examinez les offres des coursiers incluant leurs évaluations, le prix proposé et le délai de livraison estimé. Sélectionnez l'offre qui correspond le mieux à vos besoins. Vous pouvez également envoyer des messages aux coursiers avant d'accepter.",
+        "q3": "Que se passe-t-il si mon colis est perdu ou endommagé ?",
+        "a3": "Contactez immédiatement notre équipe de support. Nous enquêtons sur toutes les réclamations et travaillons avec les deux parties pour résoudre les problèmes. Nous recommandons de documenter l'état de votre colis avant l'expédition."
+      },
+      "couriers": {
+        "title": "Pour les Coursiers",
+        "q1": "Comment devenir coursier ?",
+        "a1": "Inscrivez-vous en tant que coursier, complétez la vérification de l'email et du téléphone, puis vérifiez votre identité via notre processus de vérification sécurisé. Une fois vérifié, vous pouvez commencer à accepter des livraisons.",
+        "q2": "Comment trouver des colis à livrer ?",
+        "a2": "Créez un trajet avec vos lieux de départ et d'arrivée. L'application vous montrera les colis sur votre trajet. Vous pouvez faire des offres sur les colis que vous souhaitez livrer.",
+        "q3": "Quand suis-je payé ?",
+        "a3": "Le paiement est libéré après confirmation de livraison réussie. Vous pouvez transférer vos gains vers votre compte bancaire via notre système de paiement sécurisé."
+      },
+      "payments": {
+        "title": "Paiements",
+        "q1": "Quels modes de paiement sont acceptés ?",
+        "a1": "Nous acceptons les principales cartes de crédit et de débit via notre processeur de paiement sécurisé. Les coursiers peuvent configurer le dépôt direct pour les paiements.",
+        "q2": "Y a-t-il des frais ?",
+        "a2": "MyChaski facture des frais de service modestes sur les livraisons effectuées. Les frais sont transparents et affichés avant de confirmer toute transaction."
+      },
+      "safety": {
+        "title": "Sécurité et Confiance",
+        "q1": "Comment MyChaski assure-t-il la sécurité ?",
+        "a1": "Tous les utilisateurs doivent vérifier leur email et téléphone. Les coursiers passent par une vérification d'identité supplémentaire. Notre système d'évaluation aide à maintenir la confiance de la communauté, et vous pouvez envoyer des messages aux utilisateurs avant de vous engager dans une livraison.",
+        "q2": "Quels articles sont interdits ?",
+        "a2": "Les articles illégaux, matières dangereuses, armes, drogues et denrées périssables nécessitant une manipulation spéciale sont interdits. Consultez nos Conditions d'Utilisation pour la liste complète."
+      }
+    }
   },
   "legal": {
     "backToRegistration": "Retour à l'Inscription",

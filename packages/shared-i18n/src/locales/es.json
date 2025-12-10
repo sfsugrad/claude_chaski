@@ -42,7 +42,8 @@
     "copied": "¡Copiado!",
     "copyToClipboard": "Copiar al portapapeles",
     "noResults": "No se encontraron resultados",
-    "emptyState": "Aún no hay nada aquí"
+    "emptyState": "Aún no hay nada aquí",
+    "version": "Versión"
   },
   "nav": {
     "home": "Inicio",
@@ -294,7 +295,8 @@
     "assignedCourier": "Mensajero Asignado",
     "price": "Precio",
     "notes": "Notas",
-    "addNotes": "Agregar Notas",
+    "addNotes": "Agregar una nota...",
+    "noNotes": "Aún no hay notas",
     "packageNotes": "Notas del Paquete",
     "proofRequired": "Comprobante de Entrega Requerido",
     "proofRequiredDescription": "El mensajero debe subir una foto como comprobante al momento de la entrega",
@@ -440,7 +442,8 @@
     "messageSent": "Mensaje enviado",
     "regarding": "Respecto a",
     "package": "Paquete",
-    "startConversation": "Iniciar una conversación"
+    "startConversation": "Iniciar una conversación",
+    "send": "Enviar"
   },
   "notifications": {
     "title": "Notificaciones",
@@ -615,6 +618,67 @@
     "minutes": "minutos",
     "hours": "horas",
     "days": "días"
+  },
+  "help": {
+    "title": "Ayuda y Soporte",
+    "faq": "Preguntas Frecuentes",
+    "faqDescription": "Encuentra respuestas a preguntas comunes",
+    "contactSupport": "Contactar Soporte",
+    "contactDescription": "Obtén ayuda de nuestro equipo de soporte",
+    "termsOfService": "Términos de Servicio",
+    "termsDescription": "Lee nuestros términos y condiciones",
+    "privacyPolicy": "Política de Privacidad",
+    "privacyDescription": "Conoce cómo protegemos tus datos",
+    "appInfo": "Información de la App",
+    "buildNumber": "Número de Compilación"
+  },
+  "faq": {
+    "title": "Preguntas Frecuentes",
+    "subtitle": "Encuentra respuestas a preguntas comunes sobre MyChaski",
+    "moreHelp": "¿Aún necesitas ayuda? Contáctanos en",
+    "sections": {
+      "general": {
+        "title": "General",
+        "q1": "¿Qué es MyChaski?",
+        "a1": "MyChaski es una plataforma de entrega entre personas que conecta a quienes necesitan enviar paquetes con mensajeros que viajan por la misma ruta. Es una forma económica y ecológica de enviar artículos.",
+        "q2": "¿Cómo funciona MyChaski?",
+        "a2": "Los remitentes crean listados de paquetes con ubicaciones de recogida y entrega. Los mensajeros buscan paquetes en sus rutas y hacen ofertas. Una vez aceptada una oferta, el mensajero recoge y entrega el paquete, y ambas partes pueden calificarse mutuamente.",
+        "q3": "¿Está MyChaski disponible en mi área?",
+        "a3": "MyChaski está actualmente disponible en Estados Unidos. Estamos trabajando en expandirnos a más regiones. ¡Mantente atento a las actualizaciones!"
+      },
+      "senders": {
+        "title": "Para Remitentes",
+        "q1": "¿Cómo envío un paquete?",
+        "a1": "Crea una cuenta, verifica tu email y teléfono, luego toca 'Enviar Paquete' para ingresar los detalles de tu paquete, direcciones de recogida y entrega, y precio preferido. Los mensajeros harán ofertas en tu listado.",
+        "q2": "¿Cómo elijo un mensajero?",
+        "a2": "Revisa las ofertas de los mensajeros incluyendo sus calificaciones, precio propuesto y tiempo estimado de entrega. Selecciona la oferta que mejor se adapte a tus necesidades. También puedes enviar mensajes a los mensajeros antes de aceptar.",
+        "q3": "¿Qué pasa si mi paquete se pierde o daña?",
+        "a3": "Contacta a nuestro equipo de soporte inmediatamente. Investigamos todas las reclamaciones y trabajamos con ambas partes para resolver problemas. Recomendamos documentar la condición de tu paquete antes del envío."
+      },
+      "couriers": {
+        "title": "Para Mensajeros",
+        "q1": "¿Cómo me convierto en mensajero?",
+        "a1": "Regístrate como mensajero, completa la verificación de email y teléfono, luego verifica tu identificación a través de nuestro proceso seguro de verificación. Una vez verificado, puedes comenzar a aceptar entregas.",
+        "q2": "¿Cómo encuentro paquetes para entregar?",
+        "a2": "Crea una ruta con tus ubicaciones de inicio y fin. La app te mostrará paquetes a lo largo de tu ruta. Puedes hacer ofertas en los paquetes que te interese entregar.",
+        "q3": "¿Cuándo me pagan?",
+        "a3": "El pago se libera después de la confirmación exitosa de entrega. Puedes transferir tus ganancias a tu cuenta bancaria a través de nuestro sistema seguro de pagos."
+      },
+      "payments": {
+        "title": "Pagos",
+        "q1": "¿Qué métodos de pago se aceptan?",
+        "a1": "Aceptamos tarjetas de crédito y débito principales a través de nuestro procesador de pagos seguro. Los mensajeros pueden configurar depósito directo para sus pagos.",
+        "q2": "¿Hay alguna tarifa?",
+        "a2": "MyChaski cobra una pequeña tarifa de servicio en las entregas completadas. La tarifa es transparente y se muestra antes de confirmar cualquier transacción."
+      },
+      "safety": {
+        "title": "Seguridad y Confianza",
+        "q1": "¿Cómo garantiza MyChaski la seguridad?",
+        "a1": "Todos los usuarios deben verificar su email y teléfono. Los mensajeros pasan por verificación adicional de identificación. Nuestro sistema de calificaciones ayuda a mantener la confianza de la comunidad, y puedes enviar mensajes a los usuarios antes de comprometerte con una entrega.",
+        "q2": "¿Qué artículos están prohibidos?",
+        "a2": "Artículos ilegales, materiales peligrosos, armas, drogas y perecederos que requieren manejo especial están prohibidos. Consulta nuestros Términos de Servicio para la lista completa."
+      }
+    }
   },
   "legal": {
     "backToRegistration": "Volver al Registro",

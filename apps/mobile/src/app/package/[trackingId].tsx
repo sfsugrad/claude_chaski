@@ -6,14 +6,19 @@ import {
   RefreshControl,
   TouchableOpacity,
   ActivityIndicator,
+  TextInput,
+  Platform,
+  KeyboardAvoidingView,
 } from 'react-native'
 import { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useLocalSearchParams, router } from 'expo-router'
+import { Ionicons } from '@expo/vector-icons'
 import { api } from '@/services/api'
+import { useAuth } from '@/contexts/AuthContext'
 import { getStatusLabel, getStatusColor } from '@chaski/shared-utils'
-import type { PackageResponse } from '@chaski/shared-types'
+import type { PackageResponse, PackageNoteResponse } from '@chaski/shared-types'
 
 function getStatusColorHex(status: string): string {
   const colorMap: Record<string, string> = {
@@ -32,7 +37,10 @@ function getStatusColorHex(status: string): string {
 export default function PackageDetailScreen() {
   const { t } = useTranslation()
   const { trackingId } = useLocalSearchParams<{ trackingId: string }>()
+  const { user } = useAuth()
+  const queryClient = useQueryClient()
   const [refreshing, setRefreshing] = useState(false)
+  const [newNote, setNewNote] = useState('')
 
   const { data: packageData, refetch, isLoading, error } = useQuery({
     queryKey: ['package', trackingId],
@@ -40,11 +48,86 @@ export default function PackageDetailScreen() {
     enabled: !!trackingId,
   })
 
+  const { data: notesData, refetch: refetchNotes } = useQuery({
+    queryKey: ['package-notes', trackingId],
+    queryFn: () => api.notesAPI.getPackageNotes(trackingId!),
+    enabled: !!trackingId,
+  })
+
+  const addNoteMutation = useMutation({
+    mutationFn: async (content: string) => {
+      console.log('Adding note to package:', trackingId)
+      console.log('Note content:', content)
+      try {
+        const result = await api.notesAPI.addNote(trackingId!, content)
+        console.log('Add note result:', result)
+        return result
+      } catch (err: any) {
+        console.error('Add note error details:', {
+          message: err?.message,
+          status: err?.status,
+          data: err?.data,
+        })
+        throw err
+      }
+    },
+    onSuccess: () => {
+      setNewNote('')
+      queryClient.invalidateQueries({ queryKey: ['package-notes', trackingId] })
+    },
+    onError: (error: any) => {
+      console.error('Failed to add note:', error)
+      if (Platform.OS === 'web') {
+        const errorMsg = error?.message || 'Unknown error'
+        const statusCode = error?.status ? ` (Status: ${error.status})` : ''
+        alert(`Failed to add note: ${errorMsg}${statusCode}`)
+      }
+    },
+  })
+
+  const handleAddNote = () => {
+    console.log('handleAddNote called, newNote:', newNote)
+    if (!newNote.trim()) {
+      console.log('Note is empty, returning')
+      return
+    }
+    console.log('Calling mutation with:', newNote.trim())
+    addNoteMutation.mutate(newNote.trim())
+  }
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
-    await refetch()
+    await Promise.all([refetch(), refetchNotes()])
     setRefreshing(false)
-  }, [refetch])
+  }, [refetch, refetchNotes])
+
+  const formatNoteTime = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return t('time.justNow')
+    if (diffMins < 60) return `${diffMins} ${t('time.minutes')} ago`
+    if (diffHours < 24) return `${diffHours} ${t('time.hours')} ago`
+    if (diffDays < 7) return `${diffDays} ${t('time.days')} ago`
+    return date.toLocaleDateString()
+  }
+
+  const getAuthorTypeColor = (authorType: string) => {
+    switch (authorType) {
+      case 'SENDER':
+        return '#3b82f6' // blue
+      case 'COURIER':
+        return '#8b5cf6' // purple
+      case 'SYSTEM':
+        return '#6b7280' // gray
+      default:
+        return '#6b7280'
+    }
+  }
 
   if (isLoading) {
     return (
@@ -260,6 +343,76 @@ export default function PackageDetailScreen() {
         </View>
       )}
 
+      {/* Notes/Comments Section */}
+      <View style={styles.card}>
+        <View style={styles.notesHeader}>
+          <Text style={styles.sectionTitle}>{t('packages.notes')}</Text>
+          <Text style={styles.notesCount}>
+            {notesData?.data?.length || 0} {t('packages.notes').toLowerCase()}
+          </Text>
+        </View>
+
+        {/* Add Note Input */}
+        <View style={styles.addNoteContainer}>
+          <TextInput
+            style={styles.noteInput}
+            value={newNote}
+            onChangeText={setNewNote}
+            placeholder={t('packages.addNotes')}
+            placeholderTextColor="#9ca3af"
+            multiline
+            maxLength={1000}
+          />
+          <TouchableOpacity
+            style={[styles.addNoteButton, !newNote.trim() && styles.addNoteButtonDisabled]}
+            onPress={handleAddNote}
+            disabled={!newNote.trim() || addNoteMutation.isPending}
+          >
+            {addNoteMutation.isPending ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Ionicons name="send" size={18} color="#fff" />
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Notes List */}
+        {notesData?.data && notesData.data.length > 0 ? (
+          <View style={styles.notesList}>
+            {notesData.data.map((note: PackageNoteResponse) => (
+              <View key={note.id} style={styles.noteItem}>
+                <View style={styles.noteHeader}>
+                  <View style={styles.noteAuthorInfo}>
+                    <View
+                      style={[
+                        styles.authorBadge,
+                        { backgroundColor: getAuthorTypeColor(note.author_type) },
+                      ]}
+                    >
+                      <Text style={styles.authorBadgeText}>
+                        {note.author_type === 'SYSTEM' ? 'SYS' : note.author_type.charAt(0)}
+                      </Text>
+                    </View>
+                    <View>
+                      <Text style={styles.noteAuthorName}>
+                        {note.author_name || note.author_type}
+                      </Text>
+                      <Text style={styles.noteTime}>{formatNoteTime(note.created_at)}</Text>
+                    </View>
+                  </View>
+                </View>
+                <Text style={styles.noteContent}>{note.content}</Text>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.emptyNotes}>
+            <Ionicons name="chatbubble-outline" size={32} color="#d1d5db" />
+            <Text style={styles.emptyNotesText}>{t('packages.noNotes')}</Text>
+          </View>
+        )}
+      </View>
+
       {/* Spacer at bottom */}
       <View style={{ height: 32 }} />
     </ScrollView>
@@ -461,5 +614,97 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
     marginTop: 2,
+  },
+  // Notes styles
+  notesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  notesCount: {
+    fontSize: 12,
+    color: '#9ca3af',
+  },
+  addNoteContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    marginBottom: 16,
+    gap: 8,
+  },
+  noteInput: {
+    flex: 1,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    maxHeight: 80,
+    color: '#111',
+  },
+  addNoteButton: {
+    backgroundColor: '#3b82f6',
+    borderRadius: 12,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addNoteButtonDisabled: {
+    backgroundColor: '#9ca3af',
+  },
+  notesList: {
+    gap: 12,
+  },
+  noteItem: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 10,
+    padding: 12,
+  },
+  noteHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  noteAuthorInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  authorBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  authorBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  noteAuthorName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#111',
+  },
+  noteTime: {
+    fontSize: 11,
+    color: '#9ca3af',
+  },
+  noteContent: {
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 20,
+  },
+  emptyNotes: {
+    alignItems: 'center',
+    paddingVertical: 24,
+    gap: 8,
+  },
+  emptyNotesText: {
+    fontSize: 14,
+    color: '#9ca3af',
   },
 })

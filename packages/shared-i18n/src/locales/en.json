@@ -42,7 +42,8 @@
     "copied": "Copied!",
     "copyToClipboard": "Copy to clipboard",
     "noResults": "No results found",
-    "emptyState": "Nothing here yet"
+    "emptyState": "Nothing here yet",
+    "version": "Version"
   },
   "nav": {
     "home": "Home",
@@ -294,7 +295,8 @@
     "assignedCourier": "Assigned Courier",
     "price": "Price",
     "notes": "Notes",
-    "addNotes": "Add Notes",
+    "addNotes": "Add a note...",
+    "noNotes": "No notes yet",
     "packageNotes": "Package Notes",
     "proofRequired": "Proof of Delivery Required",
     "proofRequiredDescription": "Courier must upload photo proof upon delivery",
@@ -440,7 +442,8 @@
     "messageSent": "Message sent",
     "regarding": "Regarding",
     "package": "Package",
-    "startConversation": "Start a conversation"
+    "startConversation": "Start a conversation",
+    "send": "Send"
   },
   "notifications": {
     "title": "Notifications",
@@ -615,6 +618,67 @@
     "minutes": "minutes",
     "hours": "hours",
     "days": "days"
+  },
+  "help": {
+    "title": "Help & Support",
+    "faq": "Frequently Asked Questions",
+    "faqDescription": "Find answers to common questions",
+    "contactSupport": "Contact Support",
+    "contactDescription": "Get help from our support team",
+    "termsOfService": "Terms of Service",
+    "termsDescription": "Read our terms and conditions",
+    "privacyPolicy": "Privacy Policy",
+    "privacyDescription": "Learn how we protect your data",
+    "appInfo": "App Information",
+    "buildNumber": "Build Number"
+  },
+  "faq": {
+    "title": "Frequently Asked Questions",
+    "subtitle": "Find answers to common questions about MyChaski",
+    "moreHelp": "Still need help? Contact us at",
+    "sections": {
+      "general": {
+        "title": "General",
+        "q1": "What is MyChaski?",
+        "a1": "MyChaski is a peer-to-peer delivery platform that connects people who need to send packages with couriers traveling along the same route. It's a cost-effective and eco-friendly way to ship items.",
+        "q2": "How does MyChaski work?",
+        "a2": "Senders create package listings with pickup and delivery locations. Couriers browse packages along their routes and place bids. Once a bid is accepted, the courier picks up and delivers the package, and both parties can rate each other.",
+        "q3": "Is MyChaski available in my area?",
+        "a3": "MyChaski is currently available in the United States. We're working on expanding to more regions. Stay tuned for updates!"
+      },
+      "senders": {
+        "title": "For Senders",
+        "q1": "How do I send a package?",
+        "a1": "Create an account, verify your email and phone, then tap 'Send Package' to enter your package details, pickup and delivery addresses, and preferred price. Couriers will bid on your listing.",
+        "q2": "How do I choose a courier?",
+        "a2": "Review bids from couriers including their ratings, proposed price, and estimated delivery time. Select the bid that best fits your needs. You can also message couriers before accepting.",
+        "q3": "What happens if my package is lost or damaged?",
+        "a3": "Contact our support team immediately. We investigate all claims and work with both parties to resolve issues. We recommend documenting your package condition before shipping."
+      },
+      "couriers": {
+        "title": "For Couriers",
+        "q1": "How do I become a courier?",
+        "a1": "Sign up as a courier, complete email and phone verification, then verify your ID through our secure verification process. Once verified, you can start accepting deliveries.",
+        "q2": "How do I find packages to deliver?",
+        "a2": "Create a route with your start and end locations. The app will show you packages along your route. You can place bids on packages you're interested in delivering.",
+        "q3": "When do I get paid?",
+        "a3": "Payment is released after successful delivery confirmation. You can transfer earnings to your bank account through our secure payout system."
+      },
+      "payments": {
+        "title": "Payments",
+        "q1": "What payment methods are accepted?",
+        "a1": "We accept major credit and debit cards through our secure payment processor. Couriers can set up direct deposit for payouts.",
+        "q2": "Are there any fees?",
+        "a2": "MyChaski charges a small service fee on completed deliveries. The fee is transparent and shown before you confirm any transaction."
+      },
+      "safety": {
+        "title": "Safety & Trust",
+        "q1": "How does MyChaski ensure safety?",
+        "a1": "All users must verify their email and phone. Couriers undergo additional ID verification. Our rating system helps maintain community trust, and you can message users before committing to a delivery.",
+        "q2": "What items are prohibited?",
+        "a2": "Illegal items, hazardous materials, weapons, drugs, and perishables that require special handling are prohibited. See our Terms of Service for the complete list."
+      }
+    }
   },
   "legal": {
     "backToRegistration": "Back to Registration",

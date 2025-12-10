@@ -10,7 +10,7 @@ import { authAPI } from '@/lib/api'
 import GoogleSignInButton from '@/components/GoogleSignInButton'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
-import { Button, Input, Card, CardBody, Alert } from '@/components/ui'
+import { Button, Input, PasswordInput, Card, CardBody, Alert } from '@/components/ui'
 import { kmToMiles, milesToKm } from '@/lib/distance'
 
 // Icons
@@ -429,11 +429,10 @@ export default function RegisterPage() {
 
               {/* Password */}
               <div>
-                <Input
+                <PasswordInput
                   label={t('password')}
                   id="password"
                   name="password"
-                  type="password"
                   required
                   value={formData.password}
                   onChange={handleChange}
@@ -446,11 +445,10 @@ export default function RegisterPage() {
 
               {/* Confirm Password */}
               <div>
-                <Input
+                <PasswordInput
                   label={t('confirmPassword')}
                   id="confirmPassword"
                   name="confirmPassword"
-                  type="password"
                   required
                   value={formData.confirmPassword}
                   onChange={handleChange}

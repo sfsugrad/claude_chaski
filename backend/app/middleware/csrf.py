@@ -88,8 +88,13 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         import os
         is_test_env = os.getenv("ENVIRONMENT") == "test"
 
-        # Validate CSRF token for state-changing requests (unless exempt or in test mode)
-        if request.method in CSRF_PROTECTED_METHODS and not is_exempt and not is_test_env:
+        # Check if request uses Bearer token authentication (mobile app)
+        # Bearer token auth is stateless and doesn't need CSRF protection
+        auth_header = request.headers.get("Authorization", "")
+        uses_bearer_auth = auth_header.startswith("Bearer ")
+
+        # Validate CSRF token for state-changing requests (unless exempt, test mode, or using Bearer auth)
+        if request.method in CSRF_PROTECTED_METHODS and not is_exempt and not is_test_env and not uses_bearer_auth:
             csrf_header = request.headers.get(CSRF_HEADER_NAME)
 
             if not validate_csrf_token(csrf_cookie, csrf_header):

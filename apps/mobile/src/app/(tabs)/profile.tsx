@@ -1,21 +1,30 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Platform } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { Ionicons } from '@expo/vector-icons'
+import { useRouter } from 'expo-router'
 import { useAuth } from '@/contexts/AuthContext'
 
 export default function ProfileScreen() {
   const { t } = useTranslation()
   const { user, logout } = useAuth()
+  const router = useRouter()
 
   const handleLogout = () => {
-    Alert.alert(
-      t('auth.logout'),
-      t('common.confirm') + '?',
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        { text: t('auth.logout'), onPress: logout, style: 'destructive' },
-      ]
-    )
+    if (Platform.OS === 'web') {
+      // Use browser confirm on web since Alert.alert doesn't work
+      if (window.confirm(`${t('auth.logout')}?`)) {
+        logout()
+      }
+    } else {
+      Alert.alert(
+        t('auth.logout'),
+        t('common.confirm') + '?',
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('auth.logout'), onPress: logout, style: 'destructive' },
+        ]
+      )
+    }
   }
 
   const getRoleLabel = (role: string) => {
@@ -91,19 +100,19 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.section}>
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings')}>
           <Ionicons name="settings-outline" size={24} color="#374151" />
           <Text style={styles.menuLabel}>{t('nav.settings')}</Text>
           <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/reviews')}>
           <Ionicons name="star-outline" size={24} color="#374151" />
           <Text style={styles.menuLabel}>{t('nav.reviews')}</Text>
           <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/help')}>
           <Ionicons name="help-circle-outline" size={24} color="#374151" />
           <Text style={styles.menuLabel}>{t('common.info')}</Text>
           <Ionicons name="chevron-forward" size={20} color="#9ca3af" />

@@ -7,7 +7,7 @@ import { useTranslations, useLocale } from 'next-intl'
 import { authAPI } from '@/lib/api'
 import GoogleSignInButton from '@/components/GoogleSignInButton'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
-import { Button, Input, Card, CardBody, Alert } from '@/components/ui'
+import { Button, Input, PasswordInput, Card, CardBody, Alert } from '@/components/ui'
 
 // Icons
 const MailIcon = () => (
@@ -191,22 +191,16 @@ function LoginForm() {
                     {t('forgotPassword')}
                   </Link>
                 </div>
-                <div className="input-group">
-                  <span className="input-group-icon">
-                    <LockIcon />
-                  </span>
-                  <input
-                    id="password"
-                    name="password"
-                    type="password"
-                    required
-                    value={formData.password}
-                    onChange={handleChange}
-                    className="input pl-10"
-                    placeholder={t('enterPassword')}
-                    autoComplete="current-password"
-                  />
-                </div>
+                <PasswordInput
+                  id="password"
+                  name="password"
+                  required
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder={t('enterPassword')}
+                  autoComplete="current-password"
+                  leftIcon={<LockIcon />}
+                />
               </div>
 
               {/* Remember Me */}

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { authAPI } from '@/lib/api'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
+import { PasswordInput } from '@/components/ui'
 
 function ResetPasswordForm() {
   const router = useRouter()
@@ -141,46 +142,26 @@ function ResetPasswordForm() {
                 </div>
               )}
 
-              <div>
-                <label
-                  htmlFor="password"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  {t('newPassword')}
-                </label>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  required
-                  value={formData.password}
-                  onChange={handleChange}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  placeholder={t('enterNewPassword')}
-                />
-                <p className="mt-1 text-xs text-gray-500">
-                  {t('mustBe8Chars')}
-                </p>
-              </div>
+              <PasswordInput
+                label={t('newPassword')}
+                id="password"
+                name="password"
+                required
+                value={formData.password}
+                onChange={handleChange}
+                placeholder={t('enterNewPassword')}
+                helperText={t('mustBe8Chars')}
+              />
 
-              <div>
-                <label
-                  htmlFor="confirmPassword"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  {t('confirmPassword')}
-                </label>
-                <input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type="password"
-                  required
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  placeholder={t('confirmNewPassword')}
-                />
-              </div>
+              <PasswordInput
+                label={t('confirmPassword')}
+                id="confirmPassword"
+                name="confirmPassword"
+                required
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                placeholder={t('confirmNewPassword')}
+              />
 
               <div className="pt-4">
                 <button
